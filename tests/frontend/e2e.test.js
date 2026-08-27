@@ -7,6 +7,10 @@ const bad = m => { console.log(`\x1b[31mFAIL\x1b[0m  ${m}`); failures++; };
 const check = (c, m) => c ? ok(m) : bad(m);
 
 (async () => {
+  // Orders and rate-limit buckets from a previous run would trip the
+  // real 2-active-order cap and fail this suite for the wrong reason.
+  await fetch(`${BASE}/__test/reset`).catch(() => {});
+
   const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
   const page = await browser.newPage();
   const errors = [];

@@ -369,6 +369,106 @@ begin
 end $$;
 
 -- ============================================================
+-- DAILY DEALS — the price a customer is charged comes from the
+-- database, never from the cart, deal or no deal.
+-- ============================================================
+do $$
+declare
+  v_pm uuid; v_prod uuid; v_plan uuid; v_list numeric; v_items jsonb;
+  v_res jsonb; v_deal uuid; v_ok boolean; v_count int;
+begin
+  select id into v_pm   from payment_methods where is_active order by sort_order limit 1;
+  select id into v_prod from products where slug = 'discord-nitro';
+  select id, price into v_plan, v_list
+    from product_plans where product_id = v_prod order by sort_order limit 1;
+
+  v_items := jsonb_build_array(jsonb_build_object(
+    'product_id', v_prod, 'plan_id', v_plan, 'quantity', 2,
+    'activation', jsonb_build_array(
+      jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
+
+  -- ---------- a deal must actually be a discount ----------
+  begin
+    insert into daily_deals (product_id, plan_id, deal_price, ends_at)
+      values (v_prod, v_plan, v_list, now() + interval '1 day');
+    raise exception 'FAILED: a deal at the list price was accepted';
+  exception when others then
+    assert sqlerrm like '%DEAL_PRICE_NOT_LOWER%', 'expected DEAL_PRICE_NOT_LOWER, got: ' || sqlerrm;
+  end;
+
+  -- ---------- the plan must belong to the product ----------
+  begin
+    insert into daily_deals (product_id, plan_id, deal_price, ends_at)
+      values ((select id from products where slug='canva-pro'), v_plan, 1, now() + interval '1 day');
+    raise exception 'FAILED: a deal on another product''s plan was accepted';
+  exception when others then
+    assert sqlerrm like '%DEAL_PLAN_PRODUCT_MISMATCH%', 'expected DEAL_PLAN_PRODUCT_MISMATCH';
+  end;
+  raise notice 'PASS  a deal must be a real discount on its own plan';
+
+  -- ---------- a live deal is what the customer pays ----------
+  insert into daily_deals (product_id, plan_id, deal_price, starts_at, ends_at)
+    values (v_prod, v_plan, v_list - 400, now() - interval '1 hour', now() + interval '6 hours')
+    returning id into v_deal;
+
+  assert active_deal_price(v_prod, v_plan) = v_list - 400, 'live deal price should be readable';
+
+  v_res := create_order('عميل عرض','0556000001',null,v_pm,v_items,'deal-key-live-1');
+  assert (v_res->>'total')::numeric = (v_list - 400) * 2,
+         'order total must use the deal price: expected ' || ((v_list-400)*2)::text
+         || ', got ' || (v_res->>'total');
+  assert (select unit_price from order_items
+           where order_id = (v_res->>'order_id')::uuid) = v_list - 400,
+         'the item snapshot must record the deal price actually charged';
+  raise notice 'PASS  a live deal is charged from the database, not the cart';
+
+  -- ---------- an expired deal is charged at full price ----------
+  -- This is the mid-checkout case: the customer saw the deal, then it
+  -- ended before they confirmed. The server must not honour it.
+  update daily_deals set starts_at = now() - interval '2 days',
+                         ends_at   = now() - interval '1 day'
+   where id = v_deal;
+  assert active_deal_price(v_prod, v_plan) is null, 'an expired deal must not price anything';
+
+  v_res := create_order('عميل عرض','0556000002',null,v_pm,v_items,'deal-key-expired-1');
+  assert (v_res->>'total')::numeric = v_list * 2,
+         'an expired deal must fall back to the list price: expected ' || (v_list*2)::text
+         || ', got ' || (v_res->>'total');
+  raise notice 'PASS  an expired deal falls back to the list price';
+
+  -- ---------- a deal that has not started yet is ignored ----------
+  update daily_deals set starts_at = now() + interval '1 day',
+                         ends_at   = now() + interval '2 days'
+   where id = v_deal;
+  assert active_deal_price(v_prod, v_plan) is null, 'a future deal must not price anything';
+
+  -- ---------- deactivating a deal ends it ----------
+  update daily_deals set starts_at = now() - interval '1 hour',
+                         ends_at   = now() + interval '1 hour',
+                         is_active = false
+   where id = v_deal;
+  assert active_deal_price(v_prod, v_plan) is null, 'an inactive deal must not price anything';
+  raise notice 'PASS  future and deactivated deals are ignored';
+
+  -- ---------- the public view shows live deals only ----------
+  update daily_deals set is_active = true where id = v_deal;
+  select count(*) into v_count from public_daily_deals where id = v_deal;
+  assert v_count = 1, 'a live deal should appear in public_daily_deals';
+  assert (select original_price from public_daily_deals where id = v_deal) = v_list,
+         'the view must carry the original price for the struck-through figure';
+  assert (select server_now from public_daily_deals where id = v_deal) is not null,
+         'the view must carry server_now so the countdown can offset the browser clock';
+
+  update daily_deals set ends_at = now() - interval '1 minute' where id = v_deal;
+  select count(*) into v_count from public_daily_deals where id = v_deal;
+  assert v_count = 0, 'an expired deal must not appear in public_daily_deals';
+  raise notice 'PASS  public_daily_deals exposes live deals only';
+
+  raise notice '';
+  raise notice '===== daily deal tests passed =====';
+end $$;
+
+-- ============================================================
 -- RLS  (§39) — run as the anon role
 -- ============================================================
 do $$

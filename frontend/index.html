@@ -92,11 +92,60 @@ img,svg{display:block}
 .wrap{max-width:1180px;margin:0 auto;padding:0 var(--s4)}
 @media(min-width:768px){.wrap{padding:0 var(--s8)}}
 
-.rv{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s cubic-bezier(.2,.7,.3,1)}
+/* ============ MOTION ============
+   Two properties only, transform and opacity, so every animation stays
+   on the compositor. One easing and one duration scale, shared by the
+   reveal and the card stagger, so nothing drifts out of step.
+   Interactions are capped at 220ms; the reveal is the only longer one
+   and it plays once per element. */
+:root{
+  --ease-out:cubic-bezier(.2,.7,.3,1);
+  --t-tap:.12s;      /* press feedback */
+  --t-ui:.2s;        /* hover, tab switch */
+  --t-reveal:.4s;    /* scroll entrance -- the longest thing on the page */
+}
+.rv{opacity:0;transform:translateY(14px);
+  transition:opacity var(--t-reveal) ease,transform var(--t-reveal) var(--ease-out)}
 .rv.in{opacity:1;transform:none}
+
+/* Card stagger. --i is set per card on entry and capped in JS, so a
+   long rail never turns into a queue the reader waits on. */
+.stag{opacity:0;transform:translateY(10px)}
+.stag.in{opacity:1;transform:none;
+  transition:opacity var(--t-reveal) ease var(--stag-d,0ms),
+             transform var(--t-reveal) var(--ease-out) var(--stag-d,0ms)}
+
+/* Hover lift: transform only, so neighbours never reflow. */
+.pcard{transition:transform var(--t-ui) var(--ease-out),box-shadow var(--t-ui) ease}
+@media(hover:hover){
+  .pcard:hover{transform:translateY(-3px);box-shadow:var(--sh-2,0 14px 34px rgba(20,30,60,.13))}
+}
+/* Press feedback, deliberately small and quick. */
+.btn:active,.paybtn:active,.opt:active,.pcard .btn:active{transform:scale(.97)}
+.btn,.paybtn,.opt{transition:transform var(--t-tap) var(--ease-out),
+  background var(--t-ui) ease,color var(--t-ui) ease,border-color var(--t-ui) ease}
+
+/* One pulse on the cart badge when something is added. */
+@keyframes cart-pulse{
+  0%{transform:scale(1)} 45%{transform:scale(1.28)} 100%{transform:scale(1)}
+}
+.cartpulse{animation:cart-pulse .34s var(--ease-out)}
+
+/* The active category tab slides rather than snapping. */
+.category-chip{transition:transform var(--t-ui) var(--ease-out),
+  background var(--t-ui) ease,color var(--t-ui) ease,border-color var(--t-ui) ease}
+
+/* Orbit rings: one full turn a minute, slow enough to read as ambient
+   rather than as something spinning. */
+@keyframes orbit-spin{to{transform:rotate(360deg)}}
+.orbit-ring.r1{animation:orbit-spin 60s linear infinite}
+.orbit-ring.r2{animation:orbit-spin 60s linear infinite reverse}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
-  .rv{opacity:1;transform:none}
+  /* Entrance states must be cleared too, or an element whose transition
+     was just disabled stays stuck at opacity 0 forever. */
+  .rv,.stag{opacity:1!important;transform:none!important}
+  .orbit-ring{animation:none!important}
   html{scroll-behavior:auto}
 }
 
@@ -197,7 +246,7 @@ header.stuck .hbar{height:48px}
   background:linear-gradient(180deg,rgba(255,255,255,.22),transparent 55%)}
 .osat{position:absolute;background:var(--light-card);color:var(--text-on-light);border:1px solid var(--light-border);
   border-radius:16px;padding:9px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--sh-dark);z-index:4;
-  animation:bob 7s ease-in-out infinite}
+  animation:bob 9s ease-in-out infinite}
 .osat b{font-size:11.5px;font-weight:600;white-space:nowrap;font-family:var(--f-body)}
 .osat .lg{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;flex:none}
 /* Positioned by their own class, not nth-child: the satellites are
@@ -208,7 +257,10 @@ header.stuck .hbar{height:48px}
 .osat.s2{top:34%;inset-inline-end:-2%;animation-delay:-2.1s}
 .osat.s3{bottom:16%;inset-inline-start:-3%;animation-delay:-3.6s}
 .osat.s4{bottom:2%;inset-inline-end:9%;animation-delay:-5.2s}
-@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+/* Float on the hero satellites. Long period and a small travel so the
+   chips drift rather than bounce; the per-satellite negative delays in
+   .s1-.s4 keep them out of phase with each other. */
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 .odot{position:absolute;width:7px;height:7px;border-radius:50%;background:#B79BFF;opacity:.7;z-index:2}
 .odot.d1{top:12%;inset-inline-end:26%}
 .odot.d2{bottom:26%;inset-inline-end:8%;background:#8FD2FF}
@@ -246,6 +298,60 @@ header.stuck .hbar{height:48px}
   box-shadow:0 8px 24px rgba(0,0,0,.16);transition:transform .18s ease,background .18s ease,color .18s ease;
 }
 .category-chip svg{flex:none}
+
+/* ============ CATEGORY ICON TILE ============
+   One component, three placements (home carousel, shop carousel, side
+   menu). Two states: an uploaded 128px asset from product-media, or the
+   designed fallback below.
+
+   The fallback is lit glass, not faked 3D: a low-opacity wash of the
+   category's own accent, a soft glow of the same hue behind it, one
+   hairline along the top edge reading as a light catch, and a white
+   glyph. No heavy shadow, no strong bloom -- it has to sit quietly
+   inside a 48px pill next to a label.
+   --cat is set per category from accent_color. */
+.cticon{
+  --cat:var(--purple);
+  position:relative;flex:none;display:grid;place-items:center;
+  width:28px;height:28px;border-radius:9px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 58%),
+    color-mix(in srgb, var(--cat) 30%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),          /* the light catch */
+    0 2px 9px -2px color-mix(in srgb, var(--cat) 55%, transparent);
+  overflow:hidden;
+}
+.cticon::after{                                    /* the glow, behind the glyph */
+  content:"";position:absolute;inset:-32%;border-radius:inherit;
+  background:radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--cat) 42%, transparent), transparent 68%);
+  z-index:0;pointer-events:none;
+}
+.cticon > *{position:relative;z-index:1}
+.cticon svg{width:16px;height:16px;color:#fff}
+/* The image overlays the fallback glyph rather than replacing it, so a
+   lazy or failed asset never leaves an empty tile. */
+.cticon.has-img img{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:contain;display:block;z-index:2;background:inherit}
+
+/* the menu placement is larger; .ci already sizes the box there */
+.mcat .cticon{width:34px;height:34px;border-radius:11px}
+.mcat .cticon svg{width:18px;height:18px}
+
+/* on the selected chip the tile sits on the brand gradient, so the
+   tint would muddy it -- go to plain frosted white instead */
+.category-chip[aria-selected="true"] .cticon{
+  background:rgba(255,255,255,.20);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45);
+}
+.category-chip[aria-selected="true"] .cticon::after{opacity:0}
+
+/* Older engines without color-mix() get a flat tint rather than a
+   transparent tile. */
+@supports not (background: color-mix(in srgb, red 30%, transparent)){
+  .cticon{background:rgba(115,87,255,.28)}
+  .cticon::after{display:none}
+}
 .category-chip[aria-selected="true"]{color:#fff;background:var(--brand-grad);border-color:transparent}
 .category-chip:active{transform:scale(.97)}
 .carr{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;
@@ -310,6 +416,17 @@ header.stuck .hbar{height:48px}
 .pprice b{font-family:var(--f-mono);font-weight:600;font-size:14.5px}
 .pprice .old{font-family:var(--f-mono);font-size:11px;color:var(--ink-2);text-decoration:line-through}
 .pprice .from{font-size:10.5px;color:var(--ink-2)}
+/* discount chip on a deal card -- reuses the price row's baseline */
+.pprice .disc{font-family:var(--f-mono);font-size:10.5px;font-weight:600;color:#fff;
+  background:var(--purple);border-radius:999px;padding:2px 6px;letter-spacing:.01em}
+
+/* remaining-time line under the عروض اليوم heading */
+.dealtime{display:flex;align-items:center;gap:7px;color:var(--muted-on-dark);font-size:14px;margin-top:6px}
+.dealtime .dot{width:7px;height:7px;border-radius:50%;background:#B79BFF;flex:none}
+.dealtime #dealsTimer{font-family:var(--f-mono);font-variant-numeric:tabular-nums;
+  font-size:13.5px;color:var(--text-on-dark)}
+/* the plan a deal applies to, so the price is never ambiguous */
+.pcard .dplan{font-size:11.5px;color:var(--ink-2);margin-top:-2px}
 .pbody .btn{margin-top:var(--s3);padding:10px;font-size:13px}
 
 /* ============ PROMO ============ */
@@ -404,7 +521,6 @@ header.stuck .hbar{height:48px}
 .mcat{display:flex;align-items:center;gap:var(--s3);width:100%;text-align:start;
   padding:9px var(--s2);border-radius:11px;font-size:14px;font-weight:500;transition:background .15s}
 .mcat:hover{background:var(--bg-2)}
-.mcat .ci{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:none}
 .pfoot{flex:none;padding:var(--s4);border-top:1px solid var(--line);
   padding-bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
 
@@ -698,6 +814,24 @@ footer ul button:hover{color:var(--text-on-dark)}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= DAILY DEALS =================
+       Rendered only when the server returns a live deal. The section
+       stays hidden otherwise -- no "no deals right now" placeholder. -->
+  <section class="sec" id="dealsSec" hidden>
+    <div class="wrap">
+      <div class="sechead rv">
+        <div>
+          <h2>عروض اليوم</h2>
+          <p class="dealtime">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="dealsTimer"></span>
+          </p>
+        </div>
+      </div>
+      <div class="rail rv" id="dealsRail"></div>
     </div>
   </section>
 
@@ -1085,7 +1219,12 @@ const BRAND_ICONS = {
 const HERO_SLUGS  = ["chatgpt-plus","canva-pro","discord-nitro","spotify-premium"];
 const ORBIT_SLUGS = ["chatgpt-plus","canva-pro","discord-nitro","adobe-creative-cloud"];
 
-let CATEGORIES = [], PRODUCTS = [], PAYMENT_METHODS = [], SETTINGS = {};
+let CATEGORIES = [], PRODUCTS = [], PAYMENT_METHODS = [], SETTINGS = {}, DEALS = [];
+/* The browser's clock is not trusted for the countdown. Every deal row
+   carries the server's now(); the difference is measured once at load
+   and every remaining-time calculation goes through it. */
+let clockOffset = 0;
+let dealTimer = null;
 let CONFIG = { whatsapp:"", brand:"Janeiro Store", currency:"دج" };
 
 /* ================================================================
@@ -1176,23 +1315,198 @@ function cardHTML(p){
 }
 
 /* ================================================================
+   MOTION HELPERS
+   ================================================================ */
+
+/* Fades a freshly rendered set of cards in with a short offset between
+   them. The step is capped at 60ms and the total at 300ms, so a rail of
+   twenty cards costs the same wait as a rail of five -- a stagger that
+   scales with the list becomes a queue. */
+const STAGGER_STEP = 60, STAGGER_MAX = 300;
+
+function staggerIn(sel){
+  const host = $(sel);
+  if(!host) return;
+  const cards = [...host.children];
+  if(prefersReducedMotion()){ cards.forEach(c=>c.classList.remove("stag")); return; }
+  cards.forEach((c,i)=>{
+    c.classList.add("stag");
+    c.style.setProperty("--stag-d", Math.min(i*STAGGER_STEP, STAGGER_MAX) + "ms");
+  });
+  /* Next frame, so the browser paints the start state before the
+     transition begins. */
+  requestAnimationFrame(()=>requestAnimationFrame(()=>
+    cards.forEach(c=>c.classList.add("in"))));
+}
+
+const prefersReducedMotion = () =>
+  window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* One pulse on the cart badge. Restarted by removing the class and
+   forcing a reflow, so rapid adds each get their own beat. */
+function pulseCart(){
+  if(prefersReducedMotion()) return;
+  const b = $("#cartBadge");
+  if(!b) return;
+  b.classList.remove("cartpulse");
+  void b.offsetWidth;
+  b.classList.add("cartpulse");
+}
+
+/* ================================================================
+   DAILY DEALS
+   ================================================================ */
+
+/* Rewrites the discounted plan's price in place, keeping the list price
+   as the struck-through figure. Everything downstream -- the detail
+   page, the cart, the order summary -- then reads one price, and it is
+   the same one create_order will charge. Showing the deal only on the
+   card would let the cart total disagree with the invoice. */
+function applyDeals(){
+  for(const d of DEALS){
+    const prod = PRODUCTS.find(p=>p.id===d.productId);
+    if(!prod) continue;
+    const plan = prod.plans.find(pl=>pl.id===d.planId);
+    if(!plan) continue;
+    plan.old  = d.originalPrice;
+    plan.p    = d.price;
+    plan.deal = d;
+  }
+  /* oldFrom was computed before deals existed; recompute so the card's
+     struck price reflects them. */
+  for(const p of PRODUCTS) p.oldFrom = p.plans.find(pl=>pl.old)?.old ?? null;
+}
+
+const serverNow = () => Date.now() + clockOffset;
+
+/* "3 أيام 04:12:33" / "04:12:33". Arabic duals and plurals differ, so
+   the day word is picked rather than pluralised. */
+function formatRemaining(ms){
+  const t = Math.max(0, Math.floor(ms/1000));
+  const d = Math.floor(t/86400), h = Math.floor(t%86400/3600),
+        m = Math.floor(t%3600/60), sec = t%60;
+  const pad = n => String(n).padStart(2,"0");
+  const clock = `${pad(h)}:${pad(m)}:${pad(sec)}`;
+  if(!d) return clock;
+  const word = d===1 ? "يوم" : d===2 ? "يومان" : d<=10 ? `${d} أيام` : `${d} يوماً`;
+  return `${word} ${clock}`;
+}
+
+function dealCardHTML(d){
+  const p = PRODUCTS.find(x=>x.id===d.productId);
+  if(!p) return "";
+  return `<article class="pcard">
+    <button style="all:unset;cursor:pointer;display:block" onclick="openDetail('${p.id}','${d.planId}')" aria-label="عرض ${p.name}">
+      ${posterHTML(p)}
+    </button>
+    <div class="pbody">
+      <h3>${p.name}</h3>
+      <p class="dplan">${d.planName}</p>
+      <div class="pprice">
+        <b>${money(d.price)}</b>
+        <span class="old">${money(d.originalPrice)}</span>
+        <span class="disc" dir="ltr">−${d.percentOff}%</span>
+      </div>
+      <button class="btn btn-primary" onclick="openDetail('${p.id}','${d.planId}')">عرض التفاصيل</button>
+    </div>
+  </article>`;
+}
+
+function renderDeals(){
+  const sec = $("#dealsSec");
+  /* No live deal -> the section does not exist. No empty state, no
+     placeholder deal. */
+  if(!DEALS.length){ sec.hidden = true; stopDealCountdown(); return; }
+
+  $("#dealsRail").innerHTML = DEALS.map(dealCardHTML).join("");
+  sec.hidden = false;
+  staggerIn("#dealsRail");
+  startDealCountdown();
+}
+
+function stopDealCountdown(){
+  if(dealTimer){ clearInterval(dealTimer); dealTimer = null; }
+}
+
+function startDealCountdown(){
+  stopDealCountdown();
+  const soonest = () => DEALS.reduce((a,d)=>Math.min(a,d.endsAt), Infinity);
+
+  const tick = async () => {
+    const left = soonest() - serverNow();
+    if(left <= 0){
+      /* Never let a finished countdown loop or sit at zero: ask the
+         server what is still live and re-render from that. */
+      stopDealCountdown();
+      $("#dealsTimer").textContent = "انتهى العرض";
+      await refreshDeals();
+      return;
+    }
+    $("#dealsTimer").textContent = `ينتهي أقرب عرض خلال ${formatRemaining(left)}`;
+  };
+  tick();
+  dealTimer = setInterval(tick, 1000);
+}
+
+async function refreshDeals(){
+  try{
+    const fresh = await API.loadDailyDeals();
+    /* Restore list prices before re-applying, so an ended deal does not
+       leave its discounted price behind. */
+    for(const p of PRODUCTS)
+      for(const pl of p.plans)
+        if(pl.deal){ pl.p = pl.deal.originalPrice; pl.old = null; pl.deal = null; }
+    for(const p of PRODUCTS) p.oldFrom = p.plans.find(pl=>pl.old)?.old ?? null;
+
+    DEALS = fresh;
+    if(fresh.length) clockOffset = fresh[0].serverNow - Date.now();
+    applyDeals();
+    renderDeals(); renderHome(); renderShop(); renderCart();
+  }catch(e){
+    console.error("deal refresh failed", e);
+    $("#dealsSec").hidden = true;
+    stopDealCountdown();
+  }
+}
+
+/* ================================================================
    RENDER
    ================================================================ */
+/* One icon component for every placement.
+   With an uploaded asset: the image, lazily loaded at a FIXED box so
+   nothing reflows when it arrives, and onerror swaps in the fallback
+   glyph rather than leaving an empty tile.
+   Without one: the designed fallback. */
+function catIcon(c){
+  const tint = `--cat:${c.accent}`;
+  const glyph = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">${c.svg}</svg>`;
+  if(!c.iconUrl) return `<span class="cticon" style="${tint}">${glyph}</span>`;
+  /* The glyph is always in the DOM and the image sits on top of it. A
+     lazy image that has not loaded yet -- or one that 404s -- therefore
+     shows the fallback rather than an empty tile, and onerror only has
+     to remove the image. The box is fixed either way, so nothing shifts
+     when the asset arrives. */
+  return `<span class="cticon has-img" style="${tint}">
+    ${glyph}
+    <img src="${c.iconUrl}" alt="" width="128" height="128" loading="lazy" decoding="async"
+         onerror="this.remove()">
+  </span>`;
+}
+
 function renderCats(){
-  const chip = (id,name,svg) => `<button class="category-chip" role="tab" aria-selected="${shopFilter===id}"
+  const chip = (id,name,icon) => `<button class="category-chip" role="tab" aria-selected="${shopFilter===id}"
       onclick="selectCat('${id}')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">${svg}</svg><span>${name}</span></button>`;
+      ${icon}<span>${name}</span></button>`;
   const allIcon='<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>';
-  const html = chip("all","الكل",allIcon) + CATEGORIES.map(c=>chip(c.slug,c.name,c.svg)).join("");
+  const allTile = `<span class="cticon" style="--cat:var(--purple)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">${allIcon}</svg></span>`;
+  const html = chip("all","الكل",allTile) + CATEGORIES.map(c=>chip(c.slug,c.name,catIcon(c))).join("");
   $("#catGrid").innerHTML = html;
   if($("#shopCatGrid")) $("#shopCatGrid").innerHTML = html;
   updateArrows();
 
   $("#menuCats").innerHTML = CATEGORIES.map(c=>
     `<button class="mcat" onclick="selectCat('${c.slug}');closePanels()">
-      <span class="ci" style="background:${hex2rgba(c.accent,.11)};color:${c.accent}">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">${c.svg}</svg></span>
-      <span>${c.name}</span></button>`).join("");
+      ${catIcon(c)}<span>${c.name}</span></button>`).join("");
 }
 function selectCat(id){
   go("shop", id);
@@ -1225,6 +1539,7 @@ function heroPicks(slugs){
 function renderHome(){
   $("#bestRail").innerHTML = PRODUCTS.filter(p=>p.badge==="hot"||p.badge==="off")
     .concat(PRODUCTS.filter(p=>p.available&&!p.badge)).slice(0,4).map(cardHTML).join("");
+  staggerIn("#bestRail");
 
   $("#promoBoxes").innerHTML = heroPicks(HERO_SLUGS).map((p,i)=>{
     const rot=[-8,5,-4,7][i%4];
@@ -1254,6 +1569,7 @@ function renderShop(){
   $("#shopGrid").innerHTML = list.length
     ? list.map(cardHTML).join("")
     : `<div class="empty"><b>لا توجد نتائج</b>جرّب كلمة أخرى أو تصفح كل المنتجات.</div>`;
+  if(list.length) staggerIn("#shopGrid");
 }
 function doSearch(v){
   shopQuery=v.trim().toLowerCase();
@@ -1282,8 +1598,11 @@ function go(page,filter){
    DETAIL
    ================================================================ */
 let cur=null,curPlan=0;
-function openDetail(id){
-  cur=P(id); curPlan=0;
+/* planId lets a deal card open straight onto the discounted plan
+   instead of the first one. */
+function openDetail(id, planId){
+  cur=P(id);
+  curPlan = planId ? Math.max(0, cur.plans.findIndex(pl=>pl.id===planId)) : 0;
   $("#dPoster").innerHTML=posterHTML(cur,true);
   $("#dCat").textContent=cur.catName || C(cur.cat).name;
   $("#dName").textContent=cur.name;
@@ -1294,10 +1613,11 @@ function openDetail(id){
   $("#dFeat").innerHTML=cur.features.map(f=>
     `<li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4.5 4.5L19 7"/></svg>${f}</li>`).join("");
   $("#dPlans").innerHTML=cur.plans.length
-    ? cur.plans.map((pl,i)=>`<button class="opt" role="radio" aria-checked="${i===0}" onclick="setPlan(${i})">
-        <span class="rad"></span><span class="nm">${pl.n}</span><span class="pr">${money(pl.p)}</span></button>`).join("")
+    ? cur.plans.map((pl,i)=>`<button class="opt" role="radio" aria-checked="${i===curPlan}" onclick="setPlan(${i})">
+        <span class="rad"></span><span class="nm">${pl.n}</span>
+        <span class="pr">${money(pl.p)}${pl.old?` <s>${money(pl.old)}</s>`:""}</span></button>`).join("")
     : `<p style="color:var(--ink-2);font-size:13.5px">سيتم الإعلان عن الخطط قريباً.</p>`;
-  setPlan(0);
+  setPlan(curPlan);
   go("detail");
 }
 function setPlan(i){
@@ -1319,7 +1639,7 @@ let CART=[];
 function addToCart(id,plan){
   const ex=CART.find(c=>c.id===id&&c.plan===plan);
   if(ex) ex.qty++; else CART.push({id,plan,qty:1});
-  renderCart(); toast("أُضيف إلى السلة");
+  renderCart(); pulseCart(); toast("أُضيف إلى السلة");
 }
 function chQty(i,d){ CART[i].qty+=d; if(CART[i].qty<1) CART.splice(i,1); renderCart(); }
 function delItem(i){ CART.splice(i,1); renderCart(); }
@@ -1693,11 +2013,12 @@ async function boot(){
   }
   showSkeletons();
   try{
-    const [settings, cats, prods, pays] = await Promise.all([
+    const [settings, cats, prods, pays, deals] = await Promise.all([
       API.loadStoreSettings(),
       API.loadCategories(),
       API.loadProducts(),
       API.loadPaymentMethods(),
+      API.loadDailyDeals(),
     ]);
 
     SETTINGS = settings;
@@ -1710,12 +2031,20 @@ async function boot(){
     CATEGORIES = cats.map(c=>({
       id:c.id, slug:c.slug, name:c.name,
       accent:c.accent_color || "#7357FF",
+      /* uploaded 128px asset from product-media, if the category has one */
+      iconUrl: API.mediaUrl(c.icon_path),
       svg: CATEGORY_ICONS[c.slug] || FALLBACK_CAT_ICON,
     }));
     PRODUCTS = prods;
     PAYMENT_METHODS = pays;
 
-    renderCats(); renderHome(); renderCart(); renderShop();
+    /* Measure the clock offset once, from the server's own now(), then
+       let deals rewrite the plan prices before anything renders. */
+    DEALS = deals;
+    if(deals.length) clockOffset = deals[0].serverNow - Date.now();
+    applyDeals();
+
+    renderCats(); renderDeals(); renderHome(); renderCart(); renderShop();
     revealOnScroll();
   }catch(err){
     console.error("boot failed", err);

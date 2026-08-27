@@ -55,7 +55,12 @@ async function rest(url, res) {
       return send(res, 200, await asAnon("select key, value from store_settings"));
     if (table === "categories")
       return send(res, 200, await asAnon(
-        "select id,name,slug,icon,accent_color from categories where is_active order by sort_order"));
+        "select id,name,slug,icon,icon_path,accent_color from categories where is_active order by sort_order"));
+    if (table === "public_daily_deals")
+      return send(res, 200, await asAnon(
+        `select id, product_id, plan_id, deal_price, original_price, plan_name,
+                product_slug, product_name, starts_at, ends_at, sort_order, server_now
+           from public_daily_deals order by sort_order`));
     if (table === "payment_methods")
       return send(res, 200, await asAnon(
         `select id,type,label,account_holder,account_number,extra_info,instructions
@@ -150,12 +155,34 @@ async function fn(name, req, res) {
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 
+/* Stands in for the public product-media bucket. Serves a tiny valid PNG
+   for any path, except one containing "missing" so the frontend's
+   onerror fallback can be exercised. */
+const PNG_1PX = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64");
+function storage(url, res) {
+  if (url.pathname.includes("missing")) return send(res, 404, "not found", "text/plain");
+  send(res, 200, PNG_1PX, "image/png");
+}
+
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, "");
   if (url.pathname.startsWith("/rest/v1/")) return rest(url, res);
   if (url.pathname.startsWith("/functions/v1/"))
     return fn(url.pathname.replace("/functions/v1/", ""), req, res);
+  if (url.pathname.startsWith("/storage/v1/object/public/")) return storage(url, res);
+
+  /* Test-only reset. The browser suites place real orders, and the
+     2-active-order cap is real, so without this a second run of the
+     same suite fails with ACTIVE_ORDER_LIMIT -- a test artefact that
+     looks exactly like a product bug. */
+  if (url.pathname === "/__test/reset") {
+    return asService("delete from orders; delete from rate_limits;")
+      .then(() => send(res, 200, { ok: true }))
+      .catch(e => send(res, 500, { ok: false, message: String(e.message) }));
+  }
 
   // static site
   let f = url.pathname === "/" ? "/frontend/index.html" : url.pathname;

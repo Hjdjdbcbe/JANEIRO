@@ -72,7 +72,44 @@ export async function loadStoreSettings() {
 }
 
 export async function loadCategories() {
-  return rest("categories?select=id,name,slug,icon,accent_color&is_active=eq.true&order=sort_order");
+  return rest(
+    "categories?select=id,name,slug,icon,icon_path,accent_color&is_active=eq.true&order=sort_order",
+  );
+}
+
+/**
+ * Live deals only. The view already filters by is_active and the
+ * starts_at/ends_at window server-side, so an upcoming or expired deal
+ * never reaches the browser.
+ *
+ * Every row carries server_now. The countdown uses it to measure the
+ * browser's clock offset once, so a device with a wrong clock still
+ * counts down to the real end time.
+ */
+export async function loadDailyDeals() {
+  const rows = await rest(
+    "public_daily_deals?select=id,product_id,plan_id,deal_price,original_price," +
+    "plan_name,product_slug,product_name,starts_at,ends_at,sort_order,server_now" +
+    "&order=sort_order",
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    productId: r.product_id,
+    planId: r.plan_id,
+    price: Number(r.deal_price),
+    originalPrice: Number(r.original_price),
+    planName: r.plan_name,
+    productSlug: r.product_slug,
+    productName: r.product_name,
+    endsAt: new Date(r.ends_at).getTime(),
+    serverNow: new Date(r.server_now).getTime(),
+    percentOff: Math.round((1 - Number(r.deal_price) / Number(r.original_price)) * 100),
+  }));
+}
+
+/** Public URL for a file in the product-media bucket. */
+export function mediaUrl(path) {
+  return publicMedia(path);
 }
 
 export async function loadPaymentMethods() {
