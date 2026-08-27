@@ -2,9 +2,20 @@
 
 ## ⚠️ اقرأ هذا أولاً
 
-الكود هنا **مكتوب بالكامل وجاهز للنشر**، لكنه **لم يُشغَّل ولم يُختبر فعلياً** — البيئة التي كُتب فيها بلا اتصال إنترنت، فلا يمكن إنشاء مشروع Supabase أو تشغيل migrations أو إرسال رسالة Telegram.
+**ما شُغِّل فعلاً:** الـmigrations وقاعدة البيانات كاملة اختُبرت على
+PostgreSQL 16 محلي. وُجدت خمسة أخطاء وأُصلحت (التفاصيل في `START-HERE.md`).
+شغّل كل شيء بأمر واحد، بدون حاجة إلى Supabase:
 
-**لا تعتبر أي بند من §61 ناجحاً حتى تشغّله بنفسك.** ملفات الاختبار موجودة وجاهزة (`tests/`) — شغّلها بعد النشر.
+```bash
+bash tests/local/run-tests.sh
+```
+
+**ما لم يُشغَّل بعد:** لا يوجد مشروع Supabase منشور. لذلك لم تُنفَّذ
+الـEdge Functions على Deno قط، ولم يُرفع ملف حقيقي إلى Storage، ولم
+تُرسَل رسالة Telegram واحدة. منطق قاعدة البيانات الذي تستدعيه هذه
+الدوال مُختبَر بالكامل، أما الدوال نفسها فلا.
+
+**لا تعتبر أي بند لم يُذكر أعلاه ناجحاً حتى تشغّله بنفسك بعد النشر.**
 
 ---
 
@@ -30,12 +41,22 @@ janeiro-backend/
 │       ├── submit-order/index.ts    + Telegram
 │       └── track-order/index.ts
 ├── js/janeiro-api.js                طبقة ربط الفرونت إند
+├── frontend/index.html              الموقع — مربوط بالباكند
 └── tests/
     ├── backend.test.sql             اختبارات SQL
-    └── race-test.sh                 اختبار التزامن
+    ├── race-test.sh                 تزامن عبر Edge Functions (يحتاج نشراً)
+    ├── local/                       تشغيل الباكند كاملاً بلا Supabase
+    │   ├── supabase-shim.sql        auth/storage + الأدوار + الصلاحيات
+    │   ├── run-tests.sh             migrations + الاختبارات دفعة واحدة
+    │   └── concurrency.test.sh      تزامن حقيقي باتصالات متوازية
+    └── frontend/                    اختبار المتصفح على الصفحة الحقيقية
+        ├── mock-supabase.js
+        └── e2e.test.js
 ```
 
-**الملفات المعدّلة:** لا شيء. `janeiro-store-v4.html` لم يُمسّ — الربط يتم بإضافة `js/janeiro-api.js` (خطوة 8 أدناه).
+**الملفات المعدّلة:** `frontend/index.html` — حُذفت منه مصفوفتا
+`CATEGORIES` و`PRODUCTS` الثابتتان، وصار يقرأ كل شيء من قاعدة البيانات
+عبر `js/janeiro-api.js`. التصميم لم يُمسّ.
 
 ---
 
@@ -66,13 +87,14 @@ janeiro-backend/
 | الدالة | الوصول |
 |---|---|
 | `normalize_dz_phone(text)` | عام |
-| `generate_order_number()` | داخلي |
+| `generate_order_number()` | داخلي (مسحوبة من `anon`) |
 | `create_order(...)` | **service role فقط** |
 | `submit_order(...)` | **service role فقط** |
 | `track_order(number, last4)` | عام |
 | `count_active_orders(phone)` | داخلي |
 | `check_rate_limit(...)` | داخلي |
-| `is_admin()` | داخلي (تستخدمها كل سياسات الأدمن) |
+| `is_admin()` | متاحة للجميع **عمداً** — كل سياسة RLS تستدعيها بدور صاحب الطلب، وسحبها يكسر وصول الأدمن كلياً |
+| `safe_inet(text)` | داخلي — يمنع ترويسة IP مشوّهة من إفشال الطلب |
 
 ---
 
@@ -162,58 +184,57 @@ update payment_methods
 
 ---
 
-## 8. ربط الفرونت إند
+## 8. ربط الفرونت إند — تم
 
-في `janeiro-store-v4.html`:
+`frontend/index.html` مربوط بالفعل. لا يبقى إلا وضع المفاتيح:
 
-1. ضع `js/janeiro-api.js` بجانب الملف، وعدّل `JANEIRO_CONFIG` بمفاتيحك
-2. غيّر وسم السكربت إلى `<script type="module">`
-3. احذف مصفوفتي `CATEGORIES` و`PRODUCTS` الثابتتين واستبدلهما:
-
-```js
-import * as API from './js/janeiro-api.js';
-
-let CATEGORIES = [], PRODUCTS = [], PAYMENT_METHODS = [], SETTINGS = {};
-
-async function boot() {
-  showSkeletons();
-  try {
-    [SETTINGS, CATEGORIES, PRODUCTS, PAYMENT_METHODS] = await Promise.all([
-      API.loadStoreSettings(), API.loadCategories(),
-      API.loadProducts(), API.loadPaymentMethods(),
-    ]);
-    renderCats(); renderAll();
-  } catch (e) {
-    showErrorState('تعذر تحميل المنتجات.', boot); // زر إعادة المحاولة
-  }
-}
-boot();
+```html
+<!-- قبل وسم <script type="module"> مباشرة -->
+<script>window.JANEIRO_CONFIG = {
+  SUPABASE_URL: "https://xxxx.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOi..."
+};</script>
 ```
 
-4. تدفق الطلب يصبح:
+أو عدّل `PLACEHOLDER` داخل `js/janeiro-api.js`. المفتاح `anon` عام
+بالتصميم — RLS هو ما يحمي البيانات، لا سرّية المفتاح.
 
-```js
-const key = API.newIdempotencyKey();          // مرة واحدة لكل محاولة
-const order = await API.createOrder({...});    // → awaiting_receipt
-await API.uploadReceipt(order.order_id, file, pct => setProgress(pct));
-const { order: final, whatsappNumber } = await API.submitOrder(order.order_id, ref);
-window.open(API.buildWhatsAppUrl(whatsappNumber, final, items), '_blank');
+**ما يحدث الآن عند الإقلاع:** `boot()` يحمّل الإعدادات والتصنيفات
+والمنتجات وطرق الدفع بالتوازي، مع skeletons أثناء الانتظار وError state
+مع زر إعادة محاولة عند الفشل.
+
+**تدفق الطلب:** الخطوات الأربع على الشاشة كما هي. تحتها، زر التأكيد
+النهائي ينفّذ:
+
+```
+createOrder()  →  uploadReceipt()  →  submitOrder()  →  واتساب
 ```
 
-**مهم:** لا تفتح واتساب إلا بعد نجاح `submitOrder`.
+واتساب **لا يُفتح** إلا بعد نجاح `submitOrder`، برقم من `store_settings`
+وبرقم الطلب الذي أصدره الخادم. مفتاح idempotency واحد لكل محاولة،
+يُعاد استخدامه عند إعادة المحاولة، فلا ينشأ طلبان.
 
----
+**ما بقي عليك:** رفع صور المنتجات إلى `product-media` وتحديث
+`poster_path` — البنية جاهزة والمنتج بلا صورة يعرض البوستر البديل
+المصمَّم.
 
 ## 9. القرارات المعمارية
 
 **لماذا الحد الأقصى يُفرض عند التأكيد لا عند الإنشاء؟**
-حسب §12 الطلب بحالة `awaiting_receipt` ليس طلباً نهائياً، وحسب §17 لا يُحتسب نشطاً. لذا الفحص يجري **مرتين**: عند الإنشاء (لتجربة مستخدم أفضل) وعند التأكيد (الضمان الحقيقي) — كلاهما تحت `pg_advisory_xact_lock` على رقم الهاتف، فحتى مع 10 طلبات متزامنة لا يتجاوز العدد 2.
+حسب §12 الطلب بحالة `awaiting_receipt` ليس طلباً نهائياً، وحسب §17 لا يُحتسب نشطاً. لذا الفحص يجري **مرتين**: عند الإنشاء (لتجربة مستخدم أفضل) وعند التأكيد (الضمان الحقيقي) — كلاهما تحت `pg_advisory_xact_lock` على رقم الهاتف.
+
+✅ **تم قياسه:** 10 اتصالات متوازية حقيقية → طلبان نشطان بالضبط، في
+الحالتين (إنشاء+تأكيد في معاملة واحدة، وتأكيدات متزامنة لطلبات أُنشئت
+منفصلة). انظر `tests/local/concurrency.test.sh`.
 
 **قيد قاعدة البيانات على الوصل (§27)**
 `receipt_required_after_submit` يمنع فيزيائياً وجود طلب `pending_payment_review` بلا وصل — حتى لو أخطأ كود مستقبلي.
 
 **فحص نوع الصورة**
 `Content-Type` قابل للتزوير، لذا `upload-receipt` يفحص **البايتات الأولى** فعلياً (magic bytes). ملف `.exe` مُسمّى `.jpg` سيُرفض.
+
+⚠️ هذا المنطق **لم يُنفَّذ على Deno بعد** — لا يوجد نشر. اختبره يدوياً
+بعد النشر.
 
 **التتبع لا يميّز بين الأخطاء**
 "رقم طلب خاطئ" و"هاتف خاطئ" يعطيان نفس الرد بالضبط — وإلا أصبح المسار أداة لاستكشاف أرقام الطلبات.
@@ -232,14 +253,65 @@ supabase functions serve   # الدوال على localhost:54321
 
 ## 11. الاختبار
 
-```bash
-# اختبارات SQL (على قاعدة غير إنتاجية — كل شيء داخل rollback)
-psql "$DATABASE_URL" -f tests/backend.test.sql
+### بلا نشر — يعمل الآن
 
-# اختبار التزامن
-export SUPABASE_URL=... SUPABASE_ANON_KEY=... PRODUCT_ID=... PLAN_ID=... PAYMENT_METHOD_ID=...
+```bash
+bash tests/local/run-tests.sh
+```
+
+يُنشئ قاعدة بيانات مؤقتة، يطبّق الـshim ثم الـmigrations السبعة، يعيد
+تطبيقها للتأكد من قابلية التكرار، ثم يشغّل:
+
+| الملف | ما يغطيه | النتيجة |
+|---|---|---|
+| `tests/backend.test.sql` | 59 تأكيداً: تطبيع الهاتف، التسعير من قاعدة البيانات، idempotency، حد الطلبين، الوصل، التتبع، RLS، واختبارات تراجُع للأخطاء الخمسة | ✅ تمر |
+| `tests/local/concurrency.test.sh` | 4 حالات تزامن باتصالات متوازية حقيقية | ✅ تمر |
+
+`tests/local/supabase-shim.sql` يعيد بناء ما تعتمد عليه الـmigrations من
+Supabase: مخططا `auth` و`storage`، أدوار `anon`/`authenticated`/
+`service_role`، وصلاحيات Supabase الافتراضية على `public`. **ليس ملف
+migration** — أداة اختبار فقط، ولا يُنشر.
+
+كل اختبار تراجُع تم التحقق من أنه يفشل عند إرجاع الإصلاح الذي يحرسه.
+اختبار التأكيد المزدوج يفرض التشابك بحاجز `pg_advisory_lock` لأن
+التوقيت وحده لا يعيد إنتاجه.
+
+### اختبار الواجهة
+
+```bash
+npm i pg playwright
+PGUSER="$(whoami)" node tests/frontend/mock-supabase.js &
+node tests/frontend/e2e.test.js
+```
+
+23 فحصاً في Chromium على `frontend/index.html` نفسه، مقابل Supabase
+وهمي مدعوم بقاعدة البيانات المحلية: التصنيفات والمنتجات والأسعار من
+قاعدة البيانات، منتج `coming_soon` غير قابل للشراء، تدفق الطلب كاملاً،
+رابط واتساب، والتتبع بهاتف صحيح وخاطئ. التفاصيل في
+`tests/frontend/README.md`.
+
+### بعد النشر — لم يُشغَّل بعد
+
+```bash
+export SUPABASE_URL=... SUPABASE_ANON_KEY=...
+export PRODUCT_ID=... PLAN_ID=... PAYMENT_METHOD_ID=...
+export ACTIVATION='[{"label":"اسم المستخدم في ديسكورد","value":"racer"}]'
 bash tests/race-test.sh
 ```
+
+`ACTIVATION` ضروري: `create_order` يرفض عنصراً ينقصه حقل تفعيل مطلوب،
+فبدونه تفشل كل الطلبات لسبب آخر ولا يُختبر التزامن أصلاً. خذ التسميات من:
+
+```sql
+select label from product_requirements where product_id = '<PRODUCT_ID>';
+```
+
+يبقى بعد ذلك ما لا يمكن اختباره إلا على مشروع حقيقي:
+
+- رفع وصل صالح / أكبر من 5 ميغابايت / PDF / صورة مزوّرة الترويسة
+- وصول رسالة Telegram وصورة الوصل
+- فشل Telegram → الطلب يبقى محفوظاً
+- محاولة `anon` قراءة bucket `receipts`
 
 ### طلب كامل يدوياً
 ```bash
@@ -271,17 +343,19 @@ curl -X POST "$SUPABASE_URL/functions/v1/track-order" \
 
 ## 12. ما زال يحتاج إجراءً يدوياً منك
 
-- [ ] إنشاء مشروع Supabase وتشغيل `db push`
-- [ ] وضع `SUPABASE_URL` و`ANON_KEY` في `js/janeiro-api.js`
+- [x] ربط `janeiro-api.js` بالـHTML (خطوة 8)
+- [x] إضافة skeletons وError state
+- [x] تشغيل اختبارات قاعدة البيانات — `bash tests/local/run-tests.sh`
+- [ ] إنشاء مشروع Supabase وتشغيل `db push` — **يحتاج حسابك**
+- [ ] وضع `SUPABASE_URL` و`ANON_KEY` (خطوة 8)
 - [ ] إنشاء بوت Telegram وضبط الأسرار
 - [ ] تعبئة رقم واتساب في `store_settings`
 - [ ] تعبئة بيانات CCP/BaridiMob/Flexy في `payment_methods`
 - [ ] إنشاء حساب أدمن وإضافة صفه في `profiles`
 - [ ] رفع صور المنتجات إلى `product-media` وتحديث `poster_path`
-- [ ] ربط `janeiro-api.js` بالـHTML (خطوة 8)
-- [ ] إضافة skeletons وError state — البنية جاهزة، التصميم عليك
 - [ ] ضبط `ALLOWED_ORIGIN` على نطاقك الحقيقي قبل الإطلاق
-- [ ] **تشغيل كل الاختبارات**
+- [ ] **تشغيل الاختبارات التي تحتاج نشراً** — `tests/race-test.sh`،
+      رفع وصل حقيقي، ورسالة Telegram
 
 ---
 
@@ -289,5 +363,5 @@ curl -X POST "$SUPABASE_URL/functions/v1/track-order" \
 
 - ✅ `SERVICE_ROLE_KEY` غير موجود في أي ملف فرونت إند
 - ✅ `TELEGRAM_BOT_TOKEN` في Supabase Secrets فقط
-- ✅ `.env` الحقيقي **لا يُرفع لـgit** — أضف `.env` إلى `.gitignore`
+- ✅ `.env` الحقيقي **لا يُرفع لـgit** — `.env` مضاف إلى `.gitignore` بالفعل
 - ⚠️ قبل الإطلاق: غيّر `ALLOWED_ORIGIN` من `*` إلى نطاقك، وإلا أي موقع يستطيع استدعاء دوالك

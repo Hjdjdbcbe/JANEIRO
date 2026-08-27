@@ -8,50 +8,102 @@
 
 | الجزء | الحالة |
 |---|---|
-| **الفرونت إند** | ✅ مكتمل بصرياً ويعمل — `frontend/index.html` |
-| **الباكند** | ⚠️ **مكتوب بالكامل لكن لم يُنشر ولم يُختبر إطلاقاً** |
-| **الربط بينهما** | ❌ لم يتم بعد |
+| **الفرونت إند** | ✅ مكتمل بصرياً — `frontend/index.html` |
+| **الباكند** | ✅ **شُغِّل واختُبر فعلياً على PostgreSQL محلي، وأُصلحت 5 أخطاء** |
+| **الربط بينهما** | ✅ تم — الفرونت يقرأ كل شيء من قاعدة البيانات |
+| **النشر على Supabase** | ❌ **لم يتم — يحتاج حسابك أنت** (اقرأ §"الخطوة المتبقية") |
 
-**مهم جداً:** لا شيء في مجلد `supabase/` تم تشغيله. لم يُنشأ مشروع Supabase، ولم تُشغَّل أي migration، ولم تُختبر أي حالة من حالات الاختبار. الكود كُتب في بيئة بلا اتصال إنترنت.
+---
+
+## ما الذي شُغِّل فعلاً
+
+كل ما يلي نُفِّذ وشوهدت نتيجته — لا شيء منه مُفترض:
+
+- ✅ الـmigrations السبعة طُبِّقت على PostgreSQL 16 نظيف، ثم طُبِّقت **مرة ثانية** للتأكد من قابلية التكرار
+- ✅ `tests/backend.test.sql` — 59 تأكيداً (assert) موزعة على 27 مجموعة، كلها تمر
+- ✅ `tests/local/concurrency.test.sh` — 4 حالات تزامن باتصالات متوازية حقيقية
+- ✅ `tests/frontend/e2e.test.js` — 23 فحصاً في متصفح Chromium على الصفحة الحقيقية
+- ✅ كل اختبار تراجُع (regression) تم التحقق من أنه **يفشل** عند إرجاع الخطأ الذي يحرسه
+
+```bash
+bash tests/local/run-tests.sh        # الباكند كاملاً، بدون Supabase
+```
+
+**ما لم يُشغَّل** (يحتاج مشروعاً منشوراً): الـEdge Functions على Deno،
+رفع ملف حقيقي إلى Storage، وإرسال رسالة Telegram. منطق قاعدة البيانات
+الذي تستدعيه هذه الدوال مُختبَر بالكامل، لكن الدوال نفسها لم تُنفَّذ قط.
+
+---
+
+## الأخطاء التي وُجدت وأُصلحت
+
+الكود لم يكن مُختبراً، وكان فيه خمسة أخطاء حقيقية:
+
+| # | الخطأ | الأثر |
+|---|---|---|
+| 1 | `create_order` مع نفس `idempotency_key` في وقت واحد | نقرة مزدوجة → خطأ 500 للعميل |
+| 2 | `X-Forwarded-For` غير صالح يكسر `client_ip::inet` | ترويسة غريبة → الطلب يفشل كلياً |
+| 3 | `submit_order` بلا حارس على الحالة | تأكيدان متزامنان → **رسالتا Telegram** لطلب واحد |
+| 4 | `create trigger` بلا `drop if exists` | `db push` مرة ثانية يفشل |
+| 5 | `payment_methods` بلا مفتاح فريد | إعادة تشغيل الـseed **تُكرِّر** كل طرق الدفع |
+
+وكذلك: اختبارات الـRLS كانت **لا يمكن أن تفشل** — كانت ترفع `FAILED`
+داخل كتلة تلتقطها بـ`when others`، فتبتلع إشارة فشلها. أُعيدت كتابتها.
 
 ---
 
 ## الملفات
 
 ```
-frontend/index.html          الموقع كامل (HTML/CSS/JS في ملف واحد)
-                             البيانات حالياً ثابتة داخل JavaScript
-
-js/janeiro-api.js            طبقة الربط بـSupabase — جاهزة، غير مربوطة بعد
+frontend/index.html          الموقع كامل — يقرأ البيانات من Supabase الآن
+js/janeiro-api.js            طبقة الربط — مربوطة ومُختبرة
 
 supabase/migrations/         7 ملفات SQL بالترتيب
 supabase/functions/          4 Edge Functions
-tests/                       اختبارات SQL + اختبار تزامن
 
-README.md                    ⭐ التوثيق الكامل — اقرأه أولاً
+tests/backend.test.sql       اختبارات SQL
+tests/race-test.sh           اختبار التزامن عبر Edge Functions (يحتاج نشراً)
+tests/local/                 تشغيل الباكند كاملاً بلا Supabase
+tests/frontend/              اختبار المتصفح على الصفحة الحقيقية
+
+README.md                    ⭐ التوثيق الكامل
 .env.example                 المتغيرات المطلوبة
-janeiro-brief-frontend.md    مواصفات التصميم (مرجع)
 ```
 
 ---
 
-## المهمة المطلوبة
+## الخطوة المتبقية — النشر (تحتاج حسابك)
 
-**المرحلة 1 — النشر**
-1. أنشئ مشروع Supabase
-2. `supabase db push`
-3. انشر الـEdge Functions الأربع
-4. اضبط الأسرار (Telegram، ALLOWED_ORIGIN)
+لم أستطع إنشاء مشروع Supabase: البيئة التي عملت فيها تحجب
+`api.supabase.com` (رفض 403 على مستوى الشبكة)، ولا تملك بيانات حسابك
+أصلاً. هذه الخطوة تحتاجك أنت:
 
-**المرحلة 2 — الاختبار الفعلي**
-5. `psql "$DATABASE_URL" -f tests/backend.test.sql`
-6. `bash tests/race-test.sh`
-7. **أصلح أي فشل** — الكود لم يُختبر، فتوقّع وجود أخطاء
+```bash
+supabase link --project-ref YOUR-PROJECT-REF
+supabase db push
 
-**المرحلة 3 — الربط**
-8. اربط `js/janeiro-api.js` بـ`frontend/index.html` (الخطوة 8 في README)
-9. احذف مصفوفتي `CATEGORIES` و`PRODUCTS` الثابتتين
-10. أضف skeletons وError states
+supabase secrets set TELEGRAM_BOT_TOKEN=...
+supabase secrets set TELEGRAM_CHAT_ID=...
+supabase secrets set ALLOWED_ORIGIN=https://your-domain.com
+
+supabase functions deploy create-order
+supabase functions deploy upload-receipt
+supabase functions deploy submit-order
+supabase functions deploy track-order
+```
+
+ثم ضع المفاتيح للفرونت إند (المفتاح `anon` عام وآمن في المتصفح):
+
+```html
+<!-- قبل وسم <script type="module"> في frontend/index.html -->
+<script>window.JANEIRO_CONFIG = {
+  SUPABASE_URL: "https://xxxx.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOi..."
+};</script>
+```
+
+بعد النشر شغّل ما لم يمكن تشغيله هنا (تفاصيلها في README §11):
+`tests/race-test.sh`، ورفع وصل حقيقي، ورسالة Telegram.
 
 ---
 
@@ -68,16 +120,19 @@ janeiro-brief-frontend.md    مواصفات التصميم (مرجع)
 ## قرارات معمارية مقصودة (لا تغيّرها بدون سبب)
 
 1. **حد الطلبين يُفرض عند التأكيد لا الإنشاء** — لأن `awaiting_receipt` ليس طلباً نهائياً. الفحص يجري مرتين تحت `pg_advisory_xact_lock`.
-2. **`create_order` و`submit_order` ممنوعتان على `anon`** — تمر عبر Edge Functions حصراً.
+   ✅ تم التحقق: 10 اتصالات متوازية → طلبان نشطان بالضبط.
+2. **`create_order` و`submit_order` ممنوعتان على `anon`** — تمر عبر Edge Functions حصراً. ✅ تم التحقق.
 3. **فحص الصور بالبايتات لا بالـContent-Type** — الترويسة قابلة للتزوير.
-4. **التتبع لا يميّز بين "رقم خاطئ" و"هاتف خاطئ"** — منعاً لاستكشاف أرقام الطلبات.
+   ⚠️ منطق الفحص مكتوب لكنه لم يُنفَّذ على Deno بعد.
+4. **التتبع لا يميّز بين "رقم خاطئ" و"هاتف خاطئ"** — منعاً لاستكشاف أرقام الطلبات. ✅ تم التحقق.
 
 ---
 
 ## قبل الإطلاق
 
+- [ ] نشر مشروع Supabase (الخطوة أعلاه)
 - [ ] `ALLOWED_ORIGIN` من `*` إلى النطاق الحقيقي
 - [ ] رقم واتساب في `store_settings`
 - [ ] بيانات CCP/BaridiMob/Flexy في `payment_methods`
 - [ ] صور المنتجات في bucket `product-media`
-- [ ] `.env` في `.gitignore`
+- [x] `.env` في `.gitignore`
