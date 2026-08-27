@@ -1,0 +1,15 @@
+# real secrets — never commit
+.env
+.env.*
+!.env.example
+
+# supabase CLI local state
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
+# local test harness scratch
+tests/local/*.log
+
+node_modules/
+.DS_Store
