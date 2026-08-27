@@ -551,6 +551,15 @@ footer ul button:hover{color:var(--text-on-dark)}
 .stickybar .amt small{display:block;font-size:11px;color:var(--ink-2);line-height:1}
 .stickybar .amt b{font-family:var(--f-mono);font-size:16px}
 .stickybar .btn{flex:1}
+/* ---- loading skeletons ---- */
+@keyframes sk-pulse{0%,100%{opacity:.55}50%{opacity:.95}}
+.sk{pointer-events:none}
+.sk-box,.sk-line{background:var(--bg-2);animation:sk-pulse 1.4s ease-in-out infinite}
+.sk .poster.sk-box{border:0;aspect-ratio:1/1;width:100%}
+.sk-line{height:11px;border-radius:6px;margin:0 0 var(--s2)}
+.sk-line.sk-btn{height:38px;border-radius:12px;margin-top:var(--s3)}
+.category-chip.sk{min-width:104px;justify-content:center}
+
 .empty{grid-column:1/-1;text-align:center;padding:var(--s16) var(--s4);color:var(--ink-2)}
 .empty b{display:block;font-family:var(--f-display);font-size:16px;color:var(--ink);margin-bottom:5px}
 </style>
@@ -874,7 +883,7 @@ footer ul button:hover{color:var(--text-on-dark)}
       </div>
       <div class="hint">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round"/></svg>
-        <span>اذكر رقم طلبك <b class="mono" id="oidHint"></b> عند الدفع إن أمكن — يسرّع التأكيد.</span>
+        <span>احتفظ برقم العملية من إيصال الدفع — يسرّع التأكيد. رقم الطلب يصلك بعد تأكيد الطلب.</span>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(3)">دفعتُ — رفع الوصل</button>
       <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(1)">رجوع</button>
@@ -920,8 +929,8 @@ footer ul button:hover{color:var(--text-on-dark)}
     <div style="width:64px;height:64px;border-radius:22px;background:var(--brand-grad);color:#fff;display:grid;place-items:center;margin:var(--s8) auto var(--s4)">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4.5 4.5L19 7"/></svg>
     </div>
-    <h1 style="font-size:24px">طلبك جاهز للإرسال</h1>
-    <p style="color:var(--muted-on-dark);margin-top:var(--s2)">في النسخة النهائية سيفتح واتساب تلقائياً بالرسالة معبّأة. رقم طلبك:</p>
+    <h1 style="font-size:24px">تم استلام طلبك</h1>
+    <p style="color:var(--muted-on-dark);margin-top:var(--s2)">سجّلنا طلبك ووصل الدفع. احتفظ برقم الطلب لمتابعته:</p>
     <div class="card" style="text-align:start">
       <div class="dl">
         <div><span>رقم الطلب</span><b class="mono" id="sentOid"></b></div>
@@ -940,12 +949,14 @@ footer ul button:hover{color:var(--text-on-dark)}
     <h1 style="font-size:24px">تتبع الطلب</h1>
     <p style="color:var(--muted-on-dark);font-size:14px;margin-top:var(--s2)">أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.</p>
     <div class="card">
-      <div class="field" style="margin:0"><label for="tNum">رقم الطلب</label><input id="tNum" class="mono" placeholder="JNR-XXXXXXXX-XXXX"></div>
-      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="toast('نظام التتبع سيُفعّل مع ربط قاعدة البيانات')">الاستعلام</button>
+      <div class="field"><label for="tNum">رقم الطلب</label><input id="tNum" class="mono" placeholder="JNR-XXXXXX-XXXX"></div>
+      <div class="field" style="margin:0"><label for="tLast4">آخر 4 أرقام من هاتفك</label><input id="tLast4" class="mono" inputmode="numeric" maxlength="4" placeholder="XXXX"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="runTrack()">الاستعلام</button>
     </div>
+    <div id="tResult"></div>
     <div class="hint">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round"/></svg>
-      <span>حتى تفعيل التتبع، يمكنك الاستعلام مباشرة على واتساب برقم طلبك.</span>
+      <span>يمكنك أيضاً الاستعلام مباشرة على واتساب برقم طلبك.</span>
     </div>
   </div>
 </section>
@@ -1021,115 +1032,68 @@ footer ul button:hover{color:var(--text-on-dark)}
 </footer>
 
 <script>
+/* Deploy step injects the real keys here; see js/janeiro-api.js. */
+window.JANEIRO_CONFIG = window.JANEIRO_CONFIG || {};
+</script>
+<script type="module">
+import * as API from "../js/janeiro-api.js";
+
 /* ================================================================
-   DATA LAYER — swap this for an API later without touching the UI.
-   Each product supports: image / poster / thumbnail / accent / badge
-   A designed fallback poster renders when no image asset exists.
+   DATA LAYER
+   Everything below now comes from Supabase at runtime. Nothing about
+   a product -- name, price, plans, features, warranty, badge -- is
+   written here any more; the database is the single source of truth.
+
+   The maps that remain are presentation assets, not data: the category
+   glyphs and the brand-logo slugs are part of the visual identity and
+   have no column to live in. They are keyed by slug, so a row the
+   database does not have simply renders the designed fallback.
    ================================================================ */
-const CATEGORIES = [
-  { id:"ai",      name:"الذكاء الاصطناعي",  accent:"#7357FF", svg:'<path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21M6.4 6.4l2.5 2.5M15.1 15.1l2.5 2.5M17.6 6.4l-2.5 2.5M8.9 15.1l-2.5 2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.8"/>' },
-  { id:"design",  name:"التصميم والإبداع",  accent:"#EC4899", svg:'<path d="m14.5 4.5 5 5L9 20l-5.5.5L4 15 14.5 4.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m12.5 6.5 5 5" stroke="currentColor" stroke-width="1.8"/>' },
-  { id:"work",    name:"الإنتاجية والعمل",  accent:"#F59E0B", svg:'<rect x="3" y="7" width="18" height="13" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3 12h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' },
-  { id:"social",  name:"التواصل",           accent:"#3478F6", svg:'<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' },
-  { id:"fun",     name:"الترفيه",           accent:"#10B981", svg:'<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M10.2 8.8 16 12l-5.8 3.2z" fill="currentColor"/>' },
-  { id:"dev",     name:"التطوير",           accent:"#0EA5E9", svg:'<path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4M13.5 5l-3 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' }
-];
 
-const PRODUCTS = [
-  { id:"chatgpt", name:"ChatGPT Plus", cat:"ai", icon:"openai", accent:"#10A37F",
-    image:null, poster:null, thumbnail:null, badge:"hot", available:true,
-    desc:"وصول كامل لأحدث النماذج بسرعة استجابة أعلى.",
-    micro:["تفعيل رسمي","دعم مباشر"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["استخدام غير محدود للنماذج المتقدمة","أولوية في أوقات الضغط","تفعيل على حسابك الشخصي"],
-    plans:[{n:"شهر واحد",p:3200},{n:"3 أشهر",p:9000}],
-    fields:[{l:"البريد الإلكتروني للحساب",ph:"name@example.com"}] },
-
-  { id:"gemini", name:"Gemini Pro", cat:"ai", icon:"googlegemini", accent:"#3478F6",
-    image:null, poster:null, thumbnail:null, badge:"hot", available:true,
-    desc:"باقة Google المتقدمة للذكاء الاصطناعي مع مساحة تخزين.",
-    micro:["تفعيل رسمي","ضمان الاشتراك"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["نماذج Gemini المتقدمة","تكامل مع تطبيقات Google","مساحة تخزين إضافية"],
-    plans:[{n:"شهر واحد",p:1900},{n:"3 أشهر",p:4500},{n:"12 شهراً",p:14000}],
-    fields:[{l:"بريد Gmail للتفعيل",ph:"name@gmail.com"},{l:"رقم الهاتف المرتبط",ph:"0X XX XX XX XX"}] },
-
-  { id:"canva", name:"Canva Pro", cat:"design", icon:"canva", accent:"#00C4CC",
-    image:null, poster:null, thumbnail:null, badge:null, available:true,
-    desc:"أدوات تصميم احترافية ومكتبة قوالب ضخمة.",
-    micro:["تفعيل سريع","دعم مباشر"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["ملايين القوالب والعناصر","إزالة الخلفية بنقرة","مساحة تخزين للفرق"],
-    plans:[{n:"شهر واحد",p:1200},{n:"12 شهراً",p:9500}],
-    fields:[{l:"البريد الإلكتروني للحساب",ph:"name@example.com"}] },
-
-  { id:"adobe", name:"Adobe Creative Cloud", cat:"design", icon:"adobecreativecloud", accent:"#DA1B2C",
-    image:null, poster:null, thumbnail:null, badge:null, available:true,
-    desc:"حزمة أدوبي الكاملة للتصميم والمونتاج.",
-    micro:["تفعيل رسمي","ضمان الاشتراك"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["Photoshop وIllustrator وPremiere","تحديثات مستمرة","مساحة سحابية"],
-    plans:[{n:"شهر واحد",p:4800},{n:"12 شهراً",p:38000}],
-    fields:[{l:"البريد الإلكتروني للحساب",ph:"name@example.com"}] },
-
-  { id:"notion", name:"Notion Plus", cat:"work", icon:"notion", accent:"#111318",
-    image:null, poster:null, thumbnail:null, badge:"new", available:true,
-    desc:"مساحة عمل واحدة للملاحظات والمهام وقواعد البيانات.",
-    micro:["تفعيل سريع"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["رفع ملفات بلا حدود","سجل نسخ أطول","دعوة ضيوف"],
-    plans:[{n:"شهر واحد",p:1400},{n:"12 شهراً",p:12000}],
-    fields:[{l:"البريد الإلكتروني للحساب",ph:"name@example.com"}] },
-
-  { id:"discord", name:"Discord Nitro", cat:"social", icon:"discord", accent:"#5865F2",
-    image:null, poster:null, thumbnail:null, badge:null, available:true,
-    desc:"مزايا إضافية للبث والرموز والملفات داخل ديسكورد.",
-    micro:["إهداء رسمي","دعم مباشر"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["بث بجودة أعلى","رفع ملفات أكبر","رموز مخصصة في كل السيرفرات"],
-    plans:[{n:"شهر واحد",p:1400},{n:"12 شهراً",p:12000}],
-    fields:[{l:"اسم المستخدم في ديسكورد",ph:"username"}] },
-
-  { id:"snapchat", name:"Snapchat Plus", cat:"social", icon:"snapchat", accent:"#F5A524",
-    image:null, poster:null, thumbnail:null, badge:"off", available:true, oldFrom:950,
-    desc:"مزايا حصرية داخل سناب شات.",
-    micro:["تفعيل سريع","ضمان الاشتراك"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["مزايا حصرية للمشتركين","تخصيص أيقونة التطبيق","إحصاءات إضافية"],
-    plans:[{n:"شهر واحد",p:700},{n:"12 شهراً",p:5500}],
-    fields:[{l:"اسم المستخدم في سناب شات",ph:"@username"}] },
-
-  { id:"spotify", name:"Spotify Premium", cat:"fun", icon:"spotify", accent:"#1DB954",
-    image:null, poster:null, thumbnail:null, badge:null, available:true,
-    desc:"استماع بلا إعلانات وتحميل للاستماع دون اتصال.",
-    micro:["تفعيل سريع","دعم مباشر"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["بدون إعلانات","تحميل للاستماع دون اتصال","جودة صوت أعلى"],
-    plans:[{n:"شهر واحد",p:1100},{n:"3 أشهر",p:2900}],
-    fields:[{l:"البريد الإلكتروني للحساب",ph:"name@example.com"}] },
-
-  { id:"appleone", name:"Apple One", cat:"fun", icon:"apple", accent:"#3A3D46",
-    image:null, poster:null, thumbnail:null, badge:null, available:false,
-    desc:"حزمة خدمات Apple في اشتراك واحد.",
-    micro:["قريباً"], delivery:"—", warranty:"—", features:[], plans:[], fields:[] },
-
-  { id:"copilot", name:"GitHub Copilot", cat:"dev", icon:"github", accent:"#24292F",
-    image:null, poster:null, thumbnail:null, badge:null, available:true,
-    desc:"مساعد برمجي داخل محرر الأكواد.",
-    micro:["تفعيل رسمي"], delivery:"يُحدَّد عند الطلب", warranty:"طوال مدة الاشتراك",
-    features:["اقتراحات كود فورية","دعم أغلب المحررات","شرح وإصلاح الأخطاء"],
-    plans:[{n:"شهر واحد",p:1600},{n:"12 شهراً",p:14500}],
-    fields:[{l:"اسم المستخدم في GitHub",ph:"username"}] }
-];
-
-const CONFIG = { whatsapp:"", brand:"Janeiro Store", currency:"دج" };
-
-/* بيانات الدفع — عدّلها ببياناتك الحقيقية */
-const PAY_INFO = {
-  CCP:[["الاسم واللقب","—— يُملأ لاحقاً ——"],["رقم الحساب CCP","—— يُملأ لاحقاً ——"],["المفتاح","——"]],
-  BaridiMob:[["الاسم واللقب","—— يُملأ لاحقاً ——"],["رقم RIP","—— يُملأ لاحقاً ——"]],
-  Flexy:[["رقم الفليكسي","—— يُملأ لاحقاً ——"],["المشغل","——"]]
+const CATEGORY_ICONS = {
+  ai:     '<path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21M6.4 6.4l2.5 2.5M15.1 15.1l2.5 2.5M17.6 6.4l-2.5 2.5M8.9 15.1l-2.5 2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.8"/>',
+  design: '<path d="m14.5 4.5 5 5L9 20l-5.5.5L4 15 14.5 4.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m12.5 6.5 5 5" stroke="currentColor" stroke-width="1.8"/>',
+  work:   '<rect x="3" y="7" width="18" height="13" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3 12h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  social: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  fun:    '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M10.2 8.8 16 12l-5.8 3.2z" fill="currentColor"/>',
+  dev:    '<path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4M13.5 5l-3 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
 };
+const FALLBACK_CAT_ICON = '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/>';
+
+/* simple-icons slugs, keyed by product slug */
+const BRAND_ICONS = {
+  "chatgpt-plus":         "openai",
+  "gemini-pro":           "googlegemini",
+  "canva-pro":            "canva",
+  "adobe-creative-cloud": "adobecreativecloud",
+  "notion-plus":          "notion",
+  "discord-nitro":        "discord",
+  "snapchat-plus":        "snapchat",
+  "spotify-premium":      "spotify",
+  "apple-one":            "apple",
+  "github-copilot":       "githubcopilot"
+};
+
+/* Products featured in the hero composition, by slug. Whichever of
+   these the catalogue actually has is used, and the remaining slots
+   fall back to whatever else is published -- so an unpublished
+   product leaves a gap in the data, never a hole in the layout. */
+const HERO_SLUGS  = ["chatgpt-plus","canva-pro","discord-nitro","spotify-premium"];
+const ORBIT_SLUGS = ["chatgpt-plus","canva-pro","discord-nitro","adobe-creative-cloud"];
+
+let CATEGORIES = [], PRODUCTS = [], PAYMENT_METHODS = [], SETTINGS = {};
+let CONFIG = { whatsapp:"", brand:"Janeiro Store", currency:"دج" };
 
 /* ================================================================
    HELPERS
    ================================================================ */
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const P  = id => PRODUCTS.find(p=>p.id===id);
-const C  = id => CATEGORIES.find(c=>c.id===id);
+const P  = id  => PRODUCTS.find(p=>p.id===id);
+/* products carry the category SLUG, chips are keyed by slug, but a UUID
+   may also arrive from a link -- accept either. */
+const C  = key => CATEGORIES.find(c=>c.slug===key||c.id===key) || {name:"",accent:"#7357FF",svg:FALLBACK_CAT_ICON};
+const PS = slug => PRODUCTS.find(p=>p.slug===slug);
 const money = n => n.toLocaleString("en-US") + " " + CONFIG.currency;
 const minPrice = p => p.plans.length ? Math.min(...p.plans.map(x=>x.p)) : 0;
 const BADGES = { hot:["الأكثر طلباً","hot"], new:["جديد","new"], off:["عرض","off"] };
@@ -1153,8 +1117,20 @@ function contactWhatsApp(msg){
 /* brand logo with graceful fallback to a designed monogram */
 function brandLogo(p,size,color){
   const c=(color||p.accent).replace("#","");
-  return `<img src="https://cdn.simpleicons.org/${p.icon}/${c}" alt="" width="${size}" height="${size}" loading="lazy"
+  const icon = BRAND_ICONS[p.slug];
+  const mono = `<b style="font-family:var(--f-display);font-weight:800;font-size:${Math.round(size*.8)}px;color:${p.accent}">${p.name[0]}</b>`;
+  if(!icon) return mono;   // no brand asset for this product -> designed monogram
+  return `<img src="https://cdn.simpleicons.org/${icon}/${c}" alt="" width="${size}" height="${size}" loading="lazy"
     onerror="this.replaceWith(Object.assign(document.createElement('b'),{textContent:'${p.name[0]}',style:'font-family:var(--f-display);font-weight:800;font-size:${Math.round(size*.8)}px;color:${p.accent}'}))">`;
+}
+
+/* The poster's micro-chips. The old build hard-coded claims like
+   "تفعيل رسمي" per product; there is no column for those, so rather
+   than invent them the chips now show two facts the database really
+   holds -- warranty and delivery window -- and render nothing when it
+   holds neither. */
+function microChips(p){
+  return [p.warranty, p.delivery].filter(v => v && v !== "—" && v !== "يُحدَّد عند الطلب");
 }
 
 /* ================================================================
@@ -1167,7 +1143,7 @@ function posterHTML(p,big){
     ? `<img class="pimg" src="${p.poster||p.image}" alt="${p.name}" loading="lazy">`
     : `<div class="pwordmark"><i></i>Janeiro Store</div>
        <div class="plogo"><div class="chip">${brandLogo(p,big?40:30)}</div></div>
-       <div class="pmicro">${p.micro.map(m=>`<span>${m}</span>`).join("")}</div>`;
+       <div class="pmicro">${microChips(p).map(m=>`<span>${m}</span>`).join("")}</div>`;
   return `<div class="poster" style="${style}">
     ${b?`<span class="badge ${b[1]}">${b[0]}</span>`:""}
     ${!p.available?`<div class="pout">غير متوفر حالياً</div>`:""}
@@ -1203,13 +1179,13 @@ function renderCats(){
       onclick="selectCat('${id}')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">${svg}</svg><span>${name}</span></button>`;
   const allIcon='<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>';
-  const html = chip("all","الكل",allIcon) + CATEGORIES.map(c=>chip(c.id,c.name,c.svg)).join("");
+  const html = chip("all","الكل",allIcon) + CATEGORIES.map(c=>chip(c.slug,c.name,c.svg)).join("");
   $("#catGrid").innerHTML = html;
   if($("#shopCatGrid")) $("#shopCatGrid").innerHTML = html;
   updateArrows();
 
   $("#menuCats").innerHTML = CATEGORIES.map(c=>
-    `<button class="mcat" onclick="selectCat('${c.id}');closePanels()">
+    `<button class="mcat" onclick="selectCat('${c.slug}');closePanels()">
       <span class="ci" style="background:${hex2rgba(c.accent,.11)};color:${c.accent}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none">${c.svg}</svg></span>
       <span>${c.name}</span></button>`).join("");
@@ -1228,20 +1204,34 @@ function updateArrows(){
 }
 window.addEventListener("resize",()=>updateArrows());
 
+/* Fills the hero slots from the requested slugs, topping up with any
+   other published product so the composition keeps its shape even if
+   one of them is unpublished. Never pads with a placeholder product. */
+function heroPicks(slugs){
+  const picked = slugs.map(PS).filter(Boolean);
+  if(picked.length < slugs.length){
+    for(const p of PRODUCTS){
+      if(picked.length === slugs.length) break;
+      if(p.available && !picked.includes(p)) picked.push(p);
+    }
+  }
+  return picked;
+}
+
 function renderHome(){
   $("#bestRail").innerHTML = PRODUCTS.filter(p=>p.badge==="hot"||p.badge==="off")
     .concat(PRODUCTS.filter(p=>p.available&&!p.badge)).slice(0,4).map(cardHTML).join("");
 
-  $("#promoBoxes").innerHTML = ["chatgpt","canva","discord","spotify"].map((id,i)=>{
-    const p=P(id); const rot=[-8,5,-4,7][i];
+  $("#promoBoxes").innerHTML = heroPicks(HERO_SLUGS).map((p,i)=>{
+    const rot=[-8,5,-4,7][i%4];
     return `<div class="pbox" style="--rot:${rot}deg">${brandLogo(p,30)}</div>`;
   }).join("");
 
-  /* orbit satellites — real products from the data layer */
-  const sats=["chatgpt","canva","discord","adobe"].map(id=>{
-    const p=P(id);
-    return `<div class="osat"><span class="lg" style="background:${hex2rgba(p.accent,.12)}">${brandLogo(p,15)}</span><b>${p.name}</b></div>`;
-  }).join("");
+  /* orbit satellites — real products from the catalogue */
+  $$("#orbit .osat").forEach(el=>el.remove());   // re-render safe
+  const sats=heroPicks(ORBIT_SLUGS).map(p=>
+    `<div class="osat"><span class="lg" style="background:${hex2rgba(p.accent,.12)}">${brandLogo(p,15)}</span><b>${p.name}</b></div>`
+  ).join("");
   $("#orbit").insertAdjacentHTML("beforeend",sats);
 }
 
@@ -1251,9 +1241,9 @@ function renderShop(){
   let title="كل المنتجات";
   if(shopFilter==="__best"){ list=list.filter(p=>p.badge==="hot"); title="الأكثر طلباً"; }
   else if(shopFilter==="__offers"){ list=list.filter(p=>p.oldFrom); title="العروض"; }
-  else if(shopFilter!=="all"){ list=list.filter(p=>p.cat===shopFilter); title=C(shopFilter).name; }
+  else if(shopFilter!=="all"){ list=list.filter(p=>p.cat===shopFilter); title=C(shopFilter).name || "كل المنتجات"; }
   if(shopQuery) list=list.filter(p=>
-    p.name.toLowerCase().includes(shopQuery) || p.desc.includes(shopQuery) || C(p.cat).name.includes(shopQuery));
+    p.name.toLowerCase().includes(shopQuery) || p.desc.includes(shopQuery) || (C(p.cat).name||"").includes(shopQuery));
 
   $("#shopTitle").textContent=title;
   $("#shopCount").textContent = list.length ? `${list.length} منتج` : "";
@@ -1291,7 +1281,7 @@ let cur=null,curPlan=0;
 function openDetail(id){
   cur=P(id); curPlan=0;
   $("#dPoster").innerHTML=posterHTML(cur,true);
-  $("#dCat").textContent=C(cur.cat).name;
+  $("#dCat").textContent=cur.catName || C(cur.cat).name;
   $("#dName").textContent=cur.name;
   $("#dDesc").textContent=cur.desc;
   $("#dDeliv").textContent=cur.delivery;
@@ -1371,8 +1361,13 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePanels(); });
 /* ================================================================
    ORDER FLOW
    ================================================================ */
-let orderStep=1, payMethod="CCP", channel="واتساب", receiptName="";
-const ORDER_ID = "JNR-"+new Date().toISOString().slice(0,10).replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+let orderStep=1, payMethod=null, channel="واتساب";
+let receiptFile=null, receiptName="";
+let submitting=false;
+/* The order number is issued by the server when the order is confirmed.
+   The old build invented one in the browser; it never matched anything
+   the backend knew about. */
+let placedOrder=null;
 const STEP_LBL=["قناة المتابعة وبياناتك","طريقة الدفع","رفع الوصل","بيانات التفعيل والمراجعة"];
 
 function step(n){
@@ -1382,7 +1377,7 @@ function step(n){
   $$("#steps .n").forEach((el,i)=>el.classList.toggle("on",i<n));
   $$("#steps .bar").forEach((el,i)=>el.classList.toggle("on",i<n-1));
   $("#stepLbl").textContent=`الخطوة ${n} من 4 — ${STEP_LBL[n-1]}`;
-  if(n===2){ $("#oidHint").textContent=ORDER_ID; renderPayBox(); }
+  if(n===2){ renderPayMethods(); renderPayBox(); }
   if(n===4){ buildActivation(); buildReview(); }
   window.scrollTo(0,0);
 }
@@ -1391,21 +1386,56 @@ function setChannel(el,c){
   [...el.parentNode.children].forEach(b=>b.setAttribute("aria-checked","false"));
   el.setAttribute("aria-checked","true");
 }
-function setPay(el,m){
-  payMethod=m;
+function setPay(el,id){
+  payMethod=id;
   [...el.parentNode.children].forEach(b=>b.setAttribute("aria-checked","false"));
   el.setAttribute("aria-checked","true");
   renderPayBox();
 }
+const payMethodById = id => PAYMENT_METHODS.find(m=>m.id===id);
+
+/* The three buttons used to be hard-coded. They are rows in
+   payment_methods now, so the store can add or retire one without a
+   code change. */
+function renderPayMethods(){
+  const box=$("#o2 .pay2");
+  if(!PAYMENT_METHODS.length){
+    box.innerHTML=`<p style="grid-column:1/-1;font-size:13px;color:var(--ink-2)">لا توجد طريقة دفع متاحة حالياً.</p>`;
+    $("#payBox").innerHTML=""; return;
+  }
+  if(!payMethodById(payMethod)) payMethod=PAYMENT_METHODS[0].id;
+  box.style.gridTemplateColumns=`repeat(${Math.min(PAYMENT_METHODS.length,3)},1fr)`;
+  box.innerHTML=PAYMENT_METHODS.map(m=>
+    `<button class="paybtn" role="radio" aria-checked="${m.id===payMethod}"
+       onclick="setPay(this,'${m.id}')">${m.label}</button>`).join("");
+}
+
+/* Account details come from the database. Blank fields are skipped
+   rather than shown as placeholder dashes -- an empty CCP number is a
+   setup step the owner still owes, not something to dress up. */
 function renderPayBox(){
+  const m=payMethodById(payMethod);
+  const rows=[];
+  if(m){
+    if(m.account_holder) rows.push(["الاسم واللقب",m.account_holder]);
+    if(m.account_number) rows.push([m.type==="flexy"?"رقم الفليكسي":m.type==="baridimob"?"رقم RIP":"رقم الحساب CCP",m.account_number]);
+    if(m.extra_info)     rows.push(["معلومات إضافية",m.extra_info]);
+  }
   $("#payBox").innerHTML =
-    PAY_INFO[payMethod].map(r=>`<div class="r"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("")
+    (rows.length
+      ? rows.map(r=>`<div class="r"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("")
+      : `<div class="r"><span>بيانات الحساب</span><b>لم تُضف بعد</b></div>`)
+    + (m && m.instructions ? `<div class="r"><span>تعليمات</span><b>${m.instructions}</b></div>` : "")
     + `<div class="r amount"><span>المبلغ المطلوب</span><b>${money(cartTotal())}</b></div>`;
 }
 function onReceipt(input){
   const f=input.files&&input.files[0];
   if(!f) return;
   if(f.size > 5*1024*1024){ toast("حجم الصورة يتجاوز 5 ميغابايت"); input.value=""; return; }
+  if(!["image/jpeg","image/png","image/webp"].includes(f.type)){
+    toast("الملف يجب أن يكون صورة JPG أو PNG أو WebP"); input.value=""; return;
+  }
+  receiptFile=f;                       // the file itself is uploaded later
   receiptName=f.name;
   $("#dropText").textContent="✓ تم اختيار: "+f.name;
   $("#dropLabel").classList.add("filled");
@@ -1422,12 +1452,13 @@ function buildActivation(){
     </div>`;}).join("") || `<p style="font-size:13px;color:var(--ink-2)">لا حقول إضافية مطلوبة.</p>`;
 }
 function collectOrder(){
+  const m=payMethodById(payMethod);
   return {
-    id:ORDER_ID,
+    id:placedOrder?placedOrder.order_number:null,   // null until the server issues it
     name:$("#fName").value.trim()||"—",
     phone:$("#fPhone").value.trim()||"—",
     wilaya:$("#fWilaya").value.trim(),
-    pay:payMethod,
+    pay:m?m.label:"—",
     channel:channel,
     ref:$("#fRef").value.trim(),
     receipt:receiptName,
@@ -1439,9 +1470,41 @@ function collectOrder(){
     total:cartTotal()
   };
 }
+
+/* Shapes the cart for create-order. Sends no prices: the server reads
+   them from the catalogue and ignores anything price-like we send. */
+function cartForApi(){
+  return CART.map((c,ci)=>{
+    const p=P(c.id);
+    return {
+      productId: p.id,
+      planId:    p.plans[c.plan].id,
+      qty:       c.qty,
+      activation: p.fields.map((f,fi)=>({
+        label: f.l,                                     // must match product_requirements.label
+        value: (($(`[data-af="${ci}_${fi}"]`)||{}).value||"").trim()
+      }))
+    };
+  });
+}
+
+/* Client-side mirror of the server's required-field rule, so the
+   customer sees which box is empty instead of a generic rejection.
+   The server re-checks all of it regardless. */
+function firstMissingField(){
+  for(let ci=0; ci<CART.length; ci++){
+    const p=P(CART[ci].id);
+    for(let fi=0; fi<p.fields.length; fi++){
+      const f=p.fields[fi];
+      const el=$(`[data-af="${ci}_${fi}"]`);
+      if(f.required && !(el&&el.value.trim())) return {el, label:f.l};
+    }
+  }
+  return null;
+}
 function orderMessage(o){
   let m=`طلب جديد — ${CONFIG.brand}\n`;
-  m+=`رقم الطلب: ${o.id}\n`;
+  m+=`رقم الطلب: ${o.id ?? "يُصدر عند التأكيد"}\n`;
   m+=`———————————\n`;
   o.items.forEach(it=>{
     m+=`• ${it.name} — ${it.plan}${it.qty>1?` ×${it.qty}`:""}\n`;
@@ -1473,34 +1536,215 @@ function buildReview(){
     + `<div class="r t"><span>الإجمالي</span><b class="mono">${money(o.total)}</b></div>`;
   $("#waPreview").textContent=orderMessage(o);
 }
-function sendOrder(){
-  const o=collectOrder();
-  const text=encodeURIComponent(orderMessage(o));
-  if(CONFIG.whatsapp){
-    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${text}`,"_blank");
-  }
-  $("#sentOid").textContent=o.id;
-  $("#sentTotal").textContent=money(o.total);
-  $("#sentPay").textContent=o.pay;
-  go("sent");
+/* One key per checkout attempt. Reused across retries of the SAME
+   attempt so a failed network call cannot create a second order. */
+let idemKey=null;
+
+function setSendBusy(on,label){
+  submitting=on;
+  const btn=$("#o4 .btn-primary");
+  btn.disabled=on;
+  btn.style.opacity=on?".7":"";
+  btn.dataset.orig = btn.dataset.orig || btn.innerHTML;
+  btn.innerHTML = on ? (label||"جارٍ الإرسال…") : btn.dataset.orig;
 }
-function resetOrder(){ CART=[]; renderCart(); go("home"); }
+
+async function sendOrder(){
+  if(submitting) return;                       // guards the double click
+  if(!CART.length){ toast("سلتك فارغة"); return; }
+
+  const name=$("#fName").value.trim(), phone=$("#fPhone").value.trim();
+  if(name.length<2){ toast("أدخل اسمك الكامل"); step(1); $("#fName").focus(); return; }
+  if(!phone){ toast("أدخل رقم هاتفك"); step(1); $("#fPhone").focus(); return; }
+  if(!payMethod){ toast("اختر طريقة الدفع"); step(2); return; }
+  if(!receiptFile){ toast("ارفع صورة وصل الدفع"); step(3); return; }
+
+  const missing=firstMissingField();
+  if(missing){ toast(`أكمل: ${missing.label}`); missing.el&&missing.el.focus(); return; }
+
+  if(!idemKey) idemKey=API.newIdempotencyKey();
+
+  try{
+    setSendBusy(true,"جارٍ إنشاء الطلب…");
+
+    /* 1) create — the server prices the cart and issues the number */
+    if(!placedOrder){
+      placedOrder = await API.createOrder({
+        name, phone,
+        wilaya: $("#fWilaya").value.trim() || null,
+        paymentMethodId: payMethod,
+        items: cartForApi(),
+        idempotencyKey: idemKey,
+      });
+    }
+
+    /* 2) upload the receipt */
+    setSendBusy(true,"جارٍ رفع الوصل… 0%");
+    await API.uploadReceipt(placedOrder.order_id, receiptFile,
+      pct => setSendBusy(true,`جارٍ رفع الوصل… ${pct}%`));
+
+    /* 3) confirm. Only now is the order real. */
+    setSendBusy(true,"جارٍ تأكيد الطلب…");
+    const { order, whatsappNumber } = await API.submitOrder(placedOrder.order_id, $("#fRef").value.trim());
+
+    /* 4) and only now do we open WhatsApp */
+    const items=CART.map(c=>{
+      const p=P(c.id);
+      return { name:p.name, plan:p.plans[c.plan].n };
+    });
+    const number = whatsappNumber || CONFIG.whatsapp;
+    if(number) window.open(API.buildWhatsAppUrl(number, order, items, CONFIG.currency), "_blank");
+
+    $("#sentOid").textContent   = order.order_number;
+    $("#sentTotal").textContent = money(Number(order.total));
+    $("#sentPay").textContent   = (payMethodById(payMethod)||{}).label || "—";
+    go("sent");
+
+    CART=[]; renderCart();
+    placedOrder=null; idemKey=null; receiptFile=null; receiptName="";
+  }catch(err){
+    /* The server sends a ready-made Arabic message; show that, never
+       a raw error. A created-but-unconfirmed order is kept in
+       placedOrder so a retry resumes instead of ordering twice. */
+    toast(err.message || "تعذر إرسال الطلب. حاول مرة أخرى.");
+    if(err.code==="ACTIVE_ORDER_LIMIT" || err.code==="RATE_LIMITED"){
+      placedOrder=null; idemKey=null;
+    }
+  }finally{
+    setSendBusy(false);
+  }
+}
+
+function resetOrder(){
+  CART=[]; renderCart();
+  placedOrder=null; idemKey=null; receiptFile=null; receiptName="";
+  $("#fRef").value=""; $("#dropLabel").classList.remove("filled");
+  $("#dropText").textContent="اضغط لاختيار صورة الوصل";
+  $("#receiptFile").value="";
+  go("home");
+}
 
 /* ================================================================
-   INIT
+   ORDER TRACKING
    ================================================================ */
-renderCats(); renderHome(); renderCart(); renderShop();
+async function runTrack(){
+  const num=$("#tNum").value.trim(), last4=$("#tLast4").value.trim();
+  const out=$("#tResult");
+  if(!num || !/^[0-9]{4}$/.test(last4)){
+    out.innerHTML=`<div class="hint"><span>أدخل رقم الطلب وآخر 4 أرقام من هاتفك.</span></div>`;
+    return;
+  }
+  out.innerHTML=`<div class="hint"><span>جارٍ الاستعلام…</span></div>`;
+  try{
+    const o=await API.trackOrder(num,last4);
+    out.innerHTML=`<div class="card" style="text-align:start">
+      <div class="dl">
+        <div><span>رقم الطلب</span><b class="mono">${o.order_number}</b></div>
+        <div><span>الحالة</span><b>${o.status_label}</b></div>
+        <div><span>تاريخ الطلب</span><b class="mono">${new Date(o.created_at).toLocaleDateString("en-GB")}</b></div>
+      </div>
+      ${o.items&&o.items.length?`<div class="summary" style="margin-top:var(--s4)">${
+        o.items.map(i=>`<div class="r"><span>${i.name} — ${i.plan}${i.quantity>1?` ×${i.quantity}`:""}</span></div>`).join("")
+      }</div>`:""}
+    </div>`;
+  }catch(err){
+    out.innerHTML=`<div class="hint"><span>${err.message||"لم نعثر على طلب بهذه البيانات."}</span></div>`;
+  }
+}
 
-$$(".sec .rv, .promo").forEach(el=>el.classList.add("rv"));
+/* ================================================================
+   BOOT — load the catalogue, then render
+   ================================================================ */
+function skeletonCards(n){
+  return Array.from({length:n},()=>`<article class="pcard sk">
+    <div class="poster sk-box"></div>
+    <div class="pbody"><div class="sk-line" style="width:60%"></div>
+      <div class="sk-line" style="width:90%"></div>
+      <div class="sk-line" style="width:40%"></div>
+      <div class="sk-line sk-btn"></div></div>
+  </article>`).join("");
+}
+function showSkeletons(){
+  $("#bestRail").innerHTML = skeletonCards(4);
+  $("#shopGrid").innerHTML = skeletonCards(6);
+  $("#catGrid").innerHTML  = Array.from({length:5},()=>
+    `<span class="category-chip sk"><span class="sk-line" style="width:74px;margin:0"></span></span>`).join("");
+}
+function showErrorState(msg, retry){
+  const html = `<div class="empty">
+      <b>${msg}</b>
+      تحقق من اتصالك ثم أعد المحاولة.
+      <button class="btn btn-primary" style="margin-top:var(--s4)" id="retryBtn">إعادة المحاولة</button>
+    </div>`;
+  $("#shopGrid").innerHTML = html;
+  $("#bestRail").innerHTML = html;
+  $("#catGrid").innerHTML  = "";
+  $$("#retryBtn").forEach(b=>b.addEventListener("click",retry));
+}
+
+async function boot(){
+  if(!API.isConfigured()){
+    showErrorState("المتجر غير مضبوط بعد — أضف SUPABASE_URL و SUPABASE_ANON_KEY.", boot);
+    return;
+  }
+  showSkeletons();
+  try{
+    const [settings, cats, prods, pays] = await Promise.all([
+      API.loadStoreSettings(),
+      API.loadCategories(),
+      API.loadProducts(),
+      API.loadPaymentMethods(),
+    ]);
+
+    SETTINGS = settings;
+    CONFIG = {
+      whatsapp: settings.whatsapp_number || "",
+      brand:    settings.store_name || "Janeiro Store",
+      currency: settings.currency || "دج",
+    };
+    /* category glyphs are presentation, looked up by slug */
+    CATEGORIES = cats.map(c=>({
+      id:c.id, slug:c.slug, name:c.name,
+      accent:c.accent_color || "#7357FF",
+      svg: CATEGORY_ICONS[c.slug] || FALLBACK_CAT_ICON,
+    }));
+    PRODUCTS = prods;
+    PAYMENT_METHODS = pays;
+
+    renderCats(); renderHome(); renderCart(); renderShop();
+    revealOnScroll();
+  }catch(err){
+    console.error("boot failed", err);
+    showErrorState("تعذر تحميل المنتجات.", boot);
+  }
+}
+
 const io=new IntersectionObserver(es=>es.forEach(e=>{
   if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); }
 }),{threshold:.08,rootMargin:"0px 0px -40px 0px"});
-$$(".rv").forEach(el=>io.observe(el));
+function revealOnScroll(){
+  $$(".sec .rv, .promo").forEach(el=>el.classList.add("rv"));
+  $$(".rv:not(.in)").forEach(el=>io.observe(el));
+}
 
 window.addEventListener("scroll",()=>{
   if($("#home").classList.contains("hidden")) return;
   $("#hd").classList.toggle("stuck",window.scrollY>20);
 },{passive:true});
+
+/* This script is a module now, so its declarations are not globals.
+   The markup drives everything through inline handlers, so publish
+   exactly the ones it names -- changing the markup instead would mean
+   touching the design. */
+Object.assign(window, {
+  go, selectCat, scrollCats, doSearch, openSearch,
+  openDetail, setPlan, addCurrent,
+  chQty, delItem, openPanel, closePanels,
+  step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
+  runTrack, contactWhatsApp, toast,
+});
+
+boot();
 </script>
 </body>
 </html>

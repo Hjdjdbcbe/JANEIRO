@@ -7,10 +7,32 @@
    Edge Functions that hold the service role key server-side.
    ============================================================ */
 
-const JANEIRO_CONFIG = {
+/*
+   Two ways to configure, in this order:
+
+   1. Set window.JANEIRO_CONFIG before this module loads -- lets a
+      deploy step inject the keys without editing a tracked file:
+
+        <script>window.JANEIRO_CONFIG = { SUPABASE_URL:"...", SUPABASE_ANON_KEY:"..." }</script>
+
+   2. Or fill the placeholders below.
+*/
+const PLACEHOLDER = {
   SUPABASE_URL: "__SUPABASE_URL__",       // e.g. https://xxxx.supabase.co
   SUPABASE_ANON_KEY: "__SUPABASE_ANON_KEY__",
 };
+
+const JANEIRO_CONFIG = {
+  ...PLACEHOLDER,
+  ...(typeof window !== "undefined" ? (window.JANEIRO_CONFIG || {}) : {}),
+};
+
+/** True once real keys are in place. The UI shows a setup message
+    instead of firing doomed requests at "__SUPABASE_URL__". */
+export function isConfigured() {
+  const { SUPABASE_URL: u, SUPABASE_ANON_KEY: k } = JANEIRO_CONFIG;
+  return Boolean(u && k && !u.startsWith("__") && !k.startsWith("__"));
+}
 
 const REST = () => `${JANEIRO_CONFIG.SUPABASE_URL}/rest/v1`;
 const FN   = () => `${JANEIRO_CONFIG.SUPABASE_URL}/functions/v1`;
@@ -22,7 +44,11 @@ const HEAD = () => ({
 
 async function rest(path) {
   const r = await fetch(`${REST()}/${path}`, { headers: HEAD() });
-  if (!r.ok) throw new Error(`REST ${r.status}: ${await r.text()}`);
+  if (!r.ok) {
+    const err = new Error(`REST ${r.status}: ${await r.text()}`);
+    err.code = `REST_${r.status}`;
+    throw err;
+  }
   return r.json();
 }
 async function callFn(name, body) {
