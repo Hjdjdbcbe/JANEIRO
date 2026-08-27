@@ -200,10 +200,14 @@ header.stuck .hbar{height:48px}
   animation:bob 7s ease-in-out infinite}
 .osat b{font-size:11.5px;font-weight:600;white-space:nowrap;font-family:var(--f-body)}
 .osat .lg{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;flex:none}
-.osat:nth-child(3){top:6%;inset-inline-start:2%;animation-delay:-.4s}
-.osat:nth-child(4){top:34%;inset-inline-end:-2%;animation-delay:-2.1s}
-.osat:nth-child(5){bottom:16%;inset-inline-start:-3%;animation-delay:-3.6s}
-.osat:nth-child(6){bottom:2%;inset-inline-end:9%;animation-delay:-5.2s}
+/* Positioned by their own class, not nth-child: the satellites are
+   appended after the rings, core and dots, so they are children 7-10
+   and the old nth-child(3..6) rules never matched -- all four stacked
+   unpositioned in one corner. Same coordinates, reliable selector. */
+.osat.s1{top:6%;inset-inline-start:2%;animation-delay:-.4s}
+.osat.s2{top:34%;inset-inline-end:-2%;animation-delay:-2.1s}
+.osat.s3{bottom:16%;inset-inline-start:-3%;animation-delay:-3.6s}
+.osat.s4{bottom:2%;inset-inline-end:9%;animation-delay:-5.2s}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .odot{position:absolute;width:7px;height:7px;border-radius:50%;background:#B79BFF;opacity:.7;z-index:2}
 .odot.d1{top:12%;inset-inline-end:26%}
@@ -1229,8 +1233,8 @@ function renderHome(){
 
   /* orbit satellites — real products from the catalogue */
   $$("#orbit .osat").forEach(el=>el.remove());   // re-render safe
-  const sats=heroPicks(ORBIT_SLUGS).map(p=>
-    `<div class="osat"><span class="lg" style="background:${hex2rgba(p.accent,.12)}">${brandLogo(p,15)}</span><b>${p.name}</b></div>`
+  const sats=heroPicks(ORBIT_SLUGS).map((p,i)=>
+    `<div class="osat s${i+1}"><span class="lg" style="background:${hex2rgba(p.accent,.12)}">${brandLogo(p,15)}</span><b>${p.name}</b></div>`
   ).join("");
   $("#orbit").insertAdjacentHTML("beforeend",sats);
 }
