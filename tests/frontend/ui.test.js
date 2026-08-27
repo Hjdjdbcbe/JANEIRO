@@ -179,6 +179,86 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(rm.moving === 0, `reduced motion: no animation running (${rm.moving} running)`);
   await page3.close();
 
+  // ---------- scroll behaviour across page switches ----------
+  // NOTE: click by coordinates, never locator.click(). Playwright scrolls
+  // a target into view before clicking, which moves the page itself and
+  // makes every one of these assertions measure the harness rather than
+  // the app. Two false readings came from exactly that.
+  const scr = await newPage({ viewport: { width: 390, height: 844 } });
+  await scr.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+  await scr.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  await scr.waitForTimeout(900);
+  const sy = () => scr.evaluate(() => window.scrollY);
+
+  await scr.evaluate(() => window.go("shop"));
+  await scr.waitForTimeout(400);
+  await scr.evaluate(() => window.scrollTo({ top: 1400, behavior: "instant" }));
+  await scr.waitForTimeout(350);
+  const deep = await sy();
+
+  const onScreenCard = await scr.evaluate(() => {
+    const el = [...document.querySelectorAll("#shopGrid .pcard .pbody .btn")]
+      .find(x => { const r = x.getBoundingClientRect(); return r.top > 80 && r.bottom < 800; });
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  check(!!onScreenCard && deep > 400, `scrolled deep into the shop (y=${deep})`);
+  if (onScreenCard) {
+    await scr.mouse.click(onScreenCard.x, onScreenCard.y);
+    await scr.waitForSelector("#detail:not(.hidden)");
+    await scr.waitForTimeout(350);
+    check(await sy() === 0, "the product page opens at the top");
+
+    const crumb = await scr.locator("#detail .crumb").first().boundingBox();
+    await scr.mouse.click(crumb.x + crumb.width / 2, crumb.y + crumb.height / 2);
+    await scr.waitForTimeout(600);
+    const back = await sy();
+    check(Math.abs(back - deep) <= 4,
+          `going back returns you to the card you were on, not the top (${deep} -> ${back})`);
+  }
+
+  // tapping the nav item for the page you are already on means "go to the start"
+  await scr.evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
+  await scr.waitForTimeout(300);
+  await scr.evaluate(() => window.go("shop"));
+  await scr.waitForTimeout(400);
+  check(await sy() === 0, "re-tapping the current page scrolls to the top");
+
+  // a filter replaces the list, so a remembered offset would point at nothing
+  await scr.evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
+  await scr.waitForTimeout(250);
+  await scr.evaluate(() => window.go("home"));
+  await scr.waitForTimeout(250);
+  await scr.evaluate(() => window.selectCat("design"));
+  await scr.waitForTimeout(450);
+  check(await sy() === 0, "filtering starts the new list at the top");
+
+  // page switches must jump, not animate up the old page
+  const behaviour = await scr.evaluate(() => {
+    let seen = null;
+    const orig = window.scrollTo.bind(window);
+    window.scrollTo = (...a) => { if (typeof a[0] === "object") seen = a[0].behavior; return orig(...a); };
+    window.go("home");
+    window.scrollTo = orig;
+    return seen;
+  });
+  check(behaviour === "instant",
+        `page switches scroll instantly rather than animating (behavior=${behaviour})`);
+
+  // drawers must not lose the page position
+  await scr.evaluate(() => window.go("shop"));
+  await scr.evaluate(() => window.scrollTo({ top: 800, behavior: "instant" }));
+  await scr.waitForTimeout(350);
+  const beforeDrawer = await sy();
+  await scr.evaluate(() => window.openPanel("cart"));
+  await scr.waitForTimeout(400);
+  await scr.evaluate(() => window.closePanels());
+  await scr.waitForTimeout(450);
+  check(Math.abs((await sy()) - beforeDrawer) <= 4,
+        `opening and closing the cart keeps your place (${beforeDrawer} -> ${await sy()})`);
+  await scr.close();
+
   // ---------- narrow viewports ----------
   for (const w of [375, 390, 430]) {
     const pm = await newPage({ viewport: { width: w, height: 820 } });

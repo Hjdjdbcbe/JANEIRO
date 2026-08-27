@@ -1583,14 +1583,44 @@ function openSearch(){ go("shop"); setTimeout(()=>$("#shopSearch").focus(),320);
    NAVIGATION
    ================================================================ */
 const PAGES=["home","shop","detail","order","sent","track","about","policies"];
+/* Pages are swapped in place rather than being real documents, so the
+   browser has no history entry to restore the scroll position from --
+   go() has to do it. Only the two browsable lists are remembered:
+   opening a product from deep in the shop and pressing back must return
+   you to the card you were looking at, not dump you at the top.
+   detail/order/sent/track are per-item or per-step, so a remembered
+   offset there would land you somewhere arbitrary; they always start at
+   the top. */
+const SCROLL_MEMORY_PAGES = new Set(["home","shop"]);
+const scrollMemory = {};
+let currentPage = "home";
+
 function go(page,filter){
+  const samePage = page === currentPage;
+  if(!samePage && SCROLL_MEMORY_PAGES.has(currentPage))
+    scrollMemory[currentPage] = window.scrollY;
+
   PAGES.forEach(id=>$("#"+id).classList.toggle("hidden",id!==page));
-  if(filter!==undefined){ shopFilter=filter; shopQuery=""; $("#shopSearch").value=""; }
+  if(filter!==undefined){
+    shopFilter=filter; shopQuery=""; $("#shopSearch").value="";
+    /* The list is about to be replaced, so any remembered offset into
+       the old one points at nothing. */
+    scrollMemory.shop = 0;
+  }
   if(page==="shop") renderShop();
   if(page==="order"){ orderStep=1; step(1); }
   $$("#mainNav button").forEach(b=>b.classList.toggle("on",b.dataset.nav===page));
   $("#wa").classList.toggle("lift",page==="detail");
-  window.scrollTo(0,0);
+
+  /* Tapping the nav item for the page you are already on means "take me
+     to the start"; arriving from elsewhere restores where you were.
+     Instant, not smooth: html sets scroll-behavior:smooth, which turns
+     every page switch into a visible flight up the old page, and a long
+     restore animation gets cut short partway. Swapping pages should
+     read as arriving somewhere, not as scrolling there. */
+  window.scrollTo({ top: samePage ? 0 : (scrollMemory[page] ?? 0), left: 0, behavior: "instant" });
+
+  currentPage = page;
   $("#hd").classList.toggle("stuck",page!=="home");
 }
 
@@ -1703,7 +1733,7 @@ function step(n){
   $("#stepLbl").textContent=`الخطوة ${n} من 4 — ${STEP_LBL[n-1]}`;
   if(n===2){ renderPayMethods(); renderPayBox(); }
   if(n===4){ buildActivation(); buildReview(); }
-  window.scrollTo(0,0);
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 function setChannel(el,c){
   channel=c;
@@ -1941,6 +1971,8 @@ async function sendOrder(){
 
 function resetOrder(){
   CART=[]; renderCart();
+  /* Finishing an order is a fresh start, not a return to browsing. */
+  scrollMemory.home = 0; scrollMemory.shop = 0;
   placedOrder=null; idemKey=null; receiptFile=null; receiptName="";
   $("#fRef").value=""; $("#dropLabel").classList.remove("filled");
   $("#dropText").textContent="اضغط لاختيار صورة الوصل";
