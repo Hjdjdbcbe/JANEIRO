@@ -21,11 +21,16 @@ on conflict (slug) do update
 -- ---------- payment methods ----------
 -- Account details are intentionally blank: fill them from the
 -- Supabase dashboard, they must never be committed to git.
+-- Conflict target is the type: re-running must update, never duplicate.
+-- account_holder / account_number / instructions are deliberately NOT
+-- touched here, so a re-run never wipes details entered in the dashboard.
 insert into payment_methods (type, label, sort_order, is_active) values
   ('ccp',       'CCP',        1, true),
   ('baridimob', 'BaridiMob',  2, true),
   ('flexy',     'Flexy',      3, true)
-on conflict do nothing;
+on conflict (type) do update
+  set label = excluded.label,
+      sort_order = excluded.sort_order;
 
 -- ---------- products ----------
 do $$

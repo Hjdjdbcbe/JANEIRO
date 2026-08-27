@@ -56,6 +56,7 @@ create table if not exists profiles (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+drop trigger if exists trg_profiles_updated on profiles;
 create trigger trg_profiles_updated before update on profiles
   for each row execute function set_updated_at();
 
@@ -84,6 +85,7 @@ create table if not exists categories (
   updated_at   timestamptz not null default now()
 );
 create index if not exists idx_categories_active on categories(is_active, sort_order);
+drop trigger if exists trg_categories_updated on categories;
 create trigger trg_categories_updated before update on categories
   for each row execute function set_updated_at();
 
@@ -102,6 +104,12 @@ create table if not exists payment_methods (
   updated_at     timestamptz not null default now()
 );
 create index if not exists idx_payment_active on payment_methods(is_active, sort_order);
+-- One row per method type. Without this the seed's ON CONFLICT has no
+-- arbiter to match and a re-run silently duplicates every method.
+do $$ begin
+  alter table payment_methods add constraint payment_methods_type_key unique (type);
+exception when duplicate_table or duplicate_object then null; end $$;
+drop trigger if exists trg_payment_updated on payment_methods;
 create trigger trg_payment_updated before update on payment_methods
   for each row execute function set_updated_at();
 
@@ -113,6 +121,7 @@ create table if not exists store_settings (
   is_public  boolean not null default true,
   updated_at timestamptz not null default now()
 );
+drop trigger if exists trg_settings_updated on store_settings;
 create trigger trg_settings_updated before update on store_settings
   for each row execute function set_updated_at();
 

@@ -46,6 +46,7 @@ create table if not exists orders (
 create index if not exists idx_orders_phone_status on orders(normalized_phone, status);
 create index if not exists idx_orders_status       on orders(status, created_at desc);
 create index if not exists idx_orders_number       on orders(order_number);
+drop trigger if exists trg_orders_updated on orders;
 create trigger trg_orders_updated before update on orders
   for each row execute function set_updated_at();
 
@@ -102,8 +103,10 @@ begin
   return new;
 end $$;
 
+drop trigger if exists trg_order_status_ins on orders;
 create trigger trg_order_status_ins after insert on orders
   for each row execute function log_order_status();
+drop trigger if exists trg_order_status_upd on orders;
 create trigger trg_order_status_upd after update of status on orders
   for each row execute function log_order_status();
 

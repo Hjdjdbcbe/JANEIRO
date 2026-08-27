@@ -289,10 +289,90 @@ begin
 end $$;
 
 -- ============================================================
+-- REGRESSION — bugs found when this suite was first executed.
+-- Each block fails loudly if the fix is ever reverted.
+-- ============================================================
+do $$
+declare
+  v_pm uuid; v_prod uuid; v_plan uuid; v_items jsonb;
+  v_id uuid; v_res jsonb; v_ip inet; v_ok boolean;
+begin
+  select id into v_pm   from payment_methods where is_active order by sort_order limit 1;
+  select id into v_prod from products where slug = 'discord-nitro';
+  select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
+  v_items := jsonb_build_array(jsonb_build_object(
+    'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation', jsonb_build_array(
+      jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
+
+  -- ---------- a malformed X-Forwarded-For must not kill the order ----------
+  -- Regression: client_ip used a bare ::inet cast, so "unknown" or a
+  -- host:port hop raised invalid_text_representation and the customer
+  -- got a 500 instead of an order.
+  v_res := create_order('عميل','0554000001',null,v_pm,v_items,'reg-ip-key-001','not-an-ip');
+  assert v_res->>'order_id' is not null, 'malformed client_ip must not fail the order';
+  select client_ip into v_ip from orders where id = (v_res->>'order_id')::uuid;
+  assert v_ip is null, 'unparseable client_ip should be stored as NULL';
+
+  v_res := create_order('عميل','0554000002',null,v_pm,v_items,'reg-ip-key-002','203.0.113.9:52814');
+  select client_ip into v_ip from orders where id = (v_res->>'order_id')::uuid;
+  assert v_ip = '203.0.113.9'::inet, 'ipv4:port should keep the address, got: ' || coalesce(v_ip::text,'null');
+
+  v_res := create_order('عميل','0554000003',null,v_pm,v_items,'reg-ip-key-003','203.0.113.10');
+  select client_ip into v_ip from orders where id = (v_res->>'order_id')::uuid;
+  assert v_ip = '203.0.113.10'::inet, 'a clean IP must still be recorded';
+  raise notice 'PASS  malformed client_ip degrades to NULL instead of failing';
+
+  -- ---------- submit_order is idempotent, and says so ----------
+  -- Regression: the UPDATE matched on id alone, so a repeat submit
+  -- re-applied it and still reported already_submitted = false, which
+  -- made submit-order send the admin a second Telegram message.
+  v_id := (create_order('عميل','0554000004',null,v_pm,v_items,'reg-submit-key-1')->>'order_id')::uuid;
+  update orders set receipt_path='orders/x/r.jpg', receipt_uploaded_at=now() where id=v_id;
+
+  v_res := submit_order(v_id, 'REF-FIRST');
+  assert (v_res->>'already_submitted')::boolean = false, 'first submit must report already_submitted=false';
+  assert v_res->>'status' = 'pending_payment_review', 'first submit must move the order forward';
+
+  v_res := submit_order(v_id, 'REF-SECOND');
+  assert (v_res->>'already_submitted')::boolean = true,
+         'second submit must report already_submitted=true (else Telegram fires twice)';
+  assert (select payment_reference from orders where id=v_id) = 'REF-FIRST',
+         'a repeat submit must not overwrite the payment reference';
+  raise notice 'PASS  repeat submit is idempotent and does not re-notify';
+
+  -- ---------- a replay returns the same shape as a fresh create ----------
+  -- The replay branch omitted subtotal, so the two paths disagreed on the
+  -- payload shape. Both now carry it.
+  v_res := create_order('عميل','0554000005',null,v_pm,v_items,'reg-replay-key-1');
+  v_res := create_order('عميل','0554000005',null,v_pm,v_items,'reg-replay-key-1');
+  assert (v_res->>'idempotent_replay')::boolean, 'replay must be flagged';
+  assert (v_res->>'total')::numeric > 0, 'replay must carry the total';
+  assert (v_res->>'subtotal')::numeric > 0, 'replay must carry the subtotal too';
+  raise notice 'PASS  idempotent replay matches the fresh-create payload shape';
+
+  -- ---------- functions the README calls "internal" are not public ----------
+  v_ok := not has_function_privilege('anon', 'generate_order_number()', 'EXECUTE');
+  assert v_ok, 'generate_order_number must not be callable by anon';
+  v_ok := not has_function_privilege('anon', 'count_active_orders(text)', 'EXECUTE');
+  assert v_ok, 'count_active_orders must not be callable by anon';
+  v_ok := not has_function_privilege('anon', 'check_rate_limit(text,text,int,interval)', 'EXECUTE');
+  assert v_ok, 'check_rate_limit must not be callable by anon';
+  -- is_admin() is deliberately public: every RLS policy calls it as the
+  -- querying role, so revoking it would break admin access entirely.
+  assert has_function_privilege('anon', 'is_admin()', 'EXECUTE'),
+         'is_admin must stay executable or every admin policy breaks';
+  raise notice 'PASS  internal functions are not exposed to anon';
+
+  raise notice '';
+  raise notice '===== regression tests passed =====';
+end $$;
+
+-- ============================================================
 -- RLS  (§39) — run as the anon role
 -- ============================================================
 do $$
-declare v_count int; v_ok boolean := false;
+declare v_count int; v_blocked boolean;
 begin
   set local role anon;
 
@@ -301,8 +381,8 @@ begin
   assert v_count > 0, 'anon should read published products';
 
   -- public must NOT see draft/archived
-  select count(*) into v_count from products where status = 'draft';
-  assert v_count = 0, 'anon must not see draft products';
+  select count(*) into v_count from products where status in ('draft','hidden','archived');
+  assert v_count = 0, 'anon must not see draft/hidden/archived products';
 
   -- public must NOT list orders
   select count(*) into v_count from orders;
@@ -312,23 +392,39 @@ begin
   select count(*) into v_count from order_activation_data;
   assert v_count = 0, 'anon must not read activation data';
 
-  -- public must NOT insert a product
+  -- public must NOT read receipts in storage
+  select count(*) into v_count from storage.objects where bucket_id = 'receipts';
+  assert v_count = 0, 'anon must not list the receipts bucket';
+
+  -- public must NOT insert a product.
+  -- NOTE: the flag is set on the success path, never by RAISE. An earlier
+  -- version raised 'FAILED' inside the block and caught it with `when others`,
+  -- which swallowed its own failure signal — the assert could never fire.
+  v_blocked := true;
   begin
     insert into products (name, slug, status) values ('اختراق','hack-test','published');
-    raise exception 'FAILED: anon inserted a product';
-  exception when insufficient_privilege or others then v_ok := true;
+    v_blocked := false;
+  exception when others then null;
   end;
-  assert v_ok, 'anon product insert must be blocked';
+  assert v_blocked, 'anon product insert must be blocked';
 
   -- public must NOT call create_order directly (grant revoked)
-  v_ok := false;
+  v_blocked := true;
   begin
-    perform create_order('x','0550000000',null,null,'[]'::jsonb,'rls-test');
-    raise exception 'FAILED: anon called create_order directly';
-  exception when insufficient_privilege then v_ok := true;
-           when others then v_ok := true;
+    perform create_order('x','0550000000',null,null,'[]'::jsonb,'rls-test-key');
+    v_blocked := false;
+  exception when others then null;
   end;
-  assert v_ok, 'anon must not execute create_order';
+  assert v_blocked, 'anon must not execute create_order';
+
+  -- ...nor submit_order
+  v_blocked := true;
+  begin
+    perform submit_order(gen_random_uuid(), null);
+    v_blocked := false;
+  exception when others then null;
+  end;
+  assert v_blocked, 'anon must not execute submit_order';
 
   reset role;
   raise notice 'PASS  RLS blocks anonymous access';

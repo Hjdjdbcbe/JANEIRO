@@ -53,6 +53,26 @@ begin
 end $$;
 
 -- ------------------------------------------------------------
+-- X-Forwarded-For is attacker-influenced text, and a bare ::inet
+-- cast raises on anything unexpected (a host:port pair, "unknown",
+-- an empty hop). That would turn a cosmetic header into a failed
+-- order, so parse defensively and fall back to NULL.
+-- ------------------------------------------------------------
+create or replace function safe_inet(raw text)
+returns inet language plpgsql immutable as $$
+declare v text; begin
+  v := trim(coalesce(raw, ''));
+  if v = '' then return null; end if;
+  -- strip a trailing :port from IPv4 (some proxies add one)
+  if v ~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}:[0-9]+$' then
+    v := split_part(v, ':', 1);
+  end if;
+  return v::inet;
+exception when others then
+  return null;
+end $$;
+
+-- ------------------------------------------------------------
 -- Rate limiting. Returns true when the action is allowed.
 -- ------------------------------------------------------------
 create or replace function check_rate_limit(
@@ -126,6 +146,7 @@ begin
     return jsonb_build_object(
       'order_id', v_existing.id,
       'order_number', v_existing.order_number,
+      'subtotal', v_existing.subtotal,      -- same shape as the fresh path
       'total', v_existing.total,
       'currency', v_existing.currency,
       'status', v_existing.status,
@@ -172,14 +193,34 @@ begin
 
   v_number := generate_order_number();
 
-  insert into orders (
-    order_number, customer_name, customer_phone, normalized_phone, customer_wilaya,
-    payment_method_id, subtotal, total, currency, status, idempotency_key, client_ip
-  ) values (
-    v_number, trim(p_name), p_phone, v_phone, nullif(trim(coalesce(p_wilaya,'')), ''),
-    p_payment_method, 0, 0, v_currency, 'awaiting_receipt', p_idempotency_key,
-    nullif(p_client_ip,'')::inet
-  ) returning id into v_order_id;
+  -- The SELECT above only catches a *sequential* replay. Two requests in
+  -- flight at once both miss it, and the loser hits the unique index. That
+  -- must still read as a replay, not as a failure: the double-click case is
+  -- precisely what the idempotency key exists for.
+  begin
+    insert into orders (
+      order_number, customer_name, customer_phone, normalized_phone, customer_wilaya,
+      payment_method_id, subtotal, total, currency, status, idempotency_key, client_ip
+    ) values (
+      v_number, trim(p_name), p_phone, v_phone, nullif(trim(coalesce(p_wilaya,'')), ''),
+      p_payment_method, 0, 0, v_currency, 'awaiting_receipt', p_idempotency_key,
+      safe_inet(p_client_ip)
+    ) returning id into v_order_id;
+  exception when unique_violation then
+    -- The winner has committed by the time we get here (the insert blocked
+    -- until it did), so this SELECT sees its row.
+    select * into v_existing from orders where idempotency_key = p_idempotency_key;
+    if not found then raise; end if;   -- a different unique index tripped
+    return jsonb_build_object(
+      'order_id', v_existing.id,
+      'order_number', v_existing.order_number,
+      'subtotal', v_existing.subtotal,
+      'total', v_existing.total,
+      'currency', v_existing.currency,
+      'status', v_existing.status,
+      'idempotent_replay', true
+    );
+  end;
 
   -- ---------- items ----------
   for v_item in select * from jsonb_array_elements(p_items) loop
@@ -303,12 +344,27 @@ begin
     raise exception 'ACTIVE_ORDER_LIMIT';
   end if;
 
+  -- Guard on the status too. Matching on id alone let a second concurrent
+  -- submit re-apply the update and report already_submitted = false as well,
+  -- so submit-order sent the admin two Telegram messages for one order.
   update orders set
     status = 'pending_payment_review',
     submitted_at = now(),
     payment_reference = coalesce(nullif(trim(p_payment_reference),''), payment_reference)
   where id = p_order_id
+    and status = 'awaiting_receipt'
   returning * into v_order;
+
+  if not found then
+    -- A concurrent call won the race; report its result, don't notify again.
+    select * into v_order from orders where id = p_order_id;
+    if not found then raise exception 'ORDER_NOT_FOUND'; end if;
+    return jsonb_build_object(
+      'order_id', v_order.id, 'order_number', v_order.order_number,
+      'status', v_order.status, 'total', v_order.total,
+      'currency', v_order.currency, 'already_submitted', true
+    );
+  end if;
 
   return jsonb_build_object(
     'order_id', v_order.id, 'order_number', v_order.order_number,
@@ -374,6 +430,9 @@ revoke all on function create_order(text,text,text,uuid,jsonb,text,text) from pu
 revoke all on function submit_order(uuid,text)                          from public, anon, authenticated;
 revoke all on function check_rate_limit(text,text,int,interval)         from public, anon, authenticated;
 revoke all on function count_active_orders(text)                        from public, anon, authenticated;
+
+revoke all on function generate_order_number()                   from public, anon, authenticated;
+revoke all on function safe_inet(text)                          from public, anon, authenticated;
 
 grant execute on function track_order(text,text)          to anon, authenticated;
 grant execute on function normalize_dz_phone(text)         to anon, authenticated;

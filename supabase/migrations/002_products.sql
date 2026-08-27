@@ -52,6 +52,7 @@ create table if not exists products (
 );
 create index if not exists idx_products_status   on products(status, sort_order);
 create index if not exists idx_products_category on products(category_id);
+drop trigger if exists trg_products_updated on products;
 create trigger trg_products_updated before update on products
   for each row execute function set_updated_at();
 
@@ -71,6 +72,7 @@ create table if not exists product_plans (
   constraint old_price_higher check (old_price is null or old_price > price)
 );
 create index if not exists idx_plans_product on product_plans(product_id, is_active, sort_order);
+drop trigger if exists trg_plans_updated on product_plans;
 create trigger trg_plans_updated before update on product_plans
   for each row execute function set_updated_at();
 
