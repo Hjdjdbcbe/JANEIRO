@@ -32,8 +32,13 @@ const check = (c, m) => c ? ok(m) : bad(m);
 
   // ---------- catalogue loaded from the database ----------
   await page.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0, { timeout: 10000 });
+  /* Compare against what the API actually returns, not a hardcoded count:
+     adding a product to the catalogue should not fail the test suite. */
   const cards = await page.locator("#shopGrid .pcard").count();
-  check(cards === 10, `shop grid rendered ${cards} products from the database (expected 10)`);
+  const visible = await page.evaluate(async (b) =>
+    (await (await fetch(`${b}/rest/v1/products?select=id`)).json()).length, BASE);
+  check(cards === visible && cards > 0,
+        `the grid renders every visible product (${cards} cards, ${visible} from the database)`);
 
   const chips = await page.locator("#catGrid .category-chip").count();
   check(chips === 7, `category chips: ${chips} (الكل + 6 categories)`);

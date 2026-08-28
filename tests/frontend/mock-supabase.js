@@ -269,7 +269,8 @@ async function fn(name, req, res) {
   }
 }
 
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml" };
 
 /* Stands in for the public product-media bucket. Serves a tiny valid PNG
    for any path, except one containing "missing" so the frontend's
@@ -279,6 +280,12 @@ const PNG_1PX = Buffer.from(
   "base64");
 function storage(url, res) {
   if (url.pathname.includes("missing")) return send(res, 404, "not found", "text/plain");
+  /* Serve the real artwork from assets/product-media when it is there,
+     so the preview shows what the bucket will actually hold. */
+  const rel = url.pathname.replace("/storage/v1/object/public/product-media/", "");
+  const abs = path.join(ROOT, "assets/product-media", rel);
+  if (abs.startsWith(path.join(ROOT, "assets/product-media")) && fs.existsSync(abs))
+    return send(res, 200, fs.readFileSync(abs), TYPES[path.extname(abs)] || "image/png");
   send(res, 200, PNG_1PX, "image/png");
 }
 

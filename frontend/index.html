@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light only">
 <meta name="theme-color" content="#FFFFFF">
+<link rel="icon" type="image/png" href="assets/janeiro-logo.png">
+<link rel="apple-touch-icon" href="assets/janeiro-logo.png">
 <title>Janeiro Store — كل أدواتك الرقمية في مكان واحد</title>
 <meta name="description" content="متجر جزائري للاشتراكات والمنتجات الرقمية. تفعيل سريع، دفع محلي عبر CCP وBaridiMob وFlexy، ودعم مباشر على واتساب.">
 <meta property="og:title" content="Janeiro Store — كل أدواتك الرقمية في مكان واحد">
@@ -176,6 +178,10 @@ header.stuck .hshell{box-shadow:0 8px 26px rgba(8,9,20,.14)}
 header.stuck .hbar{height:48px}
 @media(min-width:900px){.hbar{height:62px;padding-inline:var(--s6)}header.stuck .hbar{height:54px}}
 .brand{display:flex;align-items:center;gap:9px;cursor:pointer;flex:none}
+/* the real mark replaces the J monogram; the gradient tile stays as the
+   fallback if the file is ever missing */
+.jmark img{width:100%;height:100%;object-fit:contain;border-radius:inherit;display:block}
+.jmark:has(img){background:none;box-shadow:none}
 .jmark{width:34px;height:34px;border-radius:11px;background:var(--brand-grad);color:#fff;
   display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:17px;
   box-shadow:0 4px 12px -3px rgba(108,53,255,.55);flex:none}
@@ -241,7 +247,10 @@ header.stuck .hbar{height:48px}
 .orbit-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   width:31%;aspect-ratio:1;border-radius:28%;background:var(--brand-grad);color:#fff;
   display:grid;place-items:center;font-family:var(--f-display);font-weight:800;
-  font-size:clamp(30px,9vw,52px);box-shadow:0 20px 48px -14px rgba(108,53,255,.65);z-index:3}
+  font-size:clamp(30px,9vw,52px);box-shadow:0 20px 48px -14px rgba(108,53,255,.65);z-index:3;
+  overflow:hidden}
+.orbit-core img{width:100%;height:100%;object-fit:cover;display:block}
+.orbit-core:has(img){background:#000}
 .orbit-core::after{content:"";position:absolute;inset:0;border-radius:28%;
   background:linear-gradient(180deg,rgba(255,255,255,.22),transparent 55%)}
 .osat{position:absolute;background:var(--light-card);color:var(--text-on-light);border:1px solid var(--light-border);
@@ -384,7 +393,12 @@ header.stuck .hbar{height:48px}
 .pcard:hover{transform:translateY(-4px);box-shadow:var(--sh-3);border-color:transparent}
 
 /* poster artwork — designed fallback when no image asset exists */
-.poster{position:relative;aspect-ratio:1/1;display:flex;flex-direction:column;
+/* 3:4, matching the product card artwork. It was 1:1, and object-fit:
+   cover on a portrait card cropped away the product name and the
+   janeiro-store.com footer -- the half the artwork exists for. The
+   designed fallback uses the same ratio so the grid stays even whether
+   a product has a poster or not. */
+.poster{position:relative;aspect-ratio:3/4;display:flex;flex-direction:column;
   padding:var(--s3);overflow:hidden;background:var(--pbg)}
 .poster img.pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .poster::before{content:"";position:absolute;width:120%;aspect-ratio:1;border-radius:50%;
@@ -699,7 +713,7 @@ footer ul button:hover{color:var(--text-on-dark)}
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
     <div class="brand" onclick="go('home')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')go('home')">
-      <div class="jmark" aria-hidden="true">J</div>
+      <div class="jmark" aria-hidden="true"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div>
       <div><b>Janeiro Store</b><span class="mono">@janeiro_service</span></div>
     </div>
     <nav class="nav" id="mainNav" aria-label="التنقل الرئيسي">
@@ -731,7 +745,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ===== mobile menu ===== -->
 <aside class="panel r" id="menu" aria-label="القائمة">
   <div class="phead">
-    <div class="brand"><div class="jmark">J</div><b>Janeiro Store</b></div>
+    <div class="brand"><div class="jmark"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div><b>Janeiro Store</b></div>
     <button class="ibtn" onclick="closePanels()" aria-label="إغلاق">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
@@ -793,7 +807,7 @@ footer ul button:hover{color:var(--text-on-dark)}
       <div class="orbit" aria-hidden="true" id="orbit">
         <div class="orbit-ring r2"></div>
         <div class="orbit-ring r1"></div>
-        <div class="orbit-core">J</div>
+        <div class="orbit-core"><img src="assets/janeiro-logo.png" alt="Janeiro Store"></div>
         <span class="odot d1"></span><span class="odot d2"></span><span class="odot d3"></span>
       </div>
     </div>
@@ -1140,7 +1154,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <footer>
   <div class="wrap fgrid">
     <div>
-      <div class="brand"><div class="jmark">J</div><b>Janeiro Store</b></div>
+      <div class="brand"><div class="jmark"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div><b>Janeiro Store</b></div>
       <p class="fdesc">متجر جزائري للاشتراكات والمنتجات الرقمية، بتفعيل سريع ودعم مباشر.</p>
       <div class="socials">
         <a href="#" onclick="return false" aria-label="واتساب"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2Zm0 1.8a8.2 8.2 0 1 1-4.3 15.2l-.4-.2-3.3.9.9-3.2-.3-.4A8.2 8.2 0 0 1 12 3.8Zm4.6 9.9c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-1.4-.6-2.5-1.6-3.1-2.8-.1-.2 0-.4.1-.5l.5-.6c.1-.2.1-.3 0-.5l-.8-1.9c-.2-.4-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.7.7-1 1.6-.9 2.5.2 2.4 3 5.9 6.2 6.9 1.4.5 2.5.4 3.2-.2.4-.3.7-.8.8-1.3.1-.2 0-.4-.2-.5Z"/></svg></a>
