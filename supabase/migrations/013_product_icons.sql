@@ -56,7 +56,9 @@ alter table products add constraint products_icon_path_shape check (
 );
 
 -- ---------- expose it to the public read view ----------
-create or replace view public_products as
+-- Same reason as 002: drop first so neither file cares which ran last.
+drop view if exists public_products;
+create view public_products as
 select
   p.id, p.name, p.slug, p.short_description, p.description,
   p.poster_path, p.thumbnail_path, p.accent_color,

@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#FFFFFF">
+<!-- Keys live here, not in this file. config.js is gitignored; copy
+     config.example.js to config.js and fill it in. The onerror keeps an
+     unconfigured checkout from throwing -- janeiro-api.js already shows a
+     setup message instead of firing requests at "__SUPABASE_URL__".
+     The anon key is public by design; the service_role key must NEVER
+     appear in any file the browser can load. -->
+<script src="config.js" onerror="/* not configured yet */"></script>
 <link rel="icon" type="image/png" href="assets/janeiro-logo.png">
 <link rel="apple-touch-icon" href="assets/janeiro-logo.png">
 <title>Janeiro Store — كل أدواتك الرقمية في مكان واحد</title>

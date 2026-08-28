@@ -115,7 +115,14 @@ create index if not exists idx_images_product on product_images(product_id, imag
 -- ---------- public read view ----------
 -- Frontend reads this instead of joining by hand; it also guarantees
 -- that only purchasable/visible products ever leave the database.
-create or replace view public_products as
+-- DROP then CREATE, not CREATE OR REPLACE. A later migration extends this
+-- view (013 adds icon_path), and CREATE OR REPLACE cannot remove a column
+-- that a later migration added -- so on the second pass of the migration
+-- runner this file would fail with "cannot drop columns from view" and the
+-- idempotency check would break. Dropping first makes the order of passes
+-- irrelevant. Nothing depends on this view, and 005 re-grants it.
+drop view if exists public_products;
+create view public_products as
 select
   p.id, p.name, p.slug, p.short_description, p.description,
   p.poster_path, p.thumbnail_path, p.accent_color,

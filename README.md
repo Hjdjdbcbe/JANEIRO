@@ -1,5 +1,43 @@
 # Janeiro Store — Backend
 
+
+## تشغيله على جهازك بأمر واحد
+
+```bash
+bash run-locally.sh
+```
+
+يبني قاعدة بيانات محلية، يطبّق الهجرات، يزرع بيانات تجريبية، ويشغّل
+خادماً يخدم المتجر واللوحة معاً:
+
+| | الرابط |
+|---|---|
+| المتجر | `http://127.0.0.1:8808/frontend/index.html` |
+| اللوحة | `http://127.0.0.1:8808/dashboard/index.html` |
+
+دخول اللوحة محلياً: `admin@janeiro.test` / `admin-pass-123` — حساب تجريبي
+مزروع في `tests/frontend/fixtures.sql`، لا يعمل إلا محلياً.
+
+يحتاج PostgreSQL و Node.js مثبّتين. أوقفه بـ `Ctrl+C`.
+
+> ⚠️ **هذه بيئة تجربة، ليست نشراً.** كل شيء على جهازك: البيانات في قاعدة
+> محلية، والصور المرفوعة تُحفظ في `assets/product-media/` لا في تخزين
+> Supabase. لا يصل إليها أحد غيرك، ولا يوجد رابط إنترنت. للنشر الحقيقي
+> راجع قسم النشر أدناه.
+
+### المفاتيح
+
+الموقع واللوحة يقرآن كلاهما `config.js` بجانبهما (كلاهما مستثنى في
+`.gitignore`). للنشر الحقيقي انسخ المثال وعبّئه:
+
+```bash
+cp frontend/config.example.js  frontend/config.js
+cp dashboard/config.example.js dashboard/config.js
+```
+
+المفتاح `anon` عام بالتصميم ويحميه RLS. `service_role` لا يوضع في أي ملف
+يحمّله المتصفح — مكانه Supabase Secrets فقط.
+
 ## ⚠️ اقرأ هذا أولاً
 
 **ما شُغِّل فعلاً:** الـmigrations وقاعدة البيانات كاملة اختُبرت على
