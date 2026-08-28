@@ -25,3 +25,7 @@ assets/product-media/products/icons/
 
 # the storefront reads its keys the same way the dashboard does
 frontend/config.js
+
+# Built demo bundles: ~2.6MB each of inlined data URIs, regenerated in
+# seconds by tools/build-demo.js. The builder is the source, not these.
+demo/*.html
