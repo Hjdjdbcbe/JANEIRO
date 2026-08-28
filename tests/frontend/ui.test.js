@@ -147,91 +147,66 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   });
   check(animatedProps.length === 0, `nothing transitions layout properties${animatedProps.length ? " -> " + animatedProps.slice(0,3) : ""}`);
 
-  // ---------- the hero product orbit ----------
-  // earlier checks navigated away; the hero has to be on screen and in
-  // view or the marks measure zero and the observer keeps it paused
+  // ---------- the hero banner ----------
   await page.evaluate(() => window.go("home"));
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
 
-  const orb = await page.evaluate(() => {
-    const marks = [...document.querySelectorAll(".hoBill")];
-    const cs = getComputedStyle(document.getElementById("hoRing"));
+  const hero = await page.evaluate(() => {
+    const img = document.querySelector(".heroArt img");
+    const cs = getComputedStyle(img);
     return {
-      n: marks.length,
-      dur: cs.animationDuration,
-      labels: marks.map(m => m.getAttribute("aria-label")),
-      delays: marks.map(m => m.style.animationDelay),
-      /* Aspect ratio, not width: perspective legitimately shrinks a mark
-         at the back of the ring in BOTH dimensions, so a width threshold
-         flags correct foreshortening. A mark showing its edge is squashed
-         in one dimension only -- measured at 23x66 when this regressed,
-         against ~1.0 when it is right. */
-      ratios: marks.map(m => { const r = m.getBoundingClientRect(); return +(r.width / r.height).toFixed(2); }),
+      src: img.currentSrc.split("/").pop(),
+      loaded: img.naturalWidth > 0,
+      w: img.getAttribute("width"), h: img.getAttribute("height"),
+      priority: img.getAttribute("fetchpriority"),
+      sources: [...document.querySelectorAll(".heroArt source")].length,
+      webpFirst: document.querySelector(".heroArt source").type === "image/webp",
+      orbitGone: document.querySelectorAll("#horbit,.hoBill,.hoRing,.hstage,.hfeat").length === 0,
     };
   });
-  check(orb.n === 6, `six marks on a desktop column: ${orb.n}`);
-  check(parseFloat(orb.dur) >= 30, `the ring turns slowly enough to read as ambient: ${orb.dur}`);
-  check(orb.labels.every(Boolean), "every mark carries its product name for assistive tech");
-  check(new Set(orb.labels).size === orb.n, "no product appears on the ring twice");
+  check(hero.loaded, `the banner renders: ${hero.src}`);
+  check(hero.src.includes("wide"), `a desktop column gets the wide crop: ${hero.src}`);
+  check(!!hero.w && !!hero.h, `dimensions are declared so nothing jumps: ${hero.w}x${hero.h}`);
+  check(hero.priority === "high", "the banner is fetched at high priority");
+  check(hero.sources === 3 && hero.webpFirst, `webp is offered first with a png fallback (${hero.sources} sources)`);
+  check(hero.orbitGone, "no orbit left behind");
 
-  /* The counter-turn has to cancel the ring's angle AND the mark's own
-     slot angle. Cancelling only the ring leaves each mark skewed by its
-     slot angle -- it shows its edge, and its hit area shrinks to a sliver
-     that silently swallows clicks. Both animations therefore take the same
-     negative delay, and a mark that is too narrow is the symptom. */
-  check(orb.ratios.every(r => r > 0.85),
-        `every mark faces the reader, none shows its edge: ${orb.ratios.join(", ")}`);
-  check(new Set(orb.delays).size === orb.n,
-        "each mark is phase-shifted, so they do not dim in unison");
+  /* The copy has to sit in the half the artwork left clear. RTL grid
+     numbering runs right-to-left, and naming the wrong column once put
+     the whole block over the banner's black logo. */
+  const side = await page.evaluate(() => {
+    const c = document.querySelector(".heroCopy").getBoundingClientRect();
+    return { mid: c.left + c.width / 2, vw: window.innerWidth };
+  });
+  check(side.mid > side.vw / 2, `the copy sits on the clear right side (centre at ${Math.round(side.mid)} of ${side.vw})`);
 
-  /* Front marks take clicks; back ones pass behind the logo and must not,
-     or a tap on the logo lands on whatever is hidden behind it. */
-  await page.hover("#horbit");
-  await page.waitForTimeout(250);
-  const hits = await page.evaluate(() => [...document.querySelectorAll(".hoBill")].map(m => {
-    const r = m.getBoundingClientRect();
-    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return { pe: getComputedStyle(m).pointerEvents, own: m === top || m.contains(top) };
-  }));
-  const front = hits.filter(h => h.pe === "auto");
-  check(front.length > 0 && front.length < hits.length,
-        `the ring is split front/back: ${front.length} of ${hits.length} clickable`);
-  check(front.every(h => h.own),
-        "every clickable mark actually receives the click, not a slot behind it");
+  check(await page.locator(".trustline .tpoint").count() === 4, "four trust badges");
+  check(await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".trustline")).gridTemplateColumns.split(" ").length) === 4,
+    "trust badges sit four across on a desktop column");
 
-  check(await page.evaluate(() => getComputedStyle(document.getElementById("hoRing")).animationPlayState) === "paused",
-        "hovering the ring stops it");
+  // ---------- the featured strip ----------
+  const feat = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll("#featGrid .pcard")];
+    return {
+      n: cards.length,
+      priced: cards.filter(c => /\d/.test(c.querySelector(".pprice")?.textContent || "")).length,
+      buttons: cards.filter(c => c.querySelector(".btn")).length,
+      seeAll: !!document.querySelector("#featuredSec .arclink"),
+    };
+  });
+  check(feat.n > 0 && feat.n <= 4, `the featured strip shows real products: ${feat.n}`);
+  check(feat.priced === feat.n, `every card carries a price: ${feat.priced}/${feat.n}`);
+  check(feat.buttons === feat.n, `every card has a way to buy: ${feat.buttons}/${feat.n}`);
+  check(feat.seeAll, "a see-all link sits beside the heading");
 
-  // clicking a mark opens that product
-  const label = await page.evaluate(() => [...document.querySelectorAll(".hoBill")]
-    .find(m => getComputedStyle(m).pointerEvents === "auto").getAttribute("aria-label"));
-  await page.locator(`.hoBill[aria-label="${label}"]`).click();
-  await page.waitForTimeout(500);
-  check(await page.evaluate(() => document.getElementById("dName").textContent) === label,
-        `clicking a mark opens its product: ${label}`);
+  await page.locator("#featuredSec .arclink").click();
+  await page.waitForTimeout(400);
+  check(await page.evaluate(() => !document.getElementById("shop").classList.contains("hidden")),
+        "see-all opens the shop");
   await page.evaluate(() => window.go("home"));
   await page.waitForTimeout(300);
-
-  // scrolled out of sight, it stops -- an animation nobody sees costs the same
-  await page.evaluate(() => window.scrollTo(0, 3000));
-  await page.waitForTimeout(400);
-  check(await page.evaluate(() => getComputedStyle(document.getElementById("hoRing")).animationPlayState) === "paused",
-        "the ring stops once it is scrolled out of view");
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(400);
-
-  // the featured product is real, priced, and buyable
-  const feat = await page.evaluate(() => {
-    const c = document.querySelector(".hfeat");
-    if(!c) return null;
-    return { name: c.querySelector(".hfInfo b")?.textContent,
-             price: c.querySelector(".hfPrice b")?.textContent,
-             buttons: [...c.querySelectorAll("button")].map(b => b.textContent.trim()) };
-  });
-  check(feat && feat.name, `the hero features a real product: ${feat && feat.name}`);
-  check(feat && /\d/.test(feat.price || ""), `it shows a price: ${feat && feat.price}`);
-  check(feat && feat.buttons.length === 2, `with a buy and an add-to-cart: ${feat && feat.buttons.join(" / ")}`);
 
   // cart pulse fires once
   await page.evaluate(() => document.querySelector("#cartBadge").classList.remove("cartpulse"));

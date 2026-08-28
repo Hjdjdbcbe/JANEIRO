@@ -29,3 +29,6 @@ frontend/config.js
 # Built demo bundles: ~2.6MB each of inlined data URIs, regenerated in
 # seconds by tools/build-demo.js. The builder is the source, not these.
 demo/*.html
+
+# stray output when a capture script is run without its output dir set
+undefined/

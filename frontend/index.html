@@ -246,7 +246,9 @@ html{scroll-behavior:smooth;background:var(--bg);overscroll-behavior-y:none;-web
 body{
   background:var(--bg);color:var(--ink);font-family:var(--f-body);
   font-size:15px;line-height:1.7;overflow-x:hidden;min-height:100vh;
-  padding-bottom:env(safe-area-inset-bottom);
+  /* room for the floating contact button, which is fixed and would
+     otherwise cover whatever the page ends with */
+  padding-bottom:calc(64px + env(safe-area-inset-bottom));
 }
 h1,h2,h3{font-family:var(--f-display);font-weight:400;line-height:1.42;letter-spacing:normal}
 h4{font-family:var(--f-body);font-weight:700;line-height:1.4}
@@ -305,14 +307,11 @@ img,svg{display:block}
 .category-chip{transition:transform var(--t-ui) var(--ease-out),
   background var(--t-ui) ease,color var(--t-ui) ease,border-color var(--t-ui) ease}
 
-/* Orbit rings: one full turn a minute, slow enough to read as ambient
-   rather than as something spinning. */
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
   /* Entrance states must be cleared too, or an element whose transition
      was just disabled stays stuck at opacity 0 forever. */
   .rv,.stag{opacity:1!important;transform:none!important}
-  .hoRing,.hoFace,.hoBill{animation-play-state:paused!important}
   html{scroll-behavior:auto}
 }
 
@@ -378,42 +377,7 @@ header.stuck .hbar{height:48px}
 @media(min-width:900px){.hcta{display:inline-flex;padding:10px 18px;font-size:13.5px}}
 
 /* ============ HERO ============ */
-/* The supplied artwork, minus its logo and tiles -- those are the live
-   orbit's job, and baking four products into a JPEG means an archived
-   product keeps selling itself from the hero. What is left is the
-   atmosphere: the splatter field and the silk waves.
 
-   Light theme only. The artwork is a near-white ground; on the dark theme
-   it would read as a bright purple slab, and the overriding rule below
-   means the file is never even fetched there. */
-.hero::before{
-  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background-image:url(assets/hero/tex-tall.webp);
-  background-size:cover;background-position:center top;
-}
-@media(min-width:900px){.hero::before{
-  background-image:url(assets/hero/tex-wide.webp);background-position:center}}
-[data-theme="dark"] .hero::before{background-image:none}
-
-/* A readability wash over the artwork, on the side the copy sits.
-
-   Measured, not assumed: sampling the real pixels behind the hero copy
-   found a splatter blob at #9476D9 reaching into the text column. The
-   headings survived it at 4.95:1, but the lede is --ink-2 and landed at
-   1.81:1 -- unreadable. A contrast sweep that composites background
-   COLOURS cannot see this, because the ground here is an image.
-
-   The wash is opaque --bg where the words are and clears completely over
-   the orbit, so the artwork keeps its presence where nothing is read.
-   RTL puts the copy on the right, hence `to left`. */
-.hero::after{
-  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(to bottom, var(--bg) 0%, var(--bg) 34%, transparent 74%);
-}
-@media(min-width:900px){
-  .hero::after{background:linear-gradient(to left, var(--bg) 0%, var(--bg) 30%, transparent 68%)}
-}
-[data-theme="dark"] .hero::after{background:none}
 
 .hero{padding:var(--hdr-space) 0 var(--s16);position:relative;overflow:hidden;
   background:
@@ -436,126 +400,80 @@ header.stuck .hbar{height:48px}
 .hero-cta{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
 .hero .btn-ghost{background:var(--tint-1);color:var(--ink);border:1px solid var(--line-2)}
 .hero .btn-ghost:hover{background:var(--tint-2);border-color:var(--accent-line)}
-.trustline{display:flex;flex-wrap:wrap;gap:var(--s3) var(--s6);margin-top:var(--s8);
+/* A grid, not wrapping flex. Four items of unequal width wrapped 3+1 at
+   most phone widths and 2+2 at a few, which reads as a mistake rather
+   than a row -- 2x2 on a phone, four across above it, always even. */
+.trustline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:var(--s3) var(--s4);margin-top:var(--s6);
   padding-top:var(--s6);border-top:1px solid var(--line)}
-.tpoint{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-on-dark);font-weight:500}
+@media(min-width:560px){.trustline{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tpoint{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);
+  font-weight:500;min-width:0}
+.tpoint span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tpoint i{width:26px;height:26px;border-radius:9px;background:var(--tint-1);color:var(--accent-ink);
   display:grid;place-items:center;flex:none}
 .tpoint svg{width:14px;height:14px}
 
-/* ============ HERO: THE PRODUCT ORBIT ============
-   A ring of real product marks turning around the Janeiro logo, with the
-   featured product card in front of it. The card is the point -- it
-   carries the price and the buy button; the ring is ambient, and every
-   mark on it is a link to that product.
+/* ============ HERO BANNER ============
+   The artwork is a real <img>, not a CSS background: it is the largest
+   thing on the page and the first thing painted, so it carries
+   width/height to reserve its box and fetchpriority to be requested ahead
+   of the stylesheet's own assets. A background-image would not be
+   discovered until the CSS parsed.
 
-   All of it is CSS 3D. Two transform-only animations run per mark: the
-   ring turns, and each mark turns the exact opposite way so it stays
-   facing the reader instead of showing its edge. One shared pair of
-   keyframes drives every mark, so the count costs nothing -- measured at
-   60fps with 8 marks under 6x CPU throttling, indistinguishable from the
-   static page, because both animations live on the compositor.
-
-   Three things keep it from being a nuisance: it stops on hover and on
-   focus, it stops when scrolled out of view (an animation nobody can see
-   costs the same as one they can), and reduced motion freezes it. */
-.hstage{display:grid;gap:var(--s6);justify-items:center;width:100%}
-
-.horbit{
-  --ho-size:260px;          /* under a third of an 844px phone */
-  --ho-icon:52px;
-  --ho-dur:44s;             /* ~20px/s at this radius: ambient, not busy */
-  --ho-r:calc(var(--ho-size)/2 - var(--ho-icon)/2 - 5px);
-  position:relative;width:var(--ho-size);height:var(--ho-size);
-  perspective:1000px;flex:none;
+   Layered with grid rather than absolute positioning, so the hero is as
+   tall as whichever is taller -- artwork or copy -- and the copy can
+   never be clipped by a short image. */
+.hero{padding:0;position:relative;overflow:hidden;display:grid;isolation:isolate;
+  background:var(--bg)}
+.hero>*{grid-area:1/1}
+/* On a phone the artwork keeps its own 4:5 and sits at the top, with the
+   page ground continuing beneath it. Stretching it to the hero's height
+   instead would rescale it every time the copy grew a line -- and cover
+   was enlarging the logo down into the words. */
+.heroArt{display:block;z-index:0;align-self:start}
+.heroArt img{display:block;width:100%;height:auto}
+@media(min-width:900px){
+  .heroArt{align-self:stretch;height:100%}
+  .heroArt img{height:100%;object-fit:cover;object-position:left center}
 }
-@media(min-width:900px){.horbit{--ho-size:380px;--ho-icon:62px}}
 
-/* One shared 3D space so the browser depth-sorts the marks against the
-   core: a mark at the back of the ring is genuinely occluded by the logo
-   rather than painted over it by z-index. */
-/* Tilted, and that is the whole difference between a ring and a line.
-   A rotateY orbit viewed head-on projects to a horizontal line: every
-   mark sits at the same y, strung through the middle of the logo. Leaning
-   the scene back turns it into an ellipse, so marks pass above and below
-   the logo and the ring reads as a ring. */
-.hoScene{position:absolute;inset:0;transform-style:preserve-3d;
-  transform:rotateX(-20deg)}
-.hoRing{position:absolute;inset:0;transform-style:preserve-3d;
-  animation:ho-spin var(--ho-dur) linear infinite}
-@keyframes ho-spin{to{transform:rotateY(360deg)}}
-
-/* The slots are transparent to the pointer. Their boxes overlap once
-   projected onto the screen, so a slot sitting at the back of the ring
-   was intercepting clicks meant for the mark in front of it -- the click
-   landed on a div and nothing happened. Only the marks take events, and
-   which of them do is decided by the depth animation. */
-.hoSlot{position:absolute;top:50%;left:50%;pointer-events:none;
-  width:var(--ho-icon);height:var(--ho-icon);
-  margin-top:calc(var(--ho-icon) / -2);margin-left:calc(var(--ho-icon) / -2);
-  transform-style:preserve-3d}
-
-/* Two elements, because the two cancellations have to happen in this
-   order: the wrapper undoes the ring's turn, then the button undoes the
-   scene's lean. Fold them onto one element and the lean sits between the
-   ring's rotation and its inverse, so they no longer cancel and every
-   mark ends up skewed. */
-.hoFace{width:100%;height:100%;transform-style:preserve-3d;
-  animation:ho-face var(--ho-dur) linear infinite}
-.hoBill{
-  display:block;width:100%;height:100%;padding:0;border:0;cursor:pointer;
-  border-radius:30%;overflow:hidden;background:var(--card);
-  transform:rotateX(20deg);
-  box-shadow:0 8px 20px -6px rgba(10,12,30,.35), 0 0 0 1px var(--line) inset;
-  animation:ho-depth var(--ho-dur) linear infinite;
+/* The copy sits where the artwork was composed to leave room: the lower
+   half of the tall crop, the right side of the wide one. */
+.hero-grid{position:relative;z-index:2;display:grid;align-content:start;
+  padding-top:86vw;padding-bottom:var(--s12)}
+@media(min-width:900px){
+  /* One column of copy, sitting in the half the artwork left clear. In
+     RTL, grid column 1 IS the physical right -- naming column 2 put the
+     text over the banner's black logo, where it measured 1.18:1. The
+     empty second column is what holds it there. */
+  .hero-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-content:center;
+    padding-top:calc(var(--hdr-space) + var(--s8));padding-bottom:var(--s16)}
 }
-/* the counter-turn: exactly the inverse of the ring, so the mark never
-   shows its edge */
-@keyframes ho-face{to{transform:rotateY(-360deg)}}
-/* Depth, phase-shifted per mark by a negative delay set in JS. The back
-   half dims AND stops taking clicks -- it sits behind the logo, and a tap
-   on the logo must not land on something hidden behind it. */
-@keyframes ho-depth{
-  0%  {opacity:1;pointer-events:auto}
-  24% {opacity:.62;pointer-events:auto}
-  26% {opacity:.58;pointer-events:none}
-  50% {opacity:.3;pointer-events:none}
-  74% {opacity:.58;pointer-events:none}
-  76% {opacity:.62;pointer-events:auto}
-  100%{opacity:1;pointer-events:auto}
+
+/* Readability, measured rather than assumed. The artwork is light and
+   busy; --ink-2 over its splatter measured 1.8:1 before a wash existed.
+   This one fades to the page's own ground, so the dark theme resolves it
+   without a second rule. */
+/* The stops are where they are because the copy is measured against what
+   is actually behind it, not because they looked about right: the wash
+   has to be FULLY opaque everywhere a word lands, and only then fade.
+   Half-covering left the lede on splatter at 2.9:1. */
+/* Stops in vw, not %, so they track the ARTWORK rather than the hero: the
+   hero grows with the copy, and percentage stops slid off the image every
+   time it did. The tall crop is 125vw high and its subject ends around
+   77vw, which is where the copy begins. */
+.hero::after{content:"";grid-area:1/1;z-index:1;pointer-events:none;
+  background:linear-gradient(to bottom,transparent 66vw,var(--bg) 82vw,var(--bg) 100%)}
+@media(min-width:900px){
+  .hero::after{background:linear-gradient(to left,var(--bg) 0%,var(--bg) 47%,transparent 78%)}
 }
-.hoBill img{width:100%;height:100%;object-fit:cover;display:block}
-.hoBill .mono1{font-family:var(--f-display);font-weight:400;
-  font-size:calc(var(--ho-icon) * .44);color:var(--logo-ink,var(--ink-lt))}
-.hoBill:focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px}
 
-.hoCore{position:absolute;top:50%;left:50%;width:34%;aspect-ratio:1;
-  transform:translate(-50%,-50%) translateZ(0);
-  border-radius:28%;overflow:hidden;background:#000;
-  box-shadow:0 20px 46px -14px var(--glow-strong);pointer-events:none}
-.hoCore img{width:100%;height:100%;object-fit:cover;display:block}
-
-.horbit:hover .hoRing,.horbit:hover .hoFace,.horbit:hover .hoBill,
-.horbit:focus-within .hoRing,.horbit:focus-within .hoFace,.horbit:focus-within .hoBill,
-.horbit.ho-idle .hoRing,.horbit.ho-idle .hoFace,.horbit.ho-idle .hoBill{animation-play-state:paused}
-
-/* ---- featured product: the part that actually sells ---- */
-.hfeat{width:100%;max-width:340px;background:var(--card);
-  border:1px solid var(--line);border-radius:var(--r-card);
-  padding:var(--s3);box-shadow:var(--sh-2);display:grid;gap:var(--s3)}
-.hfTop{display:flex;align-items:center;gap:var(--s3)}
-.hfIcon{width:50px;height:50px;border-radius:15px;overflow:hidden;flex:none;
-  background:var(--surface);display:grid;place-items:center}
-.hfIcon img{width:100%;height:100%;object-fit:cover;display:block}
-.hfInfo{flex:1;min-width:0}
-.hfInfo b{display:block;font-size:15px;font-weight:600;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hfInfo span{font-size:11.5px;color:var(--ink-2)}
-.hfPrice{text-align:end;flex:none}
-.hfPrice small{display:block;font-size:10.5px;color:var(--ink-2);line-height:1}
-.hfPrice b{font-family:var(--f-mono);font-weight:600;font-size:15.5px}
-.hfBtns{display:grid;grid-template-columns:1.25fr 1fr;gap:var(--s2)}
-.hfBtns .btn{padding:11px 10px;font-size:13px}
+/* Dark theme: the banner is a near-white ground and cannot simply be
+   dropped on. Dimming it keeps the composition -- the logo and the tiles
+   still read -- and lets the page's own surface set the level. A dark
+   frame around a bright rectangle would only make the rectangle louder. */
+[data-theme="dark"] .heroArt img{filter:brightness(.36) saturate(.85)}
 
 /* ============ HOME — DARK PREMIUM CANVAS ============ */
 #home{background:var(--page-bg);color:var(--text-on-dark)}
@@ -744,10 +662,10 @@ header.stuck .hbar{height:48px}
 .promo .btn{margin-top:var(--s6);position:relative}
 .pboxes{display:flex;justify-content:center;gap:var(--s3);flex-wrap:wrap;position:relative}
 /* Every ground that follows the theme needs the monogram to follow with
-   it. .hoBill and .hfIcon are new members of that set -- both sit on
-   --card/--surface, so the ink chosen for white goes dark-on-dark here. */
+   it: these all sit on --card/--surface, where an ink chosen for white
+   would be dark on dark. */
 [data-theme="dark"] .pbox b,[data-theme="dark"] .cthumb b,
-[data-theme="dark"] .hoBill b,[data-theme="dark"] .hfIcon b{--logo-ink:var(--ink-dk)}
+[data-theme="dark"] .hfIcon b{--logo-ink:var(--ink-dk)}
 .pbox{width:66px;height:66px;border-radius:19px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;
   box-shadow:var(--sh-dark);transform:rotate(var(--rot))}
 
@@ -772,7 +690,7 @@ header.stuck .hbar{height:48px}
 
 /* ============ TRUST ============ */
 .trust{background:var(--dark-surface-2)}
-.trustgrid{display:grid;gap:var(--s6)}
+.trustgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s6) var(--s4)}
 @media(min-width:820px){.trustgrid{grid-template-columns:repeat(4,1fr);gap:var(--s8)}}
 .trow{display:flex;flex-direction:column;gap:9px}
 .trow i{width:38px;height:38px;border-radius:11px;background:var(--accent-soft);color:var(--accent-ink);
@@ -780,7 +698,7 @@ header.stuck .hbar{height:48px}
 .trow i svg{width:19px;height:19px}
 .trow b{font-size:14px;color:var(--text-on-dark)}
 .trow p{font-size:12.5px;color:var(--muted-on-dark)}
-.whygrid{display:grid;gap:var(--s6)}
+.whygrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s6) var(--s4)}
 @media(min-width:700px){.whygrid{grid-template-columns:repeat(4,1fr);gap:var(--s8)}}
 .why i{width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);
   color:var(--accent-ink);display:grid;place-items:center;margin-bottom:var(--s3);box-shadow:var(--sh-1)}
@@ -960,7 +878,7 @@ footer ul button:hover{color:var(--text-on-dark)}
   display:flex;flex-wrap:wrap;gap:var(--s3);justify-content:space-between;font-size:12px;color:var(--muted-on-dark)}
 
 /* ============ FLOATING / TOAST ============ */
-.wa{position:fixed;z-index:50;inset-block-end:calc(var(--s4) + env(safe-area-inset-bottom));
+.wa{position:fixed;z-index:55;inset-block-end:calc(var(--s4) + env(safe-area-inset-bottom));
   inset-inline-end:var(--s4);width:42px;height:42px;border-radius:14px;background:var(--card);
   border:1px solid var(--line);box-shadow:var(--sh-1);display:grid;place-items:center;
   color:#1FA855;transition:transform .18s,box-shadow .18s}
@@ -1091,8 +1009,20 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= HOME ================= -->
 <main id="home">
   <section class="hero">
+    <!-- Two crops, chosen by media rather than by srcset widths: they are
+         different compositions, not two sizes of one. The wide one leaves
+         its right side clear for the copy, the tall one leaves its bottom.
+         Dimensions sit on the img so the box is reserved before it decodes
+         and nothing below it jumps. -->
+    <picture class="heroArt">
+      <source media="(min-width:900px)" type="image/webp" srcset="assets/hero/banner-wide.webp">
+      <source media="(min-width:900px)"                   srcset="assets/hero/banner-wide.png">
+      <source type="image/webp" srcset="assets/hero/banner-mobile.webp">
+      <img src="assets/hero/banner-mobile.png" alt=""
+           width="1122" height="1402" fetchpriority="high" decoding="async">
+    </picture>
     <div class="wrap hero-grid">
-      <div>
+      <div class="heroCopy">
         <span class="eyebrow">متجر رقمي جزائري</span>
         <h1>كل أدواتك الرقمية،<br><span class="g">في مكان واحد.</span></h1>
         <p class="lede">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
@@ -1101,24 +1031,25 @@ footer ul button:hover{color:var(--text-on-dark)}
           <button class="btn btn-ghost" onclick="go('shop','__offers')">اكتشف العروض</button>
         </div>
         <div class="trustline">
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/></svg></i>تفعيل سريع</div>
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></i>دفع آمن</div>
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/></svg></i>دعم مباشر</div>
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5 4.5 6v6c0 4.5 3.2 8.3 7.5 9.5 4.3-1.2 7.5-5 7.5-9.5V6L12 2.5Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg></i>منتجات موثوقة</div>
+          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/></svg></i><span>تفعيل سريع</span></div>
+          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></i><span>دفع آمن</span></div>
+          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/></svg></i><span>دعم مباشر</span></div>
+          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5 4.5 6v6c0 4.5 3.2 8.3 7.5 9.5 4.3-1.2 7.5-5 7.5-9.5V6L12 2.5Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg></i><span>منتجات موثوقة</span></div>
         </div>
       </div>
 
-      <div class="hstage">
-        <!-- the ring is navigation, not decoration: every mark is a link,
-             so it is labelled rather than hidden from assistive tech -->
-        <div class="horbit" id="horbit" role="group" aria-label="منتجات مختارة">
-          <div class="hoScene">
-            <div class="hoRing" id="hoRing"></div>
-            <div class="hoCore"><img src="assets/janeiro-logo.png" alt="Janeiro Store" width="130" height="130"></div>
-          </div>
-        </div>
-        <div id="heroFeat"></div>
+    </div>
+  </section>
+
+  <section class="sec" id="featuredSec">
+    <div class="wrap">
+      <div class="sechead rv">
+        <div><h2>المنتجات المميّزة</h2><p>مختارة من الكتالوج، بأسعارها الحالية</p></div>
+        <button class="arclink" onclick="go('shop','all')">عرض الكل
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>
+        </button>
       </div>
+      <div class="pgrid rv" id="featGrid"></div>
     </div>
   </section>
 
@@ -1909,109 +1840,29 @@ function renderHome(){
     return `<div class="pbox" style="--rot:${rot}deg">${brandLogo(p,30)}</div>`;
   }).join("");
 
-  renderOrbit();
   renderFeatured();
 }
 
-/* ================================================================
-   HERO ORBIT
-   ================================================================ */
-/* Which products ride the ring. Read from the catalogue, never a list of
-   slugs in this file: the ring exists to show brand marks, so products
-   that actually have one come first, and a sold-out product sinks below a
-   available one of the same kind. Array.sort is stable, so sort_order
-   still decides within a rank. */
-function orbitPicks(n){
-  const rank = p => (p.icon ? 0 : 2) + (p.available ? 0 : 1);
-  return PRODUCTS.slice().sort((a,b) => rank(a) - rank(b)).slice(0, n);
-}
+/* The featured strip under the banner. Real products, real prices, the
+   same card the shop uses -- so what is promoted looks exactly like what
+   is bought, and there is one card component to keep right.
 
-/* Three sources, in order: the uploaded brand icon, then the icon CDN,
-   then the designed monogram. Only the first is served from our own
-   origin, which is why the dashboard nags about the ones still missing. */
-function orbitMark(p){
-  if(p.icon) return `<img src="${esc(p.icon)}" alt="" width="120" height="120" loading="lazy">`;
-  return brandLogo(p, 30);
-}
-
-const ORBIT_WIDE = window.matchMedia ? matchMedia("(min-width:900px)") : null;
-
-function renderOrbit(){
-  const box = $("#horbit"), ring = $("#hoRing");
-  if(!box || !ring) return;
-  /* Six marks read as a ring on a desktop column; on a phone the same six
-     collide and each one drops under a comfortable tap target, so four. */
-  const n = Math.min(ORBIT_WIDE && ORBIT_WIDE.matches ? 6 : 4, PRODUCTS.length);
-  const picks = orbitPicks(n);
-  box.classList.toggle("hidden", picks.length < 3);   // fewer than three is not a ring
-  if(picks.length < 3){ ring.innerHTML = ""; return; }
-
-  /* One source of truth for the period: the stylesheet.
-
-     Both animations take the SAME negative delay, and that is load-bearing
-     rather than tidy. The counter-turn has to cancel the ring's angle AND
-     the mark's own slot angle -- cancelling only the ring leaves every
-     mark permanently skewed by its slot angle, showing its edge and
-     shrinking its hit area to a sliver, which is a click that silently
-     lands on the slot behind it. Offsetting a constant rotation IS a phase
-     shift, and the shift that cancels slot angle 360i/n works out to
-     -dur*i/n -- the same value the depth animation needs to dim that mark
-     as it passes behind the core. One number, both jobs. */
-  const dur = parseFloat(getComputedStyle(box).getPropertyValue("--ho-dur")) || 44;
-  ring.innerHTML = picks.map((p,i) => {
-    const angle = (360 / picks.length) * i;
-    const delay = -(dur * i / picks.length);
-    return `<div class="hoSlot" style="transform:rotateY(${angle}deg) translateZ(var(--ho-r))">
-      <div class="hoFace" style="animation-delay:${delay.toFixed(2)}s">
-        <button class="hoBill" type="button" aria-label="${esc(p.name)}" title="${esc(p.name)}"
-          style="animation-delay:${delay.toFixed(2)}s"
-          onclick="openDetail('${p.id}')">${orbitMark(p)}</button>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-/* A ring nobody is looking at costs the same to composite as one they
-   are. The hero scrolls away within a screen or two, so stop it there --
-   this is the battery cost that frame timing never shows. */
-let orbitWatch = null;
-function watchOrbit(){
-  const box = $("#horbit");
-  if(!box || !window.IntersectionObserver) return;
-  if(orbitWatch) orbitWatch.disconnect();
-  orbitWatch = new IntersectionObserver(
-    ([e]) => box.classList.toggle("ho-idle", !e.isIntersecting), { threshold: 0 });
-  orbitWatch.observe(box);
-}
-
-/* The part of the hero that sells: a real product, its real price, and a
-   way to buy it. Prefers whatever the shop is pushing, then anything
-   available -- and renders nothing at all rather than inventing a
-   placeholder if the catalogue has nothing to sell. */
+   Chosen from the catalogue, never from a list of slugs here: what the
+   shop is pushing first (hot, then a live offer), then anything else on
+   sale. Renders nothing at all rather than padding the row out with
+   placeholders. */
 function renderFeatured(){
-  const slot = $("#heroFeat");
-  if(!slot) return;
-  const p = PRODUCTS.find(x => x.available && x.badge === "hot")
-         || PRODUCTS.find(x => x.available && x.plans.length)
-         || null;
-  if(!p || !p.plans.length){ slot.innerHTML = ""; return; }
-
-  const mark = p.icon
-    ? `<img src="${esc(p.icon)}" alt="" width="100" height="100">`
-    : brandLogo(p, 26);
-  slot.innerHTML = `<div class="hfeat">
-    <div class="hfTop">
-      <span class="hfIcon">${mark}</span>
-      <span class="hfInfo"><b>${esc(p.name)}</b><span>${esc(p.catName)}</span></span>
-      <span class="hfPrice"><small>يبدأ من</small><b class="mono">${money(minPrice(p))}</b></span>
-    </div>
-    <div class="hfBtns">
-      <button class="btn btn-primary" onclick="openDetail('${p.id}')">اشتري الآن</button>
-      <button class="btn btn-ghost" onclick="addToCart('${p.id}',0)">أضف للسلة</button>
-    </div>
-  </div>`;
+  const grid = $("#featGrid"), sec = $("#featuredSec");
+  if(!grid || !sec) return;
+  const rank = p => p.badge === "hot" ? 0 : p.badge === "off" ? 1 : p.badge === "new" ? 2 : 3;
+  const picks = PRODUCTS
+    .filter(p => p.available && p.plans.length)
+    .sort((a, b) => rank(a) - rank(b))
+    .slice(0, 4);
+  sec.classList.toggle("hidden", picks.length === 0);
+  grid.innerHTML = picks.map(cardHTML).join("");
+  staggerIn("#featGrid");
 }
-
 let shopFilter="all", shopQuery="";
 function renderShop(){
   let list=PRODUCTS.slice();
@@ -2535,7 +2386,7 @@ async function boot(){
     applyDeals();
 
     renderCats(); renderDeals(); renderHome(); renderCart(); renderShop();
-    revealOnScroll(); watchOrbit();
+    revealOnScroll();
   }catch(err){
     console.error("boot failed", err);
     showErrorState("تعذر تحميل المنتجات.", boot);
@@ -2591,9 +2442,6 @@ if(window.matchMedia){
     if(saved !== "dark" && saved !== "light") applyTheme(e.matches ? "dark" : "light");
   });
 }
-
-if(ORBIT_WIDE && ORBIT_WIDE.addEventListener)
-  ORBIT_WIDE.addEventListener("change", renderOrbit);
 
 /* This script is a module now, so its declarations are not globals.
    The markup drives everything through inline handlers, so publish
