@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>لوحة الطلبات — Janeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   لوحة الطلبات — أداة تشغيل، لا واجهة متجر.
+   نفس خطوط Janeiro وبنفسجه، لكن السطح أكثف: هذه شاشة تُقرأ
+   بسرعة ويُضغط فيها، غالباً من الهاتف أثناء تنفيذ طلب.
+   ألوان الحالة دلالية ومنفصلة عن لون الهوية.
+   ============================================================ */
+:root{
+  --bg:#101018; --surface:#191926; --surface-2:#212132; --line:#2E2E42;
+  --ink:#ECEAF4; --ink-2:#A6A2B8; --muted:#7E7995;
+  --accent:#9B85FF; --accent-soft:rgba(155,133,255,.14);
+  --wait:#F0AE4A;      /* ينتظرك */
+  --work:#5AA9FF;      /* قيد العمل */
+  --done:#45D7AC;      /* منتهٍ بخير */
+  --dead:#FF7391;      /* ملغى أو مسترجع */
+  --f-display:"Alexandria",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate;display:inline-block}
+.hidden{display:none!important}
+
+.wrap{max-width:940px;margin:0 auto;padding:0 16px 64px}
+
+/* ---------- top bar ---------- */
+header{position:sticky;top:0;z-index:20;background:rgba(16,16,24,.92);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{max-width:940px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px}
+.bar h1{font-family:var(--f-display);font-size:16px;font-weight:700;margin:0;flex:1}
+.bar .who{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:40vw;white-space:nowrap}
+.linkbtn{font-size:13px;color:var(--accent);padding:6px 10px;border-radius:9px}
+.linkbtn:hover{background:var(--accent-soft)}
+
+/* ---------- queue filter chips ---------- */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:14px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:7px;padding:7px 13px;
+  border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-2);
+  white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.chip .n{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.chip[aria-pressed="true"] .n{color:var(--accent)}
+
+/* ---------- order rows ---------- */
+.rows{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.row{display:flex;align-items:center;gap:12px;width:100%;text-align:start;
+  background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px 15px;
+  border-inline-start:3px solid var(--tone,var(--muted));transition:border-color .15s,transform .12s}
+.row:hover{border-color:var(--accent)}
+.row:active{transform:scale(.995)}
+.row .main{flex:1;min-width:0}
+.row .num{font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+.row .name{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .money{font-family:var(--f-mono);font-size:14px;font-weight:600;flex:none}
+.pill{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;flex:none;
+  color:var(--tone);background:color-mix(in srgb,var(--tone) 15%,transparent);
+  border:1px solid color-mix(in srgb,var(--tone) 32%,transparent);white-space:nowrap}
+.t-wait{--tone:var(--wait)} .t-work{--tone:var(--work)}
+.t-done{--tone:var(--done)} .t-dead{--tone:var(--dead)}
+
+.empty{text-align:center;padding:56px 20px;color:var(--muted);font-size:14px}
+.empty b{display:block;font-family:var(--f-display);color:var(--ink);font-size:16px;margin-bottom:6px}
+
+/* ---------- detail ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:15px;
+  padding:18px;display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.card h2{font-family:var(--f-display);font-size:15px;font-weight:600;margin:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px}
+.kv dt{color:var(--muted);font-size:13px}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.item{border:1px solid var(--line);border-radius:11px;padding:13px;background:var(--surface-2);
+  display:flex;flex-direction:column;gap:9px}
+.item .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.item b{font-size:14.5px}
+.item .plan{font-size:12.5px;color:var(--muted)}
+/* activation data is what you actually need to do the job */
+.act{display:grid;gap:7px;background:var(--bg);border:1px dashed var(--line);
+  border-radius:10px;padding:11px}
+.act .r{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;align-items:baseline}
+.act .r span{color:var(--muted);flex:none}
+.act .r b{font-family:var(--f-mono);font-weight:500;overflow-wrap:anywhere;text-align:end}
+/* On a phone a long email breaks mid-word against the label. Give the
+   value its own line instead -- this is the field the owner copies. */
+@media(max-width:440px){
+  .act .r{flex-wrap:wrap;gap:2px 10px}
+  .act .r b{width:100%;text-align:start;order:3}
+  .act .r .copy{margin-inline-start:auto}
+}
+.copy{font-size:11px;color:var(--accent);padding:2px 7px;border-radius:7px;flex:none}
+.copy:hover{background:var(--accent-soft)}
+
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.tl:last-child{border-bottom:0}
+.tl .dot{width:8px;height:8px;border-radius:50%;background:var(--tone,var(--muted));
+  flex:none;margin-top:8px}
+.tl .txt{flex:1}
+.tl .when{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.tl .note{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+
+/* ---------- actions ---------- */
+.acts{display:flex;flex-wrap:wrap;gap:9px}
+.btn{padding:11px 16px;border-radius:11px;font-size:14px;font-weight:600;
+  border:1px solid var(--line);background:var(--surface-2);transition:transform .12s,background .15s}
+.btn:hover{background:var(--line)}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.go{background:var(--accent);color:#12101c;border-color:transparent}
+.btn.go:hover{filter:brightness(1.08)}
+.btn.warn{color:var(--dead);border-color:color-mix(in srgb,var(--dead) 34%,transparent)}
+textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;
+  padding:11px;color:var(--ink);resize:vertical;min-height:62px;font-size:14px}
+label.fl{font-size:12.5px;color:var(--muted)}
+
+/* ---------- login ---------- */
+.login{max-width:360px;margin:14vh auto;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+.login h1{font-family:var(--f-display);font-size:22px;margin:0}
+.login p{color:var(--muted);font-size:13.5px;margin:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input{background:var(--surface);border:1px solid var(--line);border-radius:11px;
+  padding:12px;color:var(--ink)}
+.err{color:var(--dead);font-size:13.5px;min-height:20px}
+
+#toast{position:fixed;inset-block-end:18px;inset-inline-start:50%;transform:translateX(50%) translateY(20px);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:11px;
+  padding:10px 16px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60}
+#toast.on{opacity:1;transform:translateX(50%) translateY(0)}
+
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section id="login" class="login">
+  <div>
+    <h1>لوحة الطلبات</h1>
+    <p>ادخل بحساب الأدمن الخاص بالمتجر.</p>
+  </div>
+  <div class="field"><label class="fl" for="email">البريد الإلكتروني</label>
+    <input id="email" type="email" autocomplete="username" inputmode="email"></div>
+  <div class="field"><label class="fl" for="pass">كلمة السر</label>
+    <input id="pass" type="password" autocomplete="current-password"></div>
+  <div class="err" id="loginErr" role="alert"></div>
+  <button class="btn go" id="loginBtn">دخول</button>
+</section>
+
+<!-- ===================== CONSOLE ===================== -->
+<div id="app" class="hidden">
+  <header>
+    <div class="bar">
+      <h1>لوحة الطلبات</h1>
+      <span class="who" id="who"></span>
+      <button class="linkbtn" id="refresh">تحديث</button>
+      <button class="linkbtn" id="logout">خروج</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- queue -->
+    <section id="queue">
+      <div class="chips" id="chips" role="group" aria-label="تصفية الطلبات"></div>
+      <div class="rows" id="rows"></div>
+    </section>
+
+    <!-- detail -->
+    <section id="detail" class="hidden">
+      <div class="chips"><button class="chip" id="back">→ رجوع للقائمة</button></div>
+      <div id="detailBody"></div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+/* ============================================================
+   No dependencies, same as js/janeiro-api.js: plain fetch against
+   PostgREST, GoTrue and Storage. The service role key is never here --
+   this page holds a normal user session, and every privileged action
+   goes through admin_update_order_status, which checks is_admin()
+   server-side. Losing this page's token exposes nothing an admin's
+   own login would not.
+   ============================================================ */
+const CFG = {
+  SUPABASE_URL: "__SUPABASE_URL__",
+  SUPABASE_ANON_KEY: "__SUPABASE_ANON_KEY__",
+  ...(window.JANEIRO_CONFIG || {}),
+};
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* Session in sessionStorage, not localStorage: closing the tab ends the
+   shift. An admin console left signed in on a shared phone is a risk. */
+const SESSION_KEY = "janeiro_admin_session";
+let session = null;
+try { session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch { session = null; }
+
+const authHeaders = () => ({
+  apikey: CFG.SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${session?.access_token ?? CFG.SUPABASE_ANON_KEY}`,
+  "Content-Type": "application/json",
+});
+
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(`${CFG.SUPABASE_URL}${path}`, { ...opts, headers: authHeaders() });
+  const text = await r.text();
+  let body = null; try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+  if (!r.ok) {
+    /* An expired session must send you back to the login screen rather
+       than showing an unexplained failure on every row. */
+    if (r.status === 401) { signOut(); throw new Error("انتهت الجلسة. سجّل الدخول من جديد."); }
+    const msg = (body && (body.message || body.error_description || body.error)) || `خطأ ${r.status}`;
+    throw new Error(String(msg));
+  }
+  return body;
+}
+const rest = (q) => api(`/rest/v1/${q}`);
+const rpc  = (fn, args) => api(`/rest/v1/rpc/${fn}`, { method: "POST", body: JSON.stringify(args || {}) });
+
+/* ---------------- auth ---------------- */
+async function signIn(email, password) {
+  const r = await fetch(`${CFG.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: CFG.SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "تعذر تسجيل الدخول.");
+  session = d;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(d));
+}
+
+function signOut() {
+  session = null;
+  sessionStorage.removeItem(SESSION_KEY);
+  $("#app").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+}
+
+/* ---------------- status vocabulary ---------------- */
+const STATUS = {
+  awaiting_receipt:       ["بانتظار الوصل",   "t-wait"],
+  pending_payment_review: ["مراجعة الدفع",    "t-wait"],
+  payment_confirmed:      ["تم تأكيد الدفع",  "t-work"],
+  activating:             ["جاري التفعيل",    "t-work"],
+  needs_info:             ["نحتاج معلومات",   "t-wait"],
+  completed:              ["مكتمل",           "t-done"],
+  cancelled:              ["ملغي",            "t-dead"],
+  refunded:               ["تم الاسترجاع",    "t-dead"],
+};
+const label = s => (STATUS[s] || [s, ""])[0];
+const tone  = s => (STATUS[s] || ["", "t-wait"])[1];
+
+/* The queue is ordered by what needs you first, not alphabetically. */
+const QUEUE_ORDER = ["pending_payment_review","payment_confirmed","activating",
+                     "needs_info","awaiting_receipt","completed","cancelled","refunded"];
+
+const money = (n, c) => Number(n).toLocaleString("en-US") + " " + (c || "دج");
+const when  = t => new Date(t).toLocaleString("en-GB", { day:"2-digit", month:"2-digit",
+                    year:"2-digit", hour:"2-digit", minute:"2-digit" });
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+
+/* ---------------- queue ---------------- */
+let filter = "pending_payment_review";
+
+async function loadQueue() {
+  const counts = await rpc("admin_order_counts");
+  $("#chips").innerHTML = QUEUE_ORDER
+    .filter(s => counts[s] || s === filter)
+    .map(s => `<button class="chip" data-s="${s}" aria-pressed="${s === filter}">
+        ${label(s)} <span class="n">${counts[s] || 0}</span></button>`).join("")
+    || `<span class="chip">لا طلبات بعد</span>`;
+
+  $$("#chips .chip[data-s]").forEach(b => b.onclick = () => { filter = b.dataset.s; loadQueue(); });
+
+  const rows = await rest(
+    "orders?select=id,order_number,customer_name,customer_phone,status,total,currency,created_at" +
+    `&status=eq.${filter}&order=created_at.desc&limit=100`);
+
+  $("#rows").innerHTML = rows.length ? rows.map(o => `
+    <button class="row ${tone(o.status)}" data-id="${o.id}">
+      <span class="main">
+        <span class="num mono">${esc(o.order_number)}</span>
+        <span class="name">${esc(o.customer_name)}</span>
+      </span>
+      <span class="money mono">${money(o.total, o.currency)}</span>
+      <span class="pill">${label(o.status)}</span>
+    </button>`).join("")
+    : `<div class="empty"><b>لا شيء هنا</b>لا طلبات في «${label(filter)}» حالياً.</div>`;
+
+  $$("#rows .row").forEach(b => b.onclick = () => openOrder(b.dataset.id));
+}
+
+/* ---------------- one order ---------------- */
+async function openOrder(id) {
+  const [o] = await rest(
+    "orders?select=*,payment_methods(label,type)," +
+    "order_items(product_name_snapshot,plan_name_snapshot,quantity,unit_price,total_price," +
+    "warranty_label_snapshot,order_activation_data(field_label,field_value))," +
+    "order_status_history(old_status,new_status,note,created_at)" +
+    `&id=eq.${id}`);
+  if (!o) return toast("لم نعثر على الطلب.");
+
+  const next = await rest(`order_status_transitions?select=to_status&from_status=eq.${o.status}`);
+  const history = (o.order_status_history || [])
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  $("#detailBody").innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 class="mono">${esc(o.order_number)}</h2>
+        <span class="pill ${tone(o.status)}">${label(o.status)}</span>
+      </div>
+      <dl class="kv">
+        <dt>العميل</dt><dd>${esc(o.customer_name)}</dd>
+        <dt>الهاتف</dt><dd><span class="mono">${esc(o.customer_phone)}</span>
+          <button class="copy" data-copy="${esc(o.customer_phone)}">نسخ</button></dd>
+        ${o.customer_wilaya ? `<dt>الولاية</dt><dd>${esc(o.customer_wilaya)}</dd>` : ""}
+        <dt>الدفع</dt><dd>${esc(o.payment_methods?.label || "—")}</dd>
+        ${o.payment_reference ? `<dt>رقم العملية</dt><dd><span class="mono">${esc(o.payment_reference)}</span></dd>` : ""}
+        <dt>الإجمالي</dt><dd><b class="mono">${money(o.total, o.currency)}</b></dd>
+        <dt>وقت الطلب</dt><dd><span class="mono">${when(o.submitted_at || o.created_at)}</span></dd>
+      </dl>
+      ${o.receipt_path
+        ? `<button class="btn" id="receiptBtn">عرض وصل الدفع</button>`
+        : `<p style="color:var(--muted);font-size:13.5px;margin:0">لا وصل مرفوع.</p>`}
+    </div>
+
+    <div class="card">
+      <h2>ما يجب تفعيله</h2>
+      ${(o.order_items || []).map(it => `
+        <div class="item">
+          <div class="top">
+            <b>${esc(it.product_name_snapshot)}</b>
+            <span class="mono">${money(it.total_price, o.currency)}</span>
+          </div>
+          <div class="plan">${esc(it.plan_name_snapshot)}${it.quantity > 1 ? ` × ${it.quantity}` : ""}${
+            it.warranty_label_snapshot ? ` · ${esc(it.warranty_label_snapshot)}` : ""}</div>
+          ${(it.order_activation_data || []).length ? `<div class="act">${
+            it.order_activation_data.map(a => `<div class="r">
+              <span>${esc(a.field_label)}</span>
+              <b>${esc(a.field_value)}</b>
+              <button class="copy" data-copy="${esc(a.field_value)}">نسخ</button>
+            </div>`).join("")}</div>` : ""}
+        </div>`).join("")}
+    </div>
+
+    <div class="card">
+      <h2>الخطوة التالية</h2>
+      ${next.length ? `
+        <div class="field">
+          <label class="fl" for="note">سبب / ملاحظة <span style="opacity:.7">— تُحفظ في سجل الطلب</span></label>
+          <textarea id="note" maxlength="400" placeholder="مثال: الوصل مطابق للمبلغ"></textarea>
+        </div>
+        <div class="acts">${next.map(t => `
+          <button class="btn ${["cancelled","refunded"].includes(t.to_status) ? "warn" : "go"}"
+                  data-to="${t.to_status}">${label(t.to_status)}</button>`).join("")}</div>`
+        : `<p style="color:var(--muted);font-size:13.5px;margin:0">هذا الطلب وصل حالته النهائية.</p>`}
+    </div>
+
+    <div class="card">
+      <h2>السجل</h2>
+      <div class="timeline">${history.map(h => `
+        <div class="tl ${tone(h.new_status)}">
+          <span class="dot"></span>
+          <span class="txt">
+            ${h.old_status ? `${esc(label(h.old_status))} ← ` : ""}<b>${esc(label(h.new_status))}</b>
+            ${h.note ? `<div class="note">${esc(h.note)}</div>` : ""}
+          </span>
+          <span class="when">${when(h.created_at)}</span>
+        </div>`).join("")}</div>
+    </div>`;
+
+  $$("[data-copy]").forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); toast("نُسخ"); }
+    catch { toast("تعذر النسخ"); }
+  });
+
+  if (o.receipt_path) $("#receiptBtn").onclick = () => showReceipt(o.receipt_path);
+
+  $$("[data-to]").forEach(b => b.onclick = async () => {
+    const to = b.dataset.to;
+    if (["cancelled","refunded"].includes(to) &&
+        !confirm(`تأكيد النقل إلى «${label(to)}»؟ لا يمكن التراجع عن هذه الحالة.`)) return;
+    $$("[data-to]").forEach(x => x.disabled = true);
+    try {
+      const res = await rpc("admin_update_order_status", {
+        p_order_id: o.id, p_new_status: to, p_note: ($("#note")?.value || "").trim() || null,
+      });
+      toast(res.changed ? `صار «${label(res.status)}»` : "الحالة لم تتغيّر");
+      await openOrder(o.id);
+      await loadQueue();
+    } catch (e) {
+      toast(e.message);
+      $$("[data-to]").forEach(x => x.disabled = false);
+    }
+  });
+
+  $("#queue").classList.add("hidden");
+  $("#detail").classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+/* The receipts bucket is private. A short-lived signed URL is minted on
+   demand rather than making the bucket public. */
+async function showReceipt(path) {
+  try {
+    const d = await api(`/storage/v1/object/sign/receipts/${path}`, {
+      method: "POST", body: JSON.stringify({ expiresIn: 300 }),
+    });
+    const url = d.signedURL || d.signedUrl;
+    if (!url) throw new Error("تعذر إنشاء رابط الوصل.");
+    window.open(`${CFG.SUPABASE_URL}/storage/v1${url}`, "_blank", "noopener");
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------------- boot ---------------- */
+function showApp(email) {
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  $("#who").textContent = email || "";
+  loadQueue().catch(e => toast(e.message));
+}
+
+$("#loginBtn").onclick = async () => {
+  const btn = $("#loginBtn");
+  $("#loginErr").textContent = "";
+  btn.disabled = true; btn.textContent = "جارٍ الدخول…";
+  try {
+    await signIn($("#email").value.trim(), $("#pass").value);
+    /* Signing in is not the same as being an admin. The RPC refuses a
+       non-admin anyway, but say so here rather than showing an empty
+       console the person cannot use. */
+    const counts = await rpc("admin_order_counts").catch(() => null);
+    if (counts === null) {
+      signOut();
+      throw new Error("هذا الحساب ليس أدمن على هذا المتجر.");
+    }
+    $("#pass").value = "";
+    showApp($("#email").value.trim());
+  } catch (e) {
+    $("#loginErr").textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "دخول";
+  }
+};
+$("#pass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+$("#logout").onclick = signOut;
+$("#refresh").onclick = () => loadQueue().catch(e => toast(e.message));
+$("#back").onclick = () => {
+  $("#detail").classList.add("hidden");
+  $("#queue").classList.remove("hidden");
+  loadQueue().catch(e => toast(e.message));
+};
+
+if (session?.access_token) showApp(session?.user?.email);
+</script>
+</body>
+</html>

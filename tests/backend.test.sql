@@ -469,6 +469,115 @@ begin
 end $$;
 
 -- ============================================================
+-- ADMIN ORDER HANDLING — the only way an order moves forward.
+-- ============================================================
+do $$
+declare
+  v_pm uuid; v_prod uuid; v_plan uuid; v_items jsonb;
+  v_id uuid; v_admin uuid; v_res jsonb; v_note text; v_ok boolean;
+begin
+  select id into v_pm   from payment_methods where is_active order by sort_order limit 1;
+  select id into v_prod from products where slug = 'discord-nitro';
+  select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
+  v_items := jsonb_build_array(jsonb_build_object(
+    'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation', jsonb_build_array(
+      jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
+
+  v_id := (create_order('عميل أدمن','0557000001',null,v_pm,v_items,'admin-key-1')->>'order_id')::uuid;
+  update orders set receipt_path='orders/x/a.jpg', receipt_uploaded_at=now() where id=v_id;
+  perform submit_order(v_id, 'REF-ADMIN');
+
+  -- ---------- a non-admin cannot move anything ----------
+  -- The RPC is SECURITY DEFINER, so without its own guard it would run
+  -- with the owner's rights for whoever calls it.
+  v_admin := gen_random_uuid();
+  insert into auth.users(id) values (v_admin);
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role','authenticated')::text, true);
+    perform admin_update_order_status(v_id, 'payment_confirmed', null);
+    raise exception 'FAILED: a signed-in non-admin moved an order';
+  exception when others then
+    assert sqlerrm like '%NOT_AUTHORIZED%', 'expected NOT_AUTHORIZED, got: ' || sqlerrm;
+  end;
+
+  -- and with no session at all
+  begin
+    perform set_config('request.jwt.claims', '', true);
+    perform admin_update_order_status(v_id, 'payment_confirmed', null);
+    raise exception 'FAILED: an anonymous caller moved an order';
+  exception when others then
+    assert sqlerrm like '%NOT_AUTHORIZED%', 'expected NOT_AUTHORIZED for anon';
+  end;
+  raise notice 'PASS  only an admin can move an order';
+
+  -- ---------- become an admin ----------
+  insert into profiles(id, role) values (v_admin, 'admin')
+    on conflict (id) do update set role = 'admin';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role','authenticated')::text, true);
+  assert is_admin(), 'the test admin should be recognised';
+
+  -- ---------- an illegal jump is refused ----------
+  begin
+    perform admin_update_order_status(v_id, 'completed', null);
+    raise exception 'FAILED: jumped straight from payment review to completed';
+  exception when others then
+    assert sqlerrm like '%INVALID_STATUS_TRANSITION%',
+           'expected INVALID_STATUS_TRANSITION, got: ' || sqlerrm;
+  end;
+  assert (select status from orders where id=v_id) = 'pending_payment_review',
+         'a refused transition must leave the order untouched';
+  raise notice 'PASS  an illegal jump is refused and changes nothing';
+
+  -- ---------- the legal path works, and records why ----------
+  v_res := admin_update_order_status(v_id, 'payment_confirmed', 'الوصل مطابق');
+  assert (v_res->>'changed')::boolean, 'a legal move should report changed';
+  assert v_res->>'previous_status' = 'pending_payment_review', 'the previous status is reported';
+
+  select note into v_note from order_status_history
+   where order_id = v_id and new_status = 'payment_confirmed';
+  assert v_note = 'الوصل مطابق', 'the reason must reach the history row, got: ' || coalesce(v_note,'null');
+
+  assert (select changed_by from order_status_history
+           where order_id = v_id and new_status = 'payment_confirmed') = v_admin,
+         'the history must record which admin made the change';
+
+  perform admin_update_order_status(v_id, 'activating', null);
+  perform admin_update_order_status(v_id, 'completed', 'تم التفعيل');
+  assert (select status from orders where id=v_id) = 'completed',
+         'the order should reach completed through the legal path';
+  raise notice 'PASS  the legal path reaches completed and logs who and why';
+
+  -- ---------- repeating a move is a no-op, not an error ----------
+  v_res := admin_update_order_status(v_id, 'completed', null);
+  assert not (v_res->>'changed')::boolean, 're-applying the same status must report changed=false';
+  assert (select count(*) from order_status_history
+           where order_id = v_id and new_status = 'completed') = 1,
+         'a repeated move must not add a second history row';
+  raise notice 'PASS  repeating a move is harmless';
+
+  -- ---------- terminal states are terminal ----------
+  perform admin_update_order_status(v_id, 'refunded', 'استرجاع بعد شكوى');
+  begin
+    perform admin_update_order_status(v_id, 'activating', null);
+    raise exception 'FAILED: moved an order back out of refunded';
+  exception when others then
+    assert sqlerrm like '%INVALID_STATUS_TRANSITION%', 'refunded must be terminal';
+  end;
+  raise notice 'PASS  cancelled and refunded are terminal';
+
+  -- ---------- the customer sees the new status ----------
+  perform set_config('request.jwt.claims', '', true);
+  v_res := track_order((select order_number from orders where id=v_id), '0001');
+  assert v_res->>'status' = 'refunded', 'tracking must reflect the admin move';
+  assert v_res->>'status_label' = 'تم الاسترجاع', 'the Arabic label must follow';
+  raise notice 'PASS  the customer''s tracking page reflects the change';
+
+  raise notice '';
+  raise notice '===== admin order tests passed =====';
+end $$;
+
+-- ============================================================
 -- RLS  (§39) — run as the anon role
 -- ============================================================
 do $$

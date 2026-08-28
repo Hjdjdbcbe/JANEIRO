@@ -31,6 +31,35 @@ async function asAnon(sql, params = []) {
 }
 const asService = (sql, params = []) => pool.query(sql, params).then(r => r.rows);
 
+/* Runs as the `authenticated` role with request.jwt.claims set from the
+   bearer token, which is what makes auth.uid() and therefore is_admin()
+   work exactly as they do in production. Falls back to anon. */
+async function asUser(sql, params = [], uid = null) {
+  const c = await pool.connect();
+  try {
+    await c.query("begin");
+    if (uid) {
+      await c.query("select set_config('request.jwt.claims', $1, true)",
+        [JSON.stringify({ sub: uid, role: "authenticated" })]);
+      await c.query("set local role authenticated");
+    } else {
+      await c.query("set local role anon");
+    }
+    const r = await c.query(sql, params);
+    await c.query("commit");
+    return r.rows;
+  } catch (e) { await c.query("rollback"); throw e; }
+  finally { c.release(); }
+}
+
+/* The mock's token is just the user id. Real GoTrue issues a signed JWT;
+   nothing here verifies signatures, so this stays a test harness. */
+const uidFrom = (req) => {
+  const h = req.headers.authorization || "";
+  const t = h.replace(/^Bearer\s+/i, "").trim();
+  return /^[0-9a-f-]{36}$/i.test(t) ? t : null;
+};
+
 const PRODUCT_EMBED = `
   select p.*,
     (select jsonb_build_object('slug',c.slug,'name',c.name)
@@ -72,8 +101,78 @@ async function rest(url, res) {
         `${PRODUCT_EMBED} where p.status in ('published','temporarily_unavailable','coming_soon')
            and p.archived_at is null order by p.sort_order`));
     }
+    /* ---------- admin console reads ---------- */
+    if (table === "orders") {
+      const uid = q.get("__uid") || null;
+      const id = (q.get("id") || "").replace("eq.", "");
+      if (id) {
+        const rows = await asUser(`
+          select o.*,
+            (select jsonb_build_object('label', pm.label, 'type', pm.type)
+               from payment_methods pm where pm.id = o.payment_method_id) as payment_methods,
+            coalesce((select jsonb_agg(jsonb_build_object(
+                'product_name_snapshot', i.product_name_snapshot,
+                'plan_name_snapshot', i.plan_name_snapshot,
+                'quantity', i.quantity, 'unit_price', i.unit_price,
+                'total_price', i.total_price,
+                'warranty_label_snapshot', i.warranty_label_snapshot,
+                'order_activation_data', coalesce((
+                   select jsonb_agg(jsonb_build_object(
+                     'field_label', a.field_label, 'field_value', a.field_value))
+                     from order_activation_data a where a.order_item_id = i.id), '[]'::jsonb)))
+              from order_items i where i.order_id = o.id), '[]'::jsonb) as order_items,
+            coalesce((select jsonb_agg(jsonb_build_object(
+                'old_status', h.old_status, 'new_status', h.new_status,
+                'note', h.note, 'created_at', h.created_at))
+              from order_status_history h where h.order_id = o.id), '[]'::jsonb) as order_status_history
+          from orders o where o.id = $1`, [id], uid);
+        return send(res, 200, rows);
+      }
+      const st = (q.get("status") || "").replace("eq.", "");
+      const rows = await asUser(
+        `select id, order_number, customer_name, customer_phone, status, total, currency, created_at
+           from orders ${st ? "where status = $1::order_status" : ""}
+          order by created_at desc limit 100`, st ? [st] : [], uid);
+      return send(res, 200, rows);
+    }
+    if (table === "order_status_transitions") {
+      const from = (q.get("from_status") || "").replace("eq.", "");
+      return send(res, 200, await asUser(
+        "select to_status from order_status_transitions where from_status = $1::order_status order by to_status",
+        [from], q.get("__uid") || null));
+    }
     return send(res, 404, { message: `no mock for ${table}` });
   } catch (e) { return send(res, 500, { message: String(e.message) }); }
+}
+
+/* PostgREST exposes RPCs under /rest/v1/rpc/<name>; these run as the
+   caller so the functions' own is_admin() guards are what decide. */
+async function adminRpc(name, req, res) {
+  const uid = uidFrom(req);
+  const body = JSON.parse((await readBody(req)).toString() || "{}");
+  try {
+    if (name === "admin_order_counts") {
+      const rows = await asUser("select admin_order_counts() as r", [], uid);
+      return send(res, 200, rows[0].r);
+    }
+    if (name === "admin_update_order_status") {
+      const rows = await asUser(
+        "select admin_update_order_status($1::uuid, $2::order_status, $3) as r",
+        [body.p_order_id, body.p_new_status, body.p_note ?? null], uid);
+      return send(res, 200, rows[0].r);
+    }
+    return send(res, 404, { message: `no rpc ${name}` });
+  } catch (e) {
+    const raw = String(e.message || "");
+    const code = raw.split(":")[0].trim();
+    /* PostgREST answers 401/403 for a permission failure; the console
+       relies on that to send the person back to the login screen. */
+    if (code === "NOT_AUTHORIZED") return send(res, 403, { message: "غير مصرّح لك." });
+    if (code === "ORDER_NOT_FOUND") return send(res, 404, { message: "لم نعثر على الطلب." });
+    if (code.startsWith("INVALID_STATUS_TRANSITION"))
+      return send(res, 400, { message: "هذه النقلة غير مسموحة من الحالة الحالية." });
+    return send(res, 400, { message: raw });
+  }
 }
 
 const MSG = {
@@ -91,6 +190,19 @@ const mapErr = e => {
   const code = String(e.message || "").split(":")[0].trim().replace(/[^A-Z_]/g, "");
   return MSG[code] ? { code, message: MSG[code] } : { code: "UNKNOWN", message: "حدث خطأ غير متوقع." };
 };
+
+async function auth(url, req, res) {
+  const body = JSON.parse((await readBody(req)).toString() || "{}");
+  const rows = await asService(
+    "select id, email from auth.users where email = $1 and password = $2",
+    [body.email ?? "", body.password ?? ""]);
+  if (!rows.length)
+    return send(res, 400, { error: "invalid_grant", error_description: "بيانات الدخول غير صحيحة." });
+  return send(res, 200, {
+    access_token: rows[0].id, token_type: "bearer", expires_in: 3600,
+    user: { id: rows[0].id, email: rows[0].email },
+  });
+}
 
 function readBody(req) {
   return new Promise(r => { const c = []; req.on("data", d => c.push(d)); req.on("end", () => r(Buffer.concat(c))); });
@@ -169,7 +281,20 @@ function storage(url, res) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, "");
-  if (url.pathname.startsWith("/rest/v1/")) return rest(url, res);
+  if (url.pathname === "/auth/v1/token") return auth(url, req, res);
+  if (url.pathname.startsWith("/rest/v1/rpc/"))
+    return adminRpc(url.pathname.replace("/rest/v1/rpc/", ""), req, res);
+  if (url.pathname.startsWith("/storage/v1/object/sign/")) {
+    const uid = uidFrom(req);
+    const rows = await asUser("select is_admin() as ok", [], uid).catch(() => [{ ok: false }]);
+    if (!rows[0]?.ok) return send(res, 403, { message: "غير مصرّح لك." });
+    const path = url.pathname.replace("/storage/v1/object/sign/", "");
+    return send(res, 200, { signedURL: `/object/public/product-media/${path}?token=mock` });
+  }
+  if (url.pathname.startsWith("/rest/v1/")) {
+    url.searchParams.set("__uid", uidFrom(req) || "");
+    return rest(url, res);
+  }
   if (url.pathname.startsWith("/functions/v1/"))
     return fn(url.pathname.replace("/functions/v1/", ""), req, res);
   if (url.pathname.startsWith("/storage/v1/object/public/")) return storage(url, res);
@@ -179,7 +304,12 @@ http.createServer(async (req, res) => {
      same suite fails with ACTIVE_ORDER_LIMIT -- a test artefact that
      looks exactly like a product bug. */
   if (url.pathname === "/__test/reset") {
-    return asService("delete from orders; delete from rate_limits;")
+    /* Scoped on purpose. A blanket "delete from orders" also wiped the
+       lifecycle orders fixtures.sql seeds, so whichever suite ran second
+       found an empty queue and failed for the wrong reason. Fixture rows
+       carry a seed- idempotency key and are left alone. */
+    return asService(
+      "delete from orders where idempotency_key not like 'seed-%'; delete from rate_limits;")
       .then(() => send(res, 200, { ok: true }))
       .catch(e => send(res, 500, { ok: false, message: String(e.message) }));
   }

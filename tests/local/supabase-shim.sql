@@ -24,8 +24,16 @@ create schema if not exists auth;
 
 create table if not exists auth.users (
   id    uuid primary key default gen_random_uuid(),
-  email text
+  email text unique,
+  -- Test harness only. Real Supabase stores a bcrypt hash in GoTrue and
+  -- never exposes it; the mock server compares this in plaintext purely
+  -- so the browser tests can sign in.
+  password text
 );
+alter table auth.users add column if not exists password text;
+do $$ begin
+  alter table auth.users add constraint auth_users_email_key unique (email);
+exception when duplicate_table or duplicate_object then null; end $$;
 
 -- Supabase reads the request JWT out of a GUC. The shim mirrors that
 -- so `set local request.jwt.claims` drives auth.uid() in tests.
