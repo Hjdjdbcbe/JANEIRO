@@ -171,18 +171,28 @@ const dataUri = (file) => {
     '<script>window.JANEIRO_CONFIG={SUPABASE_URL:"demo",SUPABASE_ANON_KEY:"demo"};</script>');
 
   // ---------- 5. inline every asset the page references ----------
-  // href= too: the <link rel="preload"> tags point at the same files, and a
-  // preload left pointing at a path that is not there throws CORS noise in
-  // the console of a file:// build.
-  const assetRe = /(?:src="|href="|url\()assets\/([^")]+)(?:"|\))/g;
+  /* src=, href= and srcset= as well as url(): the <picture> feeds the hero
+     banner through <source srcset>, and a build that only rewrote src=
+     inlined the fallback PNG while leaving the WebP sources pointing at
+     files that are not beside the page -- so the banner did not render at
+     all, and the bundle carried 2MB of PNG nobody looked at. href= covers
+     the <link rel="preload"> tags, which otherwise throw CORS noise on
+     file://. */
+  const assetRe = /(?:src="|href="|srcset="|url\()assets\/([^")]+)(?:"|\))/g;
   const seen = new Set();
   html = html.replace(assetRe, (m, rel) => {
+    /* Prefer a .webp sibling. The page ships a PNG fallback for browsers
+       that need one; inlined as a data URI it is 4.6MB of bytes that no
+       browser capable of opening this bundle will ever decode. */
+    const webp = rel.replace(/\.png$/i, ".webp");
+    if (webp !== rel && fs.existsSync(path.join(ROOT, "frontend/assets", webp))) rel = webp;
     const f = path.join(ROOT, "frontend/assets", rel);
     if (!fs.existsSync(f)) { console.log(`  (missing asset ${rel})`); return m; }
     seen.add(rel);
     const uri = dataUri(f);
-    if (m.startsWith("src="))  return `src="${uri}"`;
-    if (m.startsWith("href=")) return `href="${uri}"`;
+    if (m.startsWith("srcset=")) return `srcset="${uri}"`;
+    if (m.startsWith("src="))    return `src="${uri}"`;
+    if (m.startsWith("href="))   return `href="${uri}"`;
     return `url(${uri})`;
   });
   console.log(`  assets: ${seen.size} inlined (fonts, logo, hero artwork)`);
