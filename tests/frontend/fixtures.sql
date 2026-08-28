@@ -98,3 +98,6 @@ begin
     end if;
   end loop;
 end $$;
+
+-- branding: posters + the new product (see docs/apply-branding.sql)
+\i docs/apply-branding.sql
