@@ -62,6 +62,15 @@ correctly render as hidden and the deal assertions will fail.
   value, and a stored choice outranking the OS across a reload. The
   `data-theme` attribute has to be set by the blocking script in `<head>`,
   not after load, or the saved theme flashes.
+- **Typography** — the faces actually render, measured by advance width
+  against a forced fallback. `document.fonts.check()` is unusable for this:
+  it returns true when no matching `@font-face` rule exists at all, so it
+  passed just as happily while the fonts were loading from
+  fonts.googleapis.com, which this browser cannot reach. The suite also
+  asserts the brief's rule that no price, order number or payment detail
+  is ever set in the display face, that nothing asks the single-weight
+  display face for a synthesised bold, and that no Arabic run carries
+  negative letter-spacing.
 - **Contrast** — a WCAG 2.1 sweep over *every* visible text node on all six
   pages in both themes (~1000 nodes), not a curated list: a list only ever
   proves the pairs someone remembered. Translucent fills are composited

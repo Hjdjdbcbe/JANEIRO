@@ -1,6 +1,7 @@
-/* Light/dark theme: FOUC guard, persistence, and a measured WCAG contrast
-   sweep over every visible text node on every page — not a curated list,
-   because a curated list only ever proves the pairs I remembered.
+/* The visual system: light/dark theme (FOUC guard, persistence), a measured
+   WCAG contrast sweep over every visible text node on every page — not a
+   curated list, because a curated list only ever proves the pairs I
+   remembered — and the typography rules the brief set out.
 
    Runs against mock-supabase.js like the other suites. */
 const { chromium } = require("playwright");
@@ -197,6 +198,86 @@ const SWEEP = () => {
         console.log(`        ${b.ratio}:1 (needs ${b.need}) ${b.sel} — "${b.text}"${b.note ? ` [${b.note}]` : ""}`));
     }
   }
+
+  // ---------- typography ----------
+  await page.evaluate(() => window.go("home"));
+  await page.waitForTimeout(200);
+
+  /* document.fonts.check() is NOT usable here: it returns true when no
+     matching @font-face rule exists at all, so it passes just as happily
+     when the font never loaded. It did exactly that while the faces were
+     still coming from fonts.googleapis.com, which this browser cannot
+     reach -- the assertion could not fail. Measure instead: render the
+     same Arabic string in the face and in a forced fallback and require
+     the advance widths to differ. */
+  const type = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const AR = "كل أدواتك الرقمية موثوقة";
+    const c = document.createElement("canvas").getContext("2d");
+    const w = f => { c.font = "400 40px " + f; return +c.measureText(AR).width.toFixed(1); };
+    const faces = [...document.fonts].map(f => `${f.family}/${f.status}`);
+    return { base: w("monospace"), lalezar: w("Lalezar, monospace"),
+             cairo: w("Cairo, monospace"), faces };
+  });
+  check(type.faces.length > 0, `@font-face rules registered: ${type.faces.length}`);
+  check(type.faces.every(f => /loaded/.test(f)) || type.faces.some(f => /loaded/.test(f)),
+        `at least one face reports loaded: ${type.faces.slice(0, 3).join(", ")}`);
+  check(type.lalezar !== type.base,
+        `Lalezar renders Arabic, not a fallback (${type.lalezar} vs ${type.base})`);
+  check(type.cairo !== type.base,
+        `Cairo renders Arabic, not a fallback (${type.cairo} vs ${type.base})`);
+  check(type.lalezar !== type.cairo,
+        `Lalezar and Cairo are distinct faces (${type.lalezar} vs ${type.cairo})`);
+
+  /* The brief was explicit: never the handwritten face on prices or payment
+     details. Asserted by walking what the browser resolved, not by reading
+     the stylesheet — a later rule could always override an earlier one. */
+  const MONEY = ".pprice b, .pprice .old, .pprice .from, .ctot b, .stickybar .amt b, " +
+                ".paybox .r b, .opt .pr, .cinfo .pr, .summary .r b, .mono, .dl div";
+  for (const p of ["home", "shop", "order", "track"]) {
+    await page.evaluate(n => window.go(n, n === "shop" ? "all" : undefined), p);
+    await page.waitForTimeout(180);
+    const bad = await page.evaluate(sel => {
+      const out = [];
+      document.querySelectorAll(sel).forEach(el => {
+        if (!el.textContent.trim()) return;
+        const f = getComputedStyle(el).fontFamily;
+        if (/Lalezar/i.test(f)) out.push(`${el.className || el.tagName} -> ${f}`);
+      });
+      return out;
+    }, MONEY);
+    check(bad.length === 0, `${p}: no price or payment detail in the display face` +
+      (bad.length ? ` — ${bad.slice(0, 3).join(", ")}` : ""));
+  }
+
+  /* Lalezar ships one weight. Asking it for 600 or 800 makes the browser
+     synthesise a bold, which on a joined script closes up the letterforms. */
+  const faux = await page.evaluate(() => {
+    const out = [];
+    document.querySelectorAll("*").forEach(el => {
+      if (!Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim())) return;
+      const cs = getComputedStyle(el);
+      if (!/Lalezar/i.test(cs.fontFamily)) return;
+      if (+cs.fontWeight !== 400) out.push(`${el.tagName}.${el.className} @${cs.fontWeight}`);
+    });
+    return out;
+  });
+  check(faux.length === 0, `no faux bold on the single-weight display face` +
+    (faux.length ? ` — ${faux.slice(0, 4).join(", ")}` : ""));
+
+  /* Arabic joins; negative tracking pulls the joins into each other. */
+  const tight = await page.evaluate(() => {
+    const out = [];
+    document.querySelectorAll("*").forEach(el => {
+      const t = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join("");
+      if (!/[\u0600-\u06FF]/.test(t)) return;               // Arabic runs only
+      const ls = getComputedStyle(el).letterSpacing;
+      if (ls !== "normal" && parseFloat(ls) < 0) out.push(`${el.tagName}.${el.className} @${ls}`);
+    });
+    return out;
+  });
+  check(tight.length === 0, `no negative letter-spacing on Arabic` +
+    (tight.length ? ` — ${tight.slice(0, 4).join(", ")}` : ""));
 
   check(errs.length === 0, `no page errors: ${errs.slice(0, 3).join(" | ") || "none"}`);
   await browser.close();
