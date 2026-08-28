@@ -30,6 +30,7 @@ PGUSER="$(whoami)" node tests/frontend/mock-supabase.js &
 # 5. drive the browser
 node tests/frontend/e2e.test.js   # catalogue, cart, order, tracking
 node tests/frontend/ui.test.js    # icons, deals, motion, narrow viewports
+node tests/frontend/theme.test.js # light/dark theme + measured contrast
 ```
 
 Both exit non-zero on the first failed check.
@@ -54,6 +55,27 @@ correctly render as hidden and the deal assertions will fail.
   property, the orbit ring at 60s, one short cart pulse, and
   `prefers-reduced-motion` leaving nothing animating or stuck invisible.
 - **Layout** — no horizontal scroll at 375, 390 and 430px.
+
+## What theme.test.js covers
+
+- **Resolution** — the light default, the OS preference as the initial
+  value, and a stored choice outranking the OS across a reload. The
+  `data-theme` attribute has to be set by the blocking script in `<head>`,
+  not after load, or the saved theme flashes.
+- **Contrast** — a WCAG 2.1 sweep over *every* visible text node on all six
+  pages in both themes (~1000 nodes), not a curated list: a list only ever
+  proves the pairs someone remembered. Translucent fills are composited
+  down the ancestor chain, and a gradient contributes one candidate per
+  colour stop with the **worst** one scored, so a failing end of a gradient
+  cannot hide behind a passing one. Text over product artwork has no
+  computable background; those nodes are counted and reported, never
+  silently dropped.
+
+It found four real defects on first run, all pre-existing:
+white on the brand gradient's blue end (2.86:1), the same on `.badge.new`,
+the poster fallback printing its wordmark and warranty chip in the raw
+product accent on a wash of that accent (1.1:1), and the brand monogram
+using an ink chosen for white on grounds that follow the theme.
 
 ## Notes
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light only">
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#FFFFFF">
 <link rel="icon" type="image/png" href="assets/janeiro-logo.png">
 <link rel="apple-touch-icon" href="assets/janeiro-logo.png">
@@ -15,41 +15,88 @@
 <meta property="og:locale" content="ar_DZ">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script>
+/* Theme is resolved here, in a blocking inline script, before the first
+   paint. Reading it any later lets the light default flash over a saved
+   dark choice. Wrapped in try/catch because localStorage throws outright
+   when site data is blocked, and the page must still render (light) then. */
+(function(){
+  var t=null;
+  try{ t=localStorage.getItem("janeiro-theme"); }catch(e){}
+  if(t!=="dark"&&t!=="light"){
+    t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";
+  }
+  document.documentElement.setAttribute("data-theme",t);
+  var m=document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute("content", t==="dark"?"#0F0F1A":"#FFFFFF");
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    JANEIRO DESIGN TOKENS
    ============================================================ */
 :root{
-  color-scheme:light only;
+  color-scheme:light;
 
-  /* color — light surface system (product cards, forms, panels, footer keep using these) */
-  --bg:#FFFFFF;
-  --bg-2:#F7F8FC;
-  --surface:#F3F5FA;
-  --ink:#11131A;
-  --ink-2:#656B7A;
+  /* ---- surfaces ---- */
+  --bg:#FFFFFF;              /* page */
+  --bg-2:#FAFAFC;            /* alternating section band */
+  --card:#FFFFFF;            /* card / panel / header shell */
+  --surface:#F3F5FA;         /* soft fill: .btn-soft, .paybox, .hint, .drop */
+  --surface-hover:#E9EDF6;
+
+  /* ---- text ---- */
+  --ink:#1A1A2E;             /* headings + primary  15.1:1 on --bg */
+  --ink-2:#5A5A6E;           /* secondary            6.7:1 on --bg */
+
+  /* ---- lines + overlays ---- */
   --line:#E8EAF1;
-  --blue:#319CFF;
-  --purple:#6C35FF;
-  --purple-soft:#F1EDFF;
-  --blue-soft:#ECF3FF;
-  --brand-grad:linear-gradient(120deg,#6C35FF 0%,#5155FF 55%,#319CFF 100%);
+  --line-2:#D2D7E3;          /* stronger hairline: radio ring, dashed drop */
+  --tint-1:rgba(26,26,46,.045);
+  --tint-2:rgba(26,26,46,.09);
+  --scrim:rgba(17,19,26,.42);
+  --bar-bg:rgba(255,255,255,.94);
 
-  /* color — dark premium system (page background + ambient sections only) */
-  --page-bg:#07080D;
-  --page-bg-2:#0C0E17;
-  --dark-surface:#111421;
-  --dark-surface-2:#17172B;
-  --text-on-dark:#F8F8FC;
-  --muted-on-dark:#A7A9BB;
-  --light-card:#FFFFFF;
-  --light-card-soft:#F6F6FA;
-  --text-on-light:#11131A;
-  --muted-on-light:#747789;
-  --dark-border:rgba(255,255,255,.10);
-  --light-border:#E9EAF0;
+  /* ---- brand ----
+     --purple/--blue are the identity and never change: as a BACKGROUND
+     under white text they carry 5.9:1 in both themes. It is the text
+     variant that has to move -- #6C35FF on the dark ground is only
+     3.2:1, under the 4.5:1 floor, so --accent-ink lightens there. */
+  --purple:#6C35FF;
+  --blue:#319CFF;
+  /* The blue end used to be --blue (#319CFF). White on it measures
+     2.86:1, so every primary button, the selected category chip and the
+     brand mark failed regardless of theme. #1A73D4 is the lightest blue
+     on the same hue line that still carries white text (4.7:1). --blue
+     itself is unchanged: it is still the accent, just not a ground for
+     white text. */
+  --brand-grad:linear-gradient(120deg,#6C35FF 0%,#4A46E8 55%,#1A73D4 100%);
+  --blue-deep:#1A73D4;       /* --blue where white text sits on it */
+  --accent-ink:#6C35FF;      /* accent as text/icon   5.9:1 on --bg */
+  --accent-ink-2:#1668C4;    /* its hover pair        5.5:1 on --bg */
+  --accent-soft:#F1EDFF;     /* tinted accent ground */
+  --accent-line:rgba(108,53,255,.22);
+  --ring:0 0 0 3px rgba(108,53,255,.16);
+  --grad-head:linear-gradient(120deg,#6C35FF,#1668C4);
+  --glow-1:rgba(108,53,255,.10);
+  --glow-2:rgba(49,156,255,.08);
+  --glow-strong:rgba(108,53,255,.14);
+
+  /* ---- status ---- */
   --ok:#15995A;
+  --ok-ink:#158048;
+  --ok-soft:#F1FBF5;
+  --danger:#DC2626;
+
+  /* ---- fixed palettes, identical in both themes ----
+     The product poster is artwork on its own light ground, so its ink
+     must not follow the theme or it disappears against the artwork.
+     The message preview and toast are dark chips by design. */
+  --poster-ink:#11131A;
+  --poster-ink-2:#656B7A;
+  --code-bg:#11131A;
+  --code-ink:#D7DBE6;
 
   /* spacing scale */
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px;
@@ -62,7 +109,6 @@
   --sh-1:0 2px 8px rgba(20,30,60,.04);
   --sh-2:0 8px 30px rgba(20,30,60,.06);
   --sh-3:0 18px 44px rgba(20,30,60,.10);
-  --sh-dark:0 18px 50px rgba(0,0,0,.35);
 
   /* type */
   --f-display:"Alexandria",system-ui,sans-serif;
@@ -71,6 +117,71 @@
 
   /* fixed header footprint — keep .hero/.page padding-top in sync with this */
   --hdr-space:78px;
+
+  /* ---- legacy aliases ----
+     The file grew with two parallel colour systems: a light one for the
+     inner pages and a dark one for the home canvas. They are now one
+     semantic set, and these names forward onto it so no component rule
+     had to be touched twice. They are removed in stage 4 once every
+     usage has been renamed. */
+  --dark-surface:var(--card);
+  --dark-surface-2:var(--bg-2);
+  --page-bg:var(--bg);
+  --page-bg-2:var(--bg-2);
+  --text-on-dark:var(--ink);
+  --muted-on-dark:var(--ink-2);
+  --text-on-light:var(--ink);
+  --muted-on-light:var(--ink-2);
+  --light-card:var(--card);
+  --light-card-soft:var(--surface);
+  --dark-border:var(--line);
+  --light-border:var(--line);
+  --sh-dark:var(--sh-3);
+  --purple-soft:var(--accent-soft);
+  --blue-soft:var(--accent-soft);
+}
+
+/* The dark theme re-declares values only. Not one component rule is
+   duplicated below this block. */
+[data-theme="dark"]{
+  color-scheme:dark;
+
+  --bg:#0F0F1A;
+  --bg-2:#14141F;
+  --card:#1A1A2E;
+  --surface:#20203A;
+  --surface-hover:#282845;
+
+  --ink:#F5F5FA;             /* 17.4:1 on --bg */
+  --ink-2:#A0A0B8;           /*  7.3:1 on --bg, 6.6:1 on --card */
+
+  --line:rgba(255,255,255,.10);
+  --line-2:rgba(255,255,255,.20);
+  --tint-1:rgba(255,255,255,.06);
+  --tint-2:rgba(255,255,255,.12);
+  --scrim:rgba(0,0,0,.62);
+  --bar-bg:rgba(15,15,26,.94);
+
+  --accent-ink:#B79BFF;      /*  8.2:1 on --bg, 6.3:1 on --accent-soft */
+  --accent-ink-2:#8FD2FF;    /* 11.5:1 on --bg */
+  --accent-soft:rgba(108,53,255,.20);
+  --accent-line:rgba(108,53,255,.38);
+  --ring:0 0 0 3px rgba(108,53,255,.32);
+  --grad-head:linear-gradient(120deg,#B79BFF,#8FD2FF);
+  --glow-1:rgba(108,53,255,.34);
+  --glow-2:rgba(49,156,255,.18);
+  --glow-strong:rgba(108,53,255,.35);
+
+  --ok:#4ED89A;
+  --ok-ink:#6FE3AC;
+  --ok-soft:rgba(31,168,85,.16);
+  --danger:#FF8A8A;
+
+  /* black casts nothing visible on a dark ground -- depth here comes
+     from a deeper, wider shadow than the light theme uses */
+  --sh-1:0 2px 10px rgba(0,0,0,.30);
+  --sh-2:0 10px 30px rgba(0,0,0,.42);
+  --sh-3:0 20px 48px rgba(0,0,0,.55);
 }
 @media(min-width:900px){:root{--hdr-space:92px}}
 
@@ -159,18 +270,18 @@ img,svg{display:block}
 .btn-primary{background:var(--brand-grad);color:#fff;box-shadow:0 6px 18px -6px rgba(115,87,255,.5)}
 .btn-primary:hover{box-shadow:0 10px 26px -8px rgba(115,87,255,.6)}
 .btn-primary:disabled{background:var(--surface);color:var(--ink-2);box-shadow:none;cursor:not-allowed}
-.btn-ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
-.btn-ghost:hover{background:var(--bg-2);border-color:#D8DCE8}
+.btn-ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn-ghost:hover{background:var(--bg-2);border-color:var(--line-2)}
 .btn-soft{background:var(--surface);color:var(--ink)}
-.btn-soft:hover{background:#E9EDF6}
+.btn-soft:hover{background:var(--surface-hover)}
 .btn-block{display:flex;width:100%}
 
 /* ============ HEADER ============ */
 header{position:fixed;top:0;left:0;right:0;z-index:60;padding:12px var(--s3) 0;
   transition:padding .25s}
 header.stuck{padding-top:8px}
-.hshell{max-width:1180px;margin-inline:auto;background:var(--light-card);
-  border-radius:20px;box-shadow:0 6px 20px rgba(8,9,20,.10);transition:box-shadow .25s}
+.hshell{max-width:1180px;margin-inline:auto;background:var(--card);
+  border:1px solid var(--line);border-radius:20px;box-shadow:0 6px 20px rgba(8,9,20,.10);transition:box-shadow .25s}
 header.stuck .hshell{box-shadow:0 8px 26px rgba(8,9,20,.14)}
 @media(min-width:768px){header{padding-inline:var(--s8)}}
 .hbar{display:flex;align-items:center;gap:var(--s3);height:54px;padding-inline:var(--s4);
@@ -196,13 +307,13 @@ header.stuck .hbar{height:48px}
 .hspace{margin-inline-start:auto}
 .hsearch{display:none;align-items:center;gap:var(--s2);background:var(--bg-2);border:1px solid var(--line);
   border-radius:var(--r-pill);padding:9px 16px;width:230px;transition:border-color .18s,background .18s}
-.hsearch:focus-within{border-color:var(--blue);background:var(--bg)}
+.hsearch:focus-within{border-color:var(--accent-ink);background:var(--card)}
 .hsearch input{border:0;outline:0;background:none;width:100%;font-size:13.5px;color:var(--text-on-light)}
 .hsearch svg{color:var(--muted-on-light);flex:none}
 @media(min-width:900px){.hsearch{display:flex}}
 .ibtn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;
   color:var(--text-on-light);position:relative;transition:background .15s}
-.ibtn:hover{background:var(--bg-2)}
+.ibtn:hover{background:var(--surface)}
 .cbadge{position:absolute;top:2px;inset-inline-end:2px;background:var(--purple);color:#fff;
   font-family:var(--f-mono);font-size:9.5px;font-weight:600;min-width:16px;height:16px;
   border-radius:var(--r-pill);display:grid;place-items:center;padding:0 4px;
@@ -215,27 +326,27 @@ header.stuck .hbar{height:48px}
 /* ============ HERO ============ */
 .hero{padding:var(--hdr-space) 0 var(--s16);position:relative;overflow:hidden;
   background:
-    radial-gradient(circle at 20% 10%, rgba(108,53,255,.55), transparent 42%),
-    radial-gradient(circle at 90% 80%, rgba(49,156,255,.22), transparent 38%),
-    #080914;
+    radial-gradient(circle at 20% 10%, var(--glow-1), transparent 42%),
+    radial-gradient(circle at 90% 80%, var(--glow-2), transparent 38%),
+    var(--bg);
 }
 @media(min-width:900px){.hero{padding-top:calc(var(--hdr-space) + var(--s8));padding-bottom:var(--s20)}}
 .hero-grid{position:relative;z-index:1;display:grid;gap:var(--s12);align-items:center}
 @media(min-width:900px){.hero-grid{grid-template-columns:1.02fr .98fr;gap:var(--s8)}}
 .eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
-  color:#C8B4FF;background:rgba(108,53,255,.18);border:1px solid rgba(108,53,255,.3);
+  color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);
   padding:6px 14px;border-radius:var(--r-pill);margin-bottom:var(--s4)}
-.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:#C8B4FF}
-.hero h1{font-size:clamp(29px,7.4vw,50px);letter-spacing:-.025em;color:#fff}
-.hero h1 .g{background:linear-gradient(120deg,#B79BFF,#8FD2FF);-webkit-background-clip:text;background-clip:text;color:transparent}
+.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent-ink)}
+.hero h1{font-size:clamp(29px,7.4vw,50px);letter-spacing:-.025em;color:var(--ink)}
+.hero h1 .g{background:var(--grad-head);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero .lede{color:var(--muted-on-dark);font-size:15.5px;margin-top:var(--s4);max-width:46ch}
 .hero-cta{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
-.hero .btn-ghost{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.2)}
-.hero .btn-ghost:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.32)}
+.hero .btn-ghost{background:var(--tint-1);color:var(--ink);border:1px solid var(--line-2)}
+.hero .btn-ghost:hover{background:var(--tint-2);border-color:var(--accent-line)}
 .trustline{display:flex;flex-wrap:wrap;gap:var(--s3) var(--s6);margin-top:var(--s8);
-  padding-top:var(--s6);border-top:1px solid rgba(255,255,255,.1)}
+  padding-top:var(--s6);border-top:1px solid var(--line)}
 .tpoint{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-on-dark);font-weight:500}
-.tpoint i{width:26px;height:26px;border-radius:9px;background:rgba(255,255,255,.08);color:#B79BFF;
+.tpoint i{width:26px;height:26px;border-radius:9px;background:var(--tint-1);color:var(--accent-ink);
   display:grid;place-items:center;flex:none}
 .tpoint svg{width:14px;height:14px}
 
@@ -287,9 +398,9 @@ header.stuck .hbar{height:48px}
 .sechead{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s4);margin-bottom:var(--s8)}
 .sechead h2{font-size:clamp(21px,4.4vw,29px);letter-spacing:-.02em;color:var(--text-on-dark)}
 .sechead p{color:var(--muted-on-dark);font-size:14px;margin-top:6px}
-.arclink{font-size:13.5px;font-weight:600;color:#B79BFF;white-space:nowrap;flex:none;
+.arclink{font-size:13.5px;font-weight:600;color:var(--accent-ink);white-space:nowrap;flex:none;
   display:inline-flex;align-items:center;gap:5px}
-.arclink:hover{color:#8FD2FF}
+.arclink:hover{color:var(--accent-ink-2)}
 
 /* ============ CATEGORY CAROUSEL ============ */
 .catwrap{position:relative}
@@ -303,8 +414,8 @@ header.stuck .hbar{height:48px}
 .category-chip{
   min-height:48px;padding:0 17px;display:inline-flex;align-items:center;justify-content:center;
   gap:8px;scroll-snap-align:start;white-space:nowrap;background:var(--light-card);color:var(--text-on-light);
-  border:1px solid rgba(255,255,255,.12);border-radius:999px;font-weight:600;font-size:13.5px;
-  box-shadow:0 8px 24px rgba(0,0,0,.16);transition:transform .18s ease,background .18s ease,color .18s ease;
+  border:1px solid var(--line);border-radius:999px;font-weight:600;font-size:13.5px;
+  box-shadow:var(--sh-2);transition:transform .18s ease,background .18s ease,color .18s ease;
 }
 .category-chip svg{flex:none}
 
@@ -364,7 +475,7 @@ header.stuck .hbar{height:48px}
 .category-chip[aria-selected="true"]{color:#fff;background:var(--brand-grad);border-color:transparent}
 .category-chip:active{transform:scale(.97)}
 .carr{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;
-  background:var(--light-card);color:var(--text-on-light);display:grid;place-items:center;
+  background:var(--card);color:var(--ink);border:1px solid var(--line);display:grid;place-items:center;
   box-shadow:var(--sh-2);z-index:2;transition:opacity .2s}
 .carr.hidden{display:none}
 .carr.prev{inset-inline-start:-6px}
@@ -387,10 +498,10 @@ header.stuck .hbar{height:48px}
   .rail{grid-auto-flow:row;grid-template-columns:repeat(4,1fr);overflow:visible;margin-inline:0;padding-inline:0}
 }
 
-.pcard{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-card);
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);
   overflow:hidden;display:flex;flex-direction:column;position:relative;
   transition:transform .18s,box-shadow .18s,border-color .18s;text-align:start}
-.pcard:hover{transform:translateY(-4px);box-shadow:var(--sh-3);border-color:transparent}
+.pcard:hover{transform:translateY(-4px);box-shadow:var(--sh-3);border-color:var(--accent-line)}
 
 /* poster artwork — designed fallback when no image asset exists */
 /* 3:4, matching the product card artwork. It was 1:1, and object-fit:
@@ -398,29 +509,35 @@ header.stuck .hbar{height:48px}
    janeiro-store.com footer -- the half the artwork exists for. The
    designed fallback uses the same ratio so the grid stays even whether
    a product has a poster or not. */
+/* The wash is a background-IMAGE layer over an opaque white base, not a
+   background-color: --pbg is translucent, and with only the card beneath
+   it the fallback poster went dark with the theme while its ink was being
+   chosen for white. Real product artwork is light; the fallback matches it
+   in both themes. */
 .poster{position:relative;aspect-ratio:3/4;display:flex;flex-direction:column;
-  padding:var(--s3);overflow:hidden;background:var(--pbg)}
+  padding:var(--s3);overflow:hidden;
+  background-color:#fff;background-image:linear-gradient(var(--pbg),var(--pbg))}
 .poster img.pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .poster::before{content:"";position:absolute;width:120%;aspect-ratio:1;border-radius:50%;
   border:1px solid var(--pline);top:52%;left:50%;transform:translate(-50%,0)}
 .poster::after{content:"";position:absolute;width:78%;aspect-ratio:1;border-radius:50%;
   border:1px dashed var(--pline);top:44%;left:50%;transform:translate(-50%,0)}
 .pwordmark{position:relative;z-index:2;display:flex;align-items:center;gap:5px;
-  font-size:8.5px;font-weight:600;color:var(--pink);opacity:.55;letter-spacing:.02em}
+  font-size:8.5px;font-weight:600;color:var(--pink);opacity:.8;letter-spacing:.02em}
 .pwordmark i{width:9px;height:9px;border-radius:3px;background:var(--brand-grad);display:block;flex:none}
 .plogo{position:relative;z-index:2;flex:1;display:grid;place-items:center;padding:var(--s2) 0}
-.plogo .chip{width:56%;max-width:74px;aspect-ratio:1;border-radius:24%;background:var(--bg);
+.plogo .chip{width:56%;max-width:74px;aspect-ratio:1;border-radius:24%;background:#fff;
   display:grid;place-items:center;box-shadow:var(--sh-2);border:1px solid rgba(255,255,255,.9)}
 .pmicro{position:relative;z-index:2;display:flex;gap:5px;flex-wrap:wrap}
-.pmicro span{font-size:8.5px;font-weight:600;color:var(--pink);background:rgba(255,255,255,.72);
+.pmicro span{font-size:8.5px;font-weight:600;color:var(--pink);background:#fff;
   border:1px solid var(--pline);border-radius:var(--r-pill);padding:3px 8px;line-height:1.4}
 .badge{position:absolute;top:10px;inset-inline-end:10px;z-index:5;font-size:9.5px;font-weight:700;
   padding:4px 10px;border-radius:var(--r-pill);font-family:var(--f-display)}
-.badge.hot{background:var(--ink);color:#fff}
-.badge.new{background:var(--blue);color:#fff}
+.badge.hot{background:var(--poster-ink);color:#fff}
+.badge.new{background:var(--blue-deep);color:#fff}
 .badge.off{background:var(--purple);color:#fff}
 .pout{position:absolute;inset:0;z-index:6;background:rgba(255,255,255,.72);display:grid;
-  place-items:center;font-family:var(--f-display);font-weight:700;font-size:13px;color:var(--ink-2)}
+  place-items:center;font-family:var(--f-display);font-weight:700;font-size:13px;color:var(--poster-ink-2)}
 
 .pbody{padding:var(--s3);display:flex;flex-direction:column;gap:3px;flex:1}
 .pbody h3{font-size:14px;font-weight:600}
@@ -436,7 +553,7 @@ header.stuck .hbar{height:48px}
 
 /* remaining-time line under the عروض اليوم heading */
 .dealtime{display:flex;align-items:center;gap:7px;color:var(--muted-on-dark);font-size:14px;margin-top:6px}
-.dealtime .dot{width:7px;height:7px;border-radius:50%;background:#B79BFF;flex:none}
+.dealtime .dot{width:7px;height:7px;border-radius:50%;background:var(--accent-ink);flex:none}
 .dealtime #dealsTimer{font-family:var(--f-mono);font-variant-numeric:tabular-nums;
   font-size:13.5px;color:var(--text-on-dark)}
 /* the plan a deal applies to, so the price is never ambiguous */
@@ -448,20 +565,21 @@ header.stuck .hbar{height:48px}
   border-radius:var(--r-sec);padding:var(--s8);display:grid;gap:var(--s6);align-items:center;
   position:relative;overflow:hidden;color:var(--text-on-dark)}
 .promo::before{content:"";position:absolute;width:340px;height:340px;border-radius:50%;
-  background:radial-gradient(circle,rgba(108,53,255,.35),transparent 70%);
+  background:radial-gradient(circle,var(--glow-strong),transparent 70%);
   top:-140px;inset-inline-end:-100px;pointer-events:none}
 @media(min-width:820px){.promo{grid-template-columns:1.15fr .85fr;padding:var(--s12)}}
-.promo h2{font-size:clamp(20px,4.2vw,28px);letter-spacing:-.02em;position:relative;color:#fff}
+.promo h2{font-size:clamp(20px,4.2vw,28px);letter-spacing:-.02em;position:relative;color:var(--ink)}
 .promo p{color:var(--muted-on-dark);font-size:14px;margin-top:var(--s2);max-width:44ch;position:relative}
 .promo .btn{margin-top:var(--s6);position:relative}
 .pboxes{display:flex;justify-content:center;gap:var(--s3);flex-wrap:wrap;position:relative}
-.pbox{width:66px;height:66px;border-radius:19px;background:var(--light-card);display:grid;place-items:center;
+[data-theme="dark"] .pbox b,[data-theme="dark"] .cthumb b{--logo-ink:var(--ink-dk)}
+.pbox{width:66px;height:66px;border-radius:19px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;
   box-shadow:var(--sh-dark);transform:rotate(var(--rot))}
 
 /* ============ HUMAN HELP BANNER ============ */
 .helpbar{display:flex;align-items:center;gap:var(--s4);flex-wrap:wrap;background:var(--dark-surface);
   border:1px solid var(--dark-border);border-radius:var(--r-card);padding:var(--s4) var(--s6)}
-.helpbar .hi{width:44px;height:44px;border-radius:13px;background:rgba(108,53,255,.18);color:#B79BFF;
+.helpbar .hi{width:44px;height:44px;border-radius:13px;background:var(--accent-soft);color:var(--accent-ink);
   display:grid;place-items:center;flex:none}
 .helpbar .ht{flex:1;min-width:200px}
 .helpbar b{display:block;font-family:var(--f-display);font-weight:600;font-size:14.5px;color:var(--text-on-dark)}
@@ -472,7 +590,7 @@ header.stuck .hbar{height:48px}
 @media(min-width:820px){.hiwgrid{grid-template-columns:repeat(4,1fr);gap:var(--s4)}}
 .hiwcard{background:var(--dark-surface);border:1px solid var(--dark-border);border-radius:var(--r-card);
   padding:var(--s4)}
-.hiwnum{width:28px;height:28px;border-radius:9px;background:rgba(108,53,255,.18);color:#B79BFF;
+.hiwnum{width:28px;height:28px;border-radius:9px;background:var(--accent-soft);color:var(--accent-ink);
   display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:11.5px;margin-bottom:var(--s3)}
 .hiwcard b{display:block;font-family:var(--f-display);font-weight:600;font-size:14px;color:var(--text-on-dark);margin-bottom:4px}
 .hiwcard p{font-size:12.5px;color:var(--muted-on-dark)}
@@ -482,15 +600,15 @@ header.stuck .hbar{height:48px}
 .trustgrid{display:grid;gap:var(--s6)}
 @media(min-width:820px){.trustgrid{grid-template-columns:repeat(4,1fr);gap:var(--s8)}}
 .trow{display:flex;flex-direction:column;gap:9px}
-.trow i{width:38px;height:38px;border-radius:11px;background:rgba(108,53,255,.16);color:#B79BFF;
+.trow i{width:38px;height:38px;border-radius:11px;background:var(--accent-soft);color:var(--accent-ink);
   display:grid;place-items:center}
 .trow i svg{width:19px;height:19px}
 .trow b{font-size:14px;color:var(--text-on-dark)}
 .trow p{font-size:12.5px;color:var(--muted-on-dark)}
 .whygrid{display:grid;gap:var(--s6)}
 @media(min-width:700px){.whygrid{grid-template-columns:repeat(4,1fr);gap:var(--s8)}}
-.why i{width:44px;height:44px;border-radius:14px;background:var(--light-card);
-  color:var(--purple);display:grid;place-items:center;margin-bottom:var(--s3);box-shadow:var(--sh-1)}
+.why i{width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);
+  color:var(--accent-ink);display:grid;place-items:center;margin-bottom:var(--s3);box-shadow:var(--sh-1)}
 .why h3{font-size:15px;font-weight:600;margin-bottom:5px;color:var(--text-on-dark)}
 .why p{font-size:13px;color:var(--muted-on-dark)}
 
@@ -499,8 +617,8 @@ header.stuck .hbar{height:48px}
 .faq summary{list-style:none;cursor:pointer;padding:var(--s4) 0;display:flex;
   justify-content:space-between;align-items:center;gap:var(--s4);font-weight:600;font-size:14.5px}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"";width:11px;height:11px;flex:none;border-inline-end:2px solid var(--purple);
-  border-block-end:2px solid var(--purple);transform:rotate(45deg);transition:transform .22s;margin-bottom:4px}
+.faq summary::after{content:"";width:11px;height:11px;flex:none;border-inline-end:2px solid var(--accent-ink);
+  border-block-end:2px solid var(--accent-ink);transform:rotate(45deg);transition:transform .22s;margin-bottom:4px}
 .faq[open] summary::after{transform:rotate(-135deg);margin-bottom:-2px}
 .faq p{padding:0 0 var(--s4);font-size:13.5px;color:var(--ink-2);max-width:70ch}
 /* homepage FAQ sits on the dark canvas — override text/border only here */
@@ -514,10 +632,10 @@ header.stuck .hbar{height:48px}
 #policies .faq p{color:var(--muted-on-light)}
 
 /* ============ DRAWER / CART ============ */
-.scrim{position:fixed;inset:0;background:rgba(17,19,26,.42);z-index:70;opacity:0;
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:70;opacity:0;
   visibility:hidden;transition:opacity .25s}
 .scrim.on{opacity:1;visibility:visible}
-.panel{position:fixed;top:0;bottom:0;background:var(--bg);z-index:80;width:min(88vw,360px);
+.panel{position:fixed;top:0;bottom:0;background:var(--card);z-index:80;width:min(88vw,360px);
   display:flex;flex-direction:column;transition:transform .3s cubic-bezier(.32,.72,0,1)}
 .panel.r{right:0;transform:translateX(101%);box-shadow:-14px 0 44px rgba(20,30,60,.14)}
 .panel.l{left:0;transform:translateX(-101%);box-shadow:14px 0 44px rgba(20,30,60,.14)}
@@ -529,12 +647,12 @@ header.stuck .hbar{height:48px}
 .mnav{display:grid;gap:2px}
 .mnav button{text-align:start;padding:13px var(--s2);font-size:14.5px;font-weight:500;
   border-radius:11px;transition:background .15s}
-.mnav button:hover{background:var(--bg-2)}
+.mnav button:hover{background:var(--surface)}
 .mlabel{font-size:11px;font-weight:700;color:var(--ink-2);letter-spacing:.04em;
   margin:var(--s6) var(--s2) var(--s2)}
 .mcat{display:flex;align-items:center;gap:var(--s3);width:100%;text-align:start;
   padding:9px var(--s2);border-radius:11px;font-size:14px;font-weight:500;transition:background .15s}
-.mcat:hover{background:var(--bg-2)}
+.mcat:hover{background:var(--surface)}
 .pfoot{flex:none;padding:var(--s4);border-top:1px solid var(--line);
   padding-bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
 
@@ -548,23 +666,23 @@ header.stuck .hbar{height:48px}
 .qty{display:inline-flex;align-items:center;gap:var(--s2);margin-top:7px;
   border:1px solid var(--line);border-radius:10px;padding:2px}
 .qty button{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;
-  color:var(--purple);font-size:15px;line-height:1}
-.qty button:hover{background:var(--purple-soft)}
+  color:var(--accent-ink);font-size:15px;line-height:1}
+.qty button:hover{background:var(--accent-soft)}
 .qty span{font-family:var(--f-mono);font-size:13px;min-width:14px;text-align:center}
 .cdel{color:var(--ink-2);font-size:11.5px;align-self:flex-start;padding:2px}
-.cdel:hover{color:#DC2626}
+.cdel:hover{color:var(--danger)}
 .ctot{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--s3)}
 .ctot span{font-size:13.5px;color:var(--ink-2)}
 .ctot b{font-family:var(--f-mono);font-size:19px}
 .blank{text-align:center;padding:var(--s16) var(--s4);color:var(--ink-2);font-size:13.5px}
-.blank i{width:56px;height:56px;border-radius:18px;background:var(--bg-2);color:var(--purple);
+.blank i{width:56px;height:56px;border-radius:18px;background:var(--surface);color:var(--accent-ink);
   display:grid;place-items:center;margin:0 auto var(--s3)}
 
 /* ============ PAGES ============ */
 .page{
   background:
-    radial-gradient(circle at 90% 0%, rgba(108,53,255,.14), transparent 32%),
-    var(--page-bg);
+    radial-gradient(circle at 90% 0%, var(--glow-1), transparent 32%),
+    var(--bg);
   color:var(--text-on-dark);
   padding-top:var(--hdr-space);padding-bottom:var(--s16);min-height:100vh;
 }
@@ -572,24 +690,24 @@ header.stuck .hbar{height:48px}
 .crumb{display:inline-flex;align-items:center;gap:6px;color:var(--muted-on-dark);font-size:13.5px;
   padding:var(--s2) 0 var(--s4)}
 .crumb:hover{color:var(--text-on-dark)}
-.card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-card);padding:var(--s4);
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:var(--s4);
   margin-top:var(--s4);color:var(--text-on-light)}
 .card>h3{font-size:14.5px;margin-bottom:var(--s3)}
 .dl{display:grid;gap:var(--s3);font-size:13.5px}
 .dl div{display:flex;justify-content:space-between;gap:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--line)}
 .dl div:last-child{border:0;padding:0}
 .dl dt,.dl span:first-child{color:var(--ink-2)}
-.hint{background:var(--bg-2);border-radius:14px;padding:var(--s3) var(--s4);font-size:12.5px;
+.hint{background:var(--surface);border-radius:14px;padding:var(--s3) var(--s4);font-size:12.5px;
   color:var(--ink-2);margin-top:var(--s4);display:flex;gap:10px}
-.hint svg{flex:none;color:var(--purple);margin-top:2px}
+.hint svg{flex:none;color:var(--accent-ink);margin-top:2px}
 
 /* dark-page search field (shop / category pages) — distinct from the header's light .hsearch */
-.dsearch{display:flex;align-items:center;gap:var(--s2);background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.12);border-radius:var(--r-pill);padding:11px 16px;
+.dsearch{display:flex;align-items:center;gap:var(--s2);background:var(--tint-1);
+  border:1px solid var(--line);border-radius:var(--r-pill);padding:11px 16px;
   transition:border-color .18s,box-shadow .18s}
-.dsearch:focus-within{border-color:var(--purple);box-shadow:0 0 0 3px rgba(108,53,255,.16)}
-.dsearch input{border:0;outline:0;background:none;width:100%;font-size:13.5px;color:#fff}
-.dsearch input::placeholder{color:rgba(255,255,255,.45)}
+.dsearch:focus-within{border-color:var(--accent-ink);box-shadow:var(--ring)}
+.dsearch input{border:0;outline:0;background:none;width:100%;font-size:13.5px;color:var(--ink)}
+.dsearch input::placeholder{color:var(--ink-2)}
 .dsearch svg{color:var(--muted-on-dark);flex:none}
 
 .dhead{display:grid;gap:var(--s6)}
@@ -597,57 +715,57 @@ header.stuck .hbar{height:48px}
 .dposter{border-radius:var(--r-sec);overflow:hidden;border:1px solid var(--line);max-width:380px;width:100%}
 .opt{display:flex;align-items:center;gap:var(--s3);border:1.5px solid var(--line);border-radius:14px;
   padding:13px var(--s4);margin-bottom:var(--s2);width:100%;text-align:start;transition:border-color .15s,background .15s}
-.opt[aria-checked="true"]{border-color:var(--purple);background:var(--purple-soft)}
-.opt .rad{width:18px;height:18px;border-radius:50%;border:2px solid #CBD1E0;flex:none;position:relative}
-.opt[aria-checked="true"] .rad{border-color:var(--purple)}
-.opt[aria-checked="true"] .rad::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--purple)}
+.opt[aria-checked="true"]{border-color:var(--accent-ink);background:var(--accent-soft)}
+.opt .rad{width:18px;height:18px;border-radius:50%;border:2px solid var(--line-2);flex:none;position:relative}
+.opt[aria-checked="true"] .rad{border-color:var(--accent-ink)}
+.opt[aria-checked="true"] .rad::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent-ink)}
 .opt .nm{font-weight:600;font-size:14px}
 .opt .pr{margin-inline-start:auto;font-family:var(--f-mono);font-weight:600;font-size:14px}
 .feat{display:grid;gap:var(--s2);font-size:13.5px;color:var(--ink-2)}
 .feat li{display:flex;gap:9px;align-items:flex-start;list-style:none}
-.feat svg{flex:none;color:var(--purple);margin-top:4px}
+.feat svg{flex:none;color:var(--accent-ink);margin-top:4px}
 
 .steps{display:flex;align-items:center;padding:var(--s2) 0 var(--s6)}
-.steps .n{width:26px;height:26px;border-radius:50%;border:2px solid var(--dark-border);background:var(--bg);
+.steps .n{width:26px;height:26px;border-radius:50%;border:2px solid var(--line-2);background:var(--card);
   display:grid;place-items:center;font-family:var(--f-mono);font-size:11px;color:var(--ink-2);flex:none}
 .steps .n.on{border-color:var(--purple);background:var(--purple);color:#fff}
-.steps .bar{flex:1;height:2px;background:var(--dark-border)}
+.steps .bar{flex:1;height:2px;background:var(--line)}
 .steps .bar.on{background:var(--purple)}
 .field{margin-bottom:var(--s4)}
 .field label{display:block;font-size:13.5px;font-weight:600;margin-bottom:6px}
 .field .sub{font-weight:400;color:var(--ink-2);font-size:12px}
 .field input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
-  background:var(--bg);outline:0;transition:border-color .15s,box-shadow .15s}
-.field input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(52,120,246,.13)}
+  background:var(--card);outline:0;transition:border-color .15s,box-shadow .15s}
+.field input:focus{border-color:var(--accent-ink);box-shadow:var(--ring)}
 .pay2{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2)}
 .paybtn{border:1.5px solid var(--line);border-radius:13px;padding:14px 8px;text-align:center;
   font-size:13px;font-weight:600;transition:border-color .15s,background .15s}
-.paybtn[aria-checked="true"]{border-color:var(--purple);background:var(--purple-soft);color:var(--purple)}
-.paybox{background:var(--bg-2);border:1px solid var(--line);border-radius:16px;
+.paybtn[aria-checked="true"]{border-color:var(--accent-ink);background:var(--accent-soft);color:var(--accent-ink)}
+.paybox{background:var(--surface);border:1px solid var(--line);border-radius:16px;
   padding:var(--s4);margin-top:var(--s4);font-size:13.5px}
 .paybox .r{display:flex;justify-content:space-between;gap:var(--s3);padding:6px 0;align-items:center}
 .paybox .r span{color:var(--ink-2)}
 .paybox .r b{font-weight:600;text-align:end}
 .paybox .r.amount{border-top:1px solid var(--line);margin-top:var(--s2);padding-top:var(--s3)}
-.paybox .r.amount b{font-family:var(--f-mono);font-size:16px;color:var(--purple)}
-.drop{display:block;border:1.5px dashed #CFD6E6;border-radius:16px;padding:var(--s8) var(--s4);
-  text-align:center;background:var(--bg-2);cursor:pointer;transition:border-color .18s,background .18s}
-.drop:hover{border-color:var(--purple);background:var(--purple-soft)}
+.paybox .r.amount b{font-family:var(--f-mono);font-size:16px;color:var(--accent-ink)}
+.drop{display:block;border:1.5px dashed var(--line-2);border-radius:16px;padding:var(--s8) var(--s4);
+  text-align:center;background:var(--surface);cursor:pointer;transition:border-color .18s,background .18s}
+.drop:hover{border-color:var(--accent-ink);background:var(--accent-soft)}
 .drop b{display:block;font-family:var(--f-display);font-weight:600;font-size:14px;
-  color:var(--purple);margin-bottom:4px}
+  color:var(--accent-ink);margin-bottom:4px}
 .drop span{font-size:12px;color:var(--ink-2)}
-.drop.filled{border-style:solid;border-color:#1FA855;background:#F1FBF5}
-.drop.filled b{color:#158048}
-.summary{background:var(--bg-2);border-radius:var(--r-card);padding:var(--s4);font-size:13.5px;color:var(--text-on-light)}
+.drop.filled{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}
+.drop.filled b{color:var(--ok-ink)}
+.summary{background:var(--surface);border-radius:var(--r-card);padding:var(--s4);font-size:13.5px;color:var(--ink)}
 .summary .r{display:flex;justify-content:space-between;gap:var(--s3);padding:5px 0}
 .summary .r.t{border-top:1px solid var(--line);margin-top:var(--s2);padding-top:var(--s3);font-weight:700}
-.msgprev{background:var(--ink);color:#D7DBE6;border-radius:16px;padding:var(--s4);
+.msgprev{background:var(--code-bg);color:var(--code-ink);border-radius:16px;padding:var(--s4);
   font-family:var(--f-mono);font-size:11.5px;line-height:1.9;white-space:pre-wrap;
   direction:rtl;margin-top:var(--s3);max-height:220px;overflow:auto}
 
 /* ============ FOOTER ============ */
 footer{background:var(--page-bg-2);border-top:1px solid var(--dark-border);padding:var(--s16) 0 var(--s6);margin-top:var(--s8);color:var(--text-on-dark)}
-footer .brand b{color:#fff}
+footer .brand b{color:var(--ink)}
 footer .brand span{color:var(--muted-on-dark)}
 .fgrid{display:grid;gap:var(--s8)}
 @media(min-width:820px){.fgrid{grid-template-columns:1.5fr 1fr 1fr 1fr}}
@@ -657,28 +775,28 @@ footer ul button{text-align:start}
 footer ul button:hover{color:var(--text-on-dark)}
 .fdesc{font-size:13.5px;color:var(--muted-on-dark);max-width:36ch;margin-top:var(--s3)}
 .socials{display:flex;gap:var(--s2);margin-top:var(--s4)}
-.socials a{width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--dark-border);
+.socials a{width:36px;height:36px;border-radius:12px;background:var(--tint-1);border:1px solid var(--line);
   display:grid;place-items:center;color:var(--muted-on-dark);transition:.18s}
-.socials a:hover{color:#fff;border-color:var(--purple);background:rgba(108,53,255,.18);transform:translateY(-2px)}
+.socials a:hover{color:var(--accent-ink);border-color:var(--accent-line);background:var(--accent-soft);transform:translateY(-2px)}
 .paylist{display:flex;gap:var(--s2);flex-wrap:wrap;margin-top:var(--s3)}
-.paylist span{font-size:11.5px;font-weight:600;color:var(--muted-on-dark);background:rgba(255,255,255,.06);
+.paylist span{font-size:11.5px;font-weight:600;color:var(--ink-2);background:var(--tint-1);
   border:1px solid var(--dark-border);border-radius:9px;padding:6px 12px}
 .fbot{margin-top:var(--s12);padding-top:var(--s6);border-top:1px solid var(--dark-border);
   display:flex;flex-wrap:wrap;gap:var(--s3);justify-content:space-between;font-size:12px;color:var(--muted-on-dark)}
 
 /* ============ FLOATING / TOAST ============ */
 .wa{position:fixed;z-index:50;inset-block-end:calc(var(--s4) + env(safe-area-inset-bottom));
-  inset-inline-end:var(--s4);width:42px;height:42px;border-radius:14px;background:#fff;
+  inset-inline-end:var(--s4);width:42px;height:42px;border-radius:14px;background:var(--card);
   border:1px solid var(--line);box-shadow:var(--sh-1);display:grid;place-items:center;
   color:#1FA855;transition:transform .18s,box-shadow .18s}
 .wa:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
 .wa.lift{inset-block-end:calc(84px + env(safe-area-inset-bottom))}
 .toast{position:fixed;z-index:90;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));
-  transform:translate(-50%,12px);background:var(--ink);color:#fff;padding:11px 20px;
+  transform:translate(-50%,12px);background:var(--code-bg);color:#fff;padding:11px 20px;
   border-radius:var(--r-pill);font-size:13px;font-weight:500;opacity:0;visibility:hidden;
   transition:.24s;box-shadow:var(--sh-3);max-width:88vw}
 .toast.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
-.stickybar{position:fixed;inset-inline:0;bottom:0;z-index:45;background:rgba(255,255,255,.94);
+.stickybar{position:fixed;inset-inline:0;bottom:0;z-index:45;background:var(--bar-bg);
   border-top:1px solid var(--line);padding:var(--s3) 0 calc(var(--s3) + env(safe-area-inset-bottom))}
 @supports(backdrop-filter:blur(1px)){.stickybar{backdrop-filter:blur(14px)}}
 .stickybar .wrap{display:flex;align-items:center;gap:var(--s3)}
@@ -688,11 +806,19 @@ footer ul button:hover{color:var(--text-on-dark)}
 /* ---- loading skeletons ---- */
 @keyframes sk-pulse{0%,100%{opacity:.55}50%{opacity:.95}}
 .sk{pointer-events:none}
-.sk-box,.sk-line{background:var(--bg-2);animation:sk-pulse 1.4s ease-in-out infinite}
+.sk-box,.sk-line{background:var(--surface);animation:sk-pulse 1.4s ease-in-out infinite}
 .sk .poster.sk-box{border:0;aspect-ratio:1/1;width:100%}
 .sk-line{height:11px;border-radius:6px;margin:0 0 var(--s2)}
 .sk-line.sk-btn{height:38px;border-radius:12px;margin-top:var(--s3)}
 .category-chip.sk{min-width:104px;justify-content:center}
+
+/* ============ THEME TOGGLE ============
+   One button, two glyphs, only the one for the theme you can switch TO
+   is shown -- so the icon is an action, not a status readout. */
+.themebtn svg{transition:opacity var(--t-ui,.2s) ease,transform var(--t-ui,.2s) ease}
+.themebtn .moon{display:none}
+[data-theme="dark"] .themebtn .moon{display:block}
+[data-theme="dark"] .themebtn .sun{display:none}
 
 .empty{grid-column:1/-1;text-align:center;padding:var(--s16) var(--s4);color:var(--ink-2)}
 .empty b{display:block;font-family:var(--f-display);font-size:16px;color:var(--ink);margin-bottom:5px}
@@ -730,6 +856,10 @@ footer ul button:hover{color:var(--text-on-dark)}
     </div>
     <button class="ibtn" onclick="openSearch()" aria-label="بحث" id="mSearchBtn">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4" stroke-linecap="round"/></svg>
+    </button>
+    <button class="ibtn themebtn" onclick="toggleTheme()" id="themeBtn" aria-label="تبديل المظهر" aria-pressed="false" title="تبديل المظهر">
+      <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
+      <svg class="moon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z"/></svg>
     </button>
     <button class="ibtn" onclick="openPanel('cart')" aria-label="سلة المشتريات">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.3 10.8a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
@@ -864,7 +994,7 @@ footer ul button:hover{color:var(--text-on-dark)}
       <div class="helpbar rv">
         <span class="hi"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/><path d="M9.5 10.5h.01M12 10.5h.01M14.5 10.5h.01"/></svg></span>
         <div class="ht"><b>تحتاج مساعدة تختار؟</b><span>راسلنا مباشرة، فريقنا يرد خلال وقت قصير.</span></div>
-        <button class="btn btn-soft" onclick="contactWhatsApp()" style="background:rgba(255,255,255,.08);color:#fff">تواصل معنا</button>
+        <button class="btn btn-soft" onclick="contactWhatsApp()" style="background:var(--tint-2);color:var(--ink)">تواصل معنا</button>
       </div>
     </div>
   </section>
@@ -1260,6 +1390,39 @@ function hex2rgba(hex,a){
   const n = parseInt(h.length===3 ? h.split("").map(c=>c+c).join("") : h, 16);
   return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
 }
+/* WCAG relative luminance, so the poster can pick an ink that is actually
+   readable instead of one that merely looks on-brand. */
+function relLum(r,g,b){
+  const f = v => { v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055,2.4); };
+  return .2126*f(r) + .7152*f(g) + .0722*f(b);
+}
+/* The poster fallback prints its wordmark and its warranty chip in the
+   product's own accent, on a 9% wash of that same accent. For a light
+   accent that lands around 1.1:1 -- the warranty line is real copy, not
+   decoration, so it has to be legible. Darken the accent toward the ink
+   until it clears the target on white, keeping the hue.
+
+   The target is 5.5, not 4.5: the ink is not printed on white but on the
+   9% accent wash over it, and the wordmark carries a further 0.8 opacity.
+   Aiming at the floor left the wordmark measuring 4.1:1 once both were
+   applied -- the headroom is what the wash and the opacity spend. */
+function readableInk(hex, onDark){
+  const h = hex.replace("#","");
+  const n = parseInt(h.length===3 ? h.split("").map(c=>c+c).join("") : h, 16);
+  let [r,g,b] = [n>>16&255, n>>8&255, n&255];
+  if(onDark){
+    /* the dark card, --card in the dark theme */
+    const gl = relLum(26,26,46);
+    for(let i=0;i<24 && (relLum(r,g,b)+.05)/(gl+.05) < 5;i++){
+      r += Math.round((255-r)*.16); g += Math.round((255-g)*.16); b += Math.round((255-b)*.16);
+    }
+  } else {
+    for(let i=0;i<24 && (1.05)/(relLum(r,g,b)+.05) < 5.5;i++){
+      r = Math.round(r*.88); g = Math.round(g*.88); b = Math.round(b*.88);
+    }
+  }
+  return `rgb(${r},${g},${b})`;
+}
 function toast(msg){
   const t=$("#toast"); t.textContent=msg; t.classList.add("on");
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"),2200);
@@ -1275,10 +1438,16 @@ function contactWhatsApp(msg){
 function brandLogo(p,size,color){
   const c=(color||p.accent).replace("#","");
   const icon = BRAND_ICONS[p.slug];
-  const mono = `<b style="font-family:var(--f-display);font-weight:800;font-size:${Math.round(size*.8)}px;color:${p.accent}">${p.name[0]}</b>`;
+  /* The monogram sits on three different grounds: the poster chip is white
+     in both themes, .pbox and .cthumb follow the theme. Carry both inks and
+     let --logo-ink decide, so a dark-on-dark monogram cannot happen. */
+  const st = `font-family:var(--f-display);font-weight:800;font-size:${Math.round(size*.8)}px;`
+    + `--ink-lt:${readableInk(p.accent)};--ink-dk:${readableInk(p.accent,true)};`
+    + `color:var(--logo-ink,var(--ink-lt))`;
+  const mono = `<b style="${st}">${p.name[0]}</b>`;
   if(!icon) return mono;   // no brand asset for this product -> designed monogram
   return `<img src="https://cdn.simpleicons.org/${icon}/${c}" alt="" width="${size}" height="${size}" loading="lazy"
-    onerror="this.replaceWith(Object.assign(document.createElement('b'),{textContent:'${p.name[0]}',style:'font-family:var(--f-display);font-weight:800;font-size:${Math.round(size*.8)}px;color:${p.accent}'}))">`;
+    onerror="this.replaceWith(Object.assign(document.createElement('b'),{textContent:'${p.name[0]}',style:'${st}'}))">`;
 }
 
 /* The poster's micro-chips. The old build hard-coded claims like
@@ -1294,7 +1463,7 @@ function microChips(p){
    PRODUCT POSTER — uses image asset if present, else designed fallback
    ================================================================ */
 function posterHTML(p,big){
-  const style = `--pbg:${hex2rgba(p.accent,.09)};--pline:${hex2rgba(p.accent,.22)};--pink:${p.accent}`;
+  const style = `--pbg:${hex2rgba(p.accent,.09)};--pline:${hex2rgba(p.accent,.22)};--pink:${readableInk(p.accent)}`;
   const b = p.badge && BADGES[p.badge];
   const inner = p.image || p.poster
     ? `<img class="pimg" src="${p.poster||p.image}" alt="${p.name}" loading="lazy">`
@@ -2111,6 +2280,43 @@ window.addEventListener("scroll",()=>{
   $("#hd").classList.toggle("stuck",window.scrollY>20);
 },{passive:true});
 
+/* ---------- theme ----------
+   The value was already resolved and written to <html data-theme> by the
+   blocking script in <head>; this half only handles the switch and the
+   persistence. A saved choice always wins over the OS setting -- that is
+   why the media query is consulted once, in <head>, and never again once
+   janeiro-theme exists. */
+const THEME_KEY = "janeiro-theme";
+
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", t === "dark" ? "#0F0F1A" : "#FFFFFF");
+  const btn = $("#themeBtn");
+  if(btn){
+    btn.setAttribute("aria-pressed", String(t === "dark"));
+    btn.setAttribute("aria-label", t === "dark" ? "التبديل إلى المظهر الفاتح" : "التبديل إلى المظهر الغامق");
+    btn.setAttribute("title", btn.getAttribute("aria-label"));
+  }
+}
+
+function toggleTheme(){
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  applyTheme(next);
+  /* Storage throws when site data is blocked. The theme still switches
+     for this visit; only the memory of it is lost. */
+  try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+}
+
+/* Follow the OS only while the visitor has never chosen for themselves. */
+if(window.matchMedia){
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+    let saved = null;
+    try{ saved = localStorage.getItem(THEME_KEY); }catch(err){}
+    if(saved !== "dark" && saved !== "light") applyTheme(e.matches ? "dark" : "light");
+  });
+}
+
 /* This script is a module now, so its declarations are not globals.
    The markup drives everything through inline handlers, so publish
    exactly the ones it names -- changing the markup instead would mean
@@ -2120,9 +2326,11 @@ Object.assign(window, {
   openDetail, setPlan, addCurrent,
   chQty, delItem, openPanel, closePanels,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
-  runTrack, contactWhatsApp, toast,
+  runTrack, contactWhatsApp, toast, toggleTheme,
 });
 
+/* label the toggle for whatever <head> resolved before first paint */
+applyTheme(document.documentElement.getAttribute("data-theme") || "light");
 boot();
 </script>
 </body>
