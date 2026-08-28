@@ -17,8 +17,10 @@ node_modules/
 # لوحة التحكم: مفاتيح النشر الحقيقية
 dashboard/config.js
 
-# Brand icons land here only when the dashboard test suite runs against the
-# local mock storage. Real icons live in the Supabase product-media bucket.
+# The dashboard test suite writes generated icons here when it runs against
+# the local mock storage. The real brand artwork in this folder is committed
+# and stays tracked -- git ignores .gitignore for files it already tracks --
+# so this rule only keeps the test's leftovers out.
 assets/product-media/products/icons/
 
 # the storefront reads its keys the same way the dashboard does
