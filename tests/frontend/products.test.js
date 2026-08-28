@@ -1,6 +1,50 @@
 /* Creates a product through the dashboard UI, publishes it, then buys it
    as a customer — the loop that proves the editor actually works. */
 const { chromium } = require("playwright");
+const zlib = require("zlib");
+
+/* A real PNG, built here rather than committed as a fixture, so a test can
+   ask for any size it needs -- square, oblong, tiny, huge -- and the bytes
+   are genuinely PNG bytes with a genuine signature. */
+function png(w, h) {
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;   // 8-bit RGBA
+  const raw = Buffer.alloc(h * (1 + w * 4));
+  for (let y = 0; y < h; y++) {
+    const row = y * (1 + w * 4);
+    raw[row] = 0;
+    for (let x = 0; x < w; x++) {
+      const o = row + 1 + x * 4;
+      raw[o] = 108; raw[o + 1] = 53; raw[o + 2] = 255; raw[o + 3] = 255;
+    }
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+    chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+let CRC;
+function crc32(buf) {
+  if (!CRC) {
+    CRC = new Int32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      CRC[n] = c;
+    }
+  }
+  let c = -1;
+  for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return c ^ -1;
+}
+const asFile = (name, mimeType, buffer) => ({ name, mimeType, buffer });
 const BASE = process.env.BASE || "http://127.0.0.1:8808";
 let fail = 0;
 const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFAIL\x1b[0m"}  ${m}`); if (!c) fail++; };
@@ -114,6 +158,79 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   const gone = await p.evaluate(async ([b, s]) =>
     (await (await fetch(`${b}/rest/v1/products?select=id&slug=eq.${s}`)).json()).length, [BASE, slug]);
   check(gone === 0, "an archived product leaves the shop");
+
+  // ---------- brand icons ----------
+  await p.locator('#tabs .tab[data-v="products"]').click();
+  await p.waitForSelector("#products .prow", { timeout: 10000 });
+
+  const notice = p.locator("#products .notice");
+  check(await notice.count() === 1, "the products list names what still needs an icon");
+  const noticeText = await notice.textContent().catch(() => "");
+  const markers = await p.locator("#products .noicon").count();
+  check(markers > 0, `each product without an icon is marked in the list (${markers})`);
+  check(/بلا أيقونة/.test(noticeText) || /أيقونة/.test(noticeText),
+        "the banner says what is missing and why it matters");
+
+  // open a product that has no icon yet
+  await p.locator("#products .prow", { has: p.locator(".noicon") }).first().click();
+  await p.waitForSelector("#iconFile", { state: "attached", timeout: 8000 });
+
+  const lastToast = () => p.locator("#toast").textContent();
+  const tryIcon = async (file) => {
+    await p.setInputFiles("#iconFile", file);
+    await p.waitForTimeout(450);
+    return (await lastToast()) || "";
+  };
+
+  /* Every rejection below has to actually reject. A validator that only
+     ever passes is the failure mode worth testing for. */
+  let t = await tryIcon(asFile("wide.png", "image/png", png(256, 128)));
+  check(/مربّعة/.test(t), `non-square is refused: "${t.slice(0, 60)}"`);
+
+  t = await tryIcon(asFile("tiny.png", "image/png", png(64, 64)));
+  check(/صغيرة/.test(t), `below the minimum is refused: "${t.slice(0, 60)}"`);
+
+  t = await tryIcon(asFile("huge.png", "image/png", png(1200, 1200)));
+  check(/كبيرة/.test(t), `above the maximum is refused: "${t.slice(0, 60)}"`);
+
+  // a text file renamed .png, announced as image/png -- the exact case
+  // Content-Type sniffing waves through
+  t = await tryIcon(asFile("fake.png", "image/png", Buffer.from("<script>alert(1)</script>", "utf8")));
+  check(/ليس PNG/.test(t), `a renamed file is refused on its bytes, not its name: "${t.slice(0, 60)}"`);
+
+  // an SVG, announced as PNG
+  t = await tryIcon(asFile("mark.png", "image/png",
+        Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>', "utf8")));
+  check(/ليس PNG/.test(t), `an SVG in PNG clothing is refused: "${t.slice(0, 60)}"`);
+
+  const stillEmpty = await p.locator("#iconTxt").textContent();
+  check(/اختر/.test(stillEmpty), "after every rejection the field is still empty, nothing was stored");
+
+  // ...and the valid one is accepted
+  t = await tryIcon(asFile("icon.png", "image/png", png(256, 256)));
+  check(/رُفعت/.test(t), `a square 256px PNG is accepted: "${t.slice(0, 60)}"`);
+  const shown = await p.locator(".iconprev img").count();
+  check(shown === 1, "the uploaded icon previews in the editor");
+
+  const iconSlug = await p.inputValue("#f_slug");
+  await p.click("#saveProd");
+  await p.waitForSelector("#products:not(.hidden)", { timeout: 10000 });
+
+  /* Reopening it is the real round trip: the path has to survive
+     admin_upsert_product, the CHECK constraint, and admin_list_products
+     before the editor can show it back. The module scope is not on
+     window, so this reads what the UI actually renders. */
+  await p.locator(`#products .prow[data-slug="${iconSlug}"]`).click();
+  await p.waitForSelector("#iconFile", { state: "attached", timeout: 8000 });
+  const savedPath = await p.locator(".card:has(#iconFile) .mono").textContent();
+  check(savedPath.trim() === `products/icons/${iconSlug}.png`,
+        `icon_path round-trips through the database: ${savedPath.trim()}`);
+  await p.click("#edBack");
+  await p.waitForSelector("#products:not(.hidden)", { timeout: 8000 });
+
+  const markersAfter = await p.locator("#products .noicon").count();
+  check(markersAfter === markers - 1,
+        `the list stops flagging it once uploaded (${markers} -> ${markersAfter})`);
 
   check(errs.length === 0, `no JS errors${errs.length ? " -> " + errs.slice(0, 3).join(" | ") : ""}`);
   await p.close();

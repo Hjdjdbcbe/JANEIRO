@@ -230,6 +230,22 @@ label.fl{font-size:12.5px;color:var(--muted)}
 .posterprev{width:96px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex:none;
   background:var(--surface-2)}
 .posterprev img{width:100%;height:100%;object-fit:cover;display:block}
+/* the icon preview is round and on a light ground, matching the orbit
+   tile -- a white-on-white mark has to look wrong here too */
+.iconprev{width:72px;height:72px;border-radius:50%;overflow:hidden;flex:none;
+  background:#fff;border:1px solid var(--line);display:grid;place-items:center;
+  font-family:var(--f-display);font-weight:700;font-size:26px;color:var(--muted)}
+.iconprev img{width:76%;height:76%;object-fit:contain;display:block}
+.lnk{color:var(--accent);font-size:12px;text-decoration:underline;padding:0}
+/* the missing-icon marker on a product row */
+.noicon{font-size:11px;font-weight:600;color:var(--wait);flex:none;
+  border:1px solid color-mix(in srgb,var(--wait) 40%,transparent);
+  border-radius:999px;padding:2px 8px}
+.notice{background:color-mix(in srgb,var(--wait) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--wait) 34%,transparent);
+  border-radius:11px;padding:11px 13px;font-size:12.5px;line-height:1.7;margin:12px 0 0}
+.notice b{display:block;font-size:13px;margin-bottom:3px}
+.notice .who{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);word-break:break-word}
 .sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);
   padding:14px 0 0;display:flex;gap:9px;flex-wrap:wrap;z-index:5}
 
@@ -545,6 +561,20 @@ async function loadProducts() {
         <h2 style="flex:1">المنتجات <span class="meta">(${PRODUCTS.length})</span></h2>
         <button class="btn go" id="newProd">+ منتج جديد</button>
       </div>
+      ${(() => {
+        /* Which products still need an icon. The orbit falls back to a
+           single letter without one, so this is the difference between
+           the feature working and looking broken -- it is called out
+           here rather than left to be discovered on the site. */
+        const missing = PRODUCTS.filter(p => !p.icon_path && p.status !== "archived");
+        if (!missing.length) return "";
+        return `<div class="notice">
+          <b>${missing.length} من ${PRODUCTS.length} منتجاً بلا أيقونة علامة</b>
+          مدار الشعارات في الصفحة الرئيسية يعرض حرف الاسم بدل الشعار لهذه المنتجات.
+          افتح المنتج وارفع أيقونته من قسم «أيقونة العلامة».
+          <span class="who">${missing.map(p => esc(p.name)).join(" · ")}</span>
+        </div>`;
+      })()}
       <div class="plist">${PRODUCTS.map(p => {
         const active = (p.plans || []).filter(x => x.is_active);
         const prices = active.map(x => Number(x.price));
@@ -560,6 +590,7 @@ async function loadProducts() {
             <b>${esc(p.name)}</b>
             <span class="meta">${range} · ${active.length} خطة</span>
           </span>
+          ${p.icon_path ? "" : `<span class="noicon">بلا أيقونة</span>`}
           <span class="pill ${p.status === "published" ? "t-done"
               : p.status === "draft" || p.status === "hidden" ? "t-dead" : "t-wait"}">
             ${STATUS_LABEL[p.status] || p.status}</span>
@@ -576,7 +607,7 @@ function blankProduct() {
   return {
     slug: "", name: "", category_slug: CATS[0]?.slug || "", short_description: "",
     description: "", accent_color: "#7357FF", status: "draft", sort_order: 0,
-    poster_path: "", warranty_type: "subscription_duration", warranty_days: "",
+    poster_path: "", icon_path: "", warranty_type: "subscription_duration", warranty_days: "",
     warranty_label: "", badge_type: "", badge_label: "",
     delivery_min: "", delivery_max: "", delivery_unit: "", delivery_label: "",
     plans: [{ name: "", price: "", old_price: "", is_active: true }],
@@ -602,7 +633,8 @@ function renderEditor() {
   const d = draft;
   const sel = (val, opts) => Object.entries(opts).map(([k, v]) =>
     `<option value="${k}" ${k === val ? "selected" : ""}>${v}</option>`).join("");
-  const url = posterUrl(d.poster_path);
+  const url  = posterUrl(d.poster_path);
+  const iurl = posterUrl(d.icon_path);
 
   $("#editor").innerHTML = `
     <div class="chips"><button class="chip" id="edBack">→ رجوع للمنتجات</button></div>
@@ -653,6 +685,25 @@ function renderEditor() {
           <p class="hint">${d.poster_path
             ? `الحالية: <span class="mono">${esc(d.poster_path)}</span>`
             : "بلا صورة يظهر البوستر البديل المصمَّم — ليس عطلاً."}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>أيقونة العلامة</h2>
+      <p class="hint">تظهر في مدار الشعارات على الصفحة الرئيسية وفي مصغّرة السلة.
+        بدونها يُستعمل حرف اسم المنتج — وهو ليس المقصود.</p>
+      <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
+        <span class="iconprev">${iurl ? `<img src="${esc(iurl)}" alt="">` : esc((d.name || "?")[0])}</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+          <label class="drop" for="iconFile">
+            <b id="iconTxt">${d.icon_path ? "تغيير الأيقونة" : "اختر أيقونة العلامة"}</b>
+            <span>مربّعة ${ICON_IDEAL}×${ICON_IDEAL} · PNG أو WebP بخلفية شفافة · حتى 1 ميغابايت</span>
+            <input type="file" id="iconFile" accept="image/png,image/webp" hidden>
+          </label>
+          <p class="hint">${d.icon_path
+            ? `الحالية: <span class="mono">${esc(d.icon_path)}</span> — <button class="lnk" id="iconClear" type="button">إزالة</button>`
+            : `ارفع النسخة الملوّنة أو الداكنة من الشعار، لا النسخة البيضاء: الخلفية خلفها فاتحة في الثيم الفاتح.`}</p>
         </div>
       </div>
     </div>
@@ -771,6 +822,8 @@ function wireEditor() {
   });
 
   $("#posterFile").onchange = e => uploadPoster(e.target.files?.[0]);
+  $("#iconFile").onchange   = e => uploadIcon(e.target.files?.[0]);
+  if ($("#iconClear")) $("#iconClear").onclick = () => { draft.icon_path = ""; renderEditor(); };
   $("#saveProd").onclick = saveProduct;
   if ($("#archProd")) $("#archProd").onclick = archiveProduct;
 }
@@ -782,6 +835,57 @@ function backToProducts() {
   loadProducts().catch(e => toast(e.message));
 }
 
+/* ---------- upload ----------
+
+   file.type is whatever the OS guessed from the extension; a renamed
+   .exe reports image/png happily. The project validates images by their
+   magic bytes everywhere else, and this upload path was the one place
+   still trusting the browser. It reads the header itself now.
+
+   SVG is deliberately absent: it is XML with no signature to check, and
+   an SVG served from a public bucket as image/svg+xml executes any
+   script it carries when its object URL is opened. */
+const MAGIC = [
+  { ext: "png",  mime: "image/png",  bytes: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
+  { ext: "jpg",  mime: "image/jpeg", bytes: [0xFF, 0xD8, 0xFF] },
+  // WebP is a RIFF container: "RIFF" .... "WEBP" -- bytes 8-11 must match too
+  { ext: "webp", mime: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46],
+    also: { at: 8, bytes: [0x57, 0x45, 0x42, 0x50] } },
+];
+
+async function sniff(file) {
+  const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const at = (o, b) => b.every((v, i) => head[o + i] === v);
+  for (const m of MAGIC) {
+    if (at(0, m.bytes) && (!m.also || at(m.also.at, m.also.bytes))) return m;
+  }
+  return null;
+}
+
+/* Natural dimensions, read by decoding the image rather than trusting a
+   header field. Returns null if the bytes do not decode at all. */
+function dimensions(file) {
+  return new Promise(res => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res({ w: img.naturalWidth, h: img.naturalHeight }); };
+    img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+    img.src = url;
+  });
+}
+
+async function putObject(path, file, mime) {
+  const r = await fetch(
+    `${CFG.SUPABASE_URL}/storage/v1/object/product-media/${path}?upsert=true`, {
+      method: "POST",
+      headers: { apikey: CFG.SUPABASE_ANON_KEY,
+                 Authorization: `Bearer ${session?.access_token}`,
+                 "x-upsert": "true", "Content-Type": mime },
+      body: file,
+    });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || `فشل الرفع (${r.status})`);
+}
+
 /* Uploads straight into the public product-media bucket. The storage
    policy already limits writes there to admins, so no extra endpoint. */
 async function uploadPoster(file) {
@@ -789,27 +893,66 @@ async function uploadPoster(file) {
   if (!draft.slug) { toast("اكتب المعرّف (slug) أولاً — اسم الملف يعتمد عليه."); return; }
   if (file.size > 5 * 1024 * 1024) { toast("الصورة أكبر من 5 ميغابايت."); return; }
 
-  const ext = ({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" })[file.type];
-  if (!ext) { toast("الصيغة يجب أن تكون PNG أو JPG أو WebP."); return; }
+  const m = await sniff(file);
+  if (!m) { toast("هذا الملف ليس PNG أو JPG أو WebP — فحصنا محتواه لا امتداده."); return; }
 
-  const path = `products/${draft.slug}.${ext}`;
+  const path = `products/${draft.slug}.${m.ext}`;
   $("#dropTxt").textContent = "جارٍ الرفع…";
   try {
-    const r = await fetch(
-      `${CFG.SUPABASE_URL}/storage/v1/object/product-media/${path}?upsert=true`, {
-        method: "POST",
-        headers: { apikey: CFG.SUPABASE_ANON_KEY,
-                   Authorization: `Bearer ${session?.access_token}`,
-                   "x-upsert": "true", "Content-Type": file.type },
-        body: file,
-      });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || `فشل الرفع (${r.status})`);
+    await putObject(path, file, m.mime);
     draft.poster_path = path;
     toast("رُفعت الصورة. لا تنسَ الحفظ.");
     renderEditor();
   } catch (e) {
     toast(e.message);
     $("#dropTxt").textContent = "اختر صورة البوستر";
+  }
+}
+
+/* The brand icon for the hero orbit. Stricter than the poster: it is
+   rendered in a small round tile, so a non-square or low-resolution mark
+   is visibly wrong rather than merely imperfect. The rules here mirror
+   the CHECK constraint in migration 013 -- the path it builds is the only
+   shape the column will accept, so a mistake here is refused on save
+   rather than stored. */
+const ICON_MIN = 128, ICON_IDEAL = 256, ICON_MAX = 1024;
+
+async function uploadIcon(file) {
+  if (!file) return;
+  if (!draft.slug) { toast("اكتب المعرّف (slug) أولاً — اسم الملف يعتمد عليه."); return; }
+  if (file.size > 1024 * 1024) { toast("الأيقونة أكبر من 1 ميغابايت — 256×256 لا تحتاج أكثر."); return; }
+
+  const m = await sniff(file);
+  if (!m) { toast("هذا الملف ليس PNG أو WebP — فحصنا محتواه لا امتداده."); return; }
+  if (m.ext === "jpg") {
+    toast("JPG بلا شفافية، وستظهر خلفية بيضاء داخل الدائرة. استعمل PNG أو WebP.");
+    return;
+  }
+
+  const dim = await dimensions(file);
+  if (!dim) { toast("تعذّرت قراءة الصورة — الملف تالف على الأرجح."); return; }
+  if (dim.w !== dim.h) {
+    toast(`الأيقونة يجب أن تكون مربّعة — هذه ${dim.w}×${dim.h}.`); return;
+  }
+  if (dim.w < ICON_MIN) {
+    toast(`الأيقونة صغيرة (${dim.w}px). الحد الأدنى ${ICON_MIN}px والموصى به ${ICON_IDEAL}px.`); return;
+  }
+  if (dim.w > ICON_MAX) {
+    toast(`الأيقونة كبيرة (${dim.w}px). الموصى به ${ICON_IDEAL}px.`); return;
+  }
+
+  const path = `products/icons/${draft.slug}.${m.ext}`;
+  $("#iconTxt").textContent = "جارٍ الرفع…";
+  try {
+    await putObject(path, file, m.mime);
+    draft.icon_path = path;
+    toast(dim.w === ICON_IDEAL
+      ? "رُفعت الأيقونة. لا تنسَ الحفظ."
+      : `رُفعت الأيقونة (${dim.w}px). الموصى به ${ICON_IDEAL}px. لا تنسَ الحفظ.`);
+    renderEditor();
+  } catch (e) {
+    toast(e.message);
+    $("#iconTxt").textContent = "اختر أيقونة العلامة";
   }
 }
 

@@ -16,3 +16,7 @@ node_modules/
 
 # لوحة التحكم: مفاتيح النشر الحقيقية
 dashboard/config.js
+
+# Brand icons land here only when the dashboard test suite runs against the
+# local mock storage. Real icons live in the Supabase product-media bucket.
+assets/product-media/products/icons/

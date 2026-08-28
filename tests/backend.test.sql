@@ -768,6 +768,96 @@ begin
   raise notice '===== RLS tests passed =====';
 end $$;
 
+-- ============================================================
+-- 013 product brand icons
+-- ============================================================
+do $$
+declare
+  v_ok    boolean;
+  v_icon  text;
+  v_slug  text := 'icon-test-product';
+  v_cat   text;
+  v_admin uuid;
+begin
+  raise notice '';
+  raise notice '===== product icon_path =====';
+
+  select slug into v_cat from categories limit 1;
+
+  -- ---------- the shape constraint ----------
+  -- icon_path is concatenated into a public URL by the frontend. Anything
+  -- that is not a path inside this bucket must be impossible to store,
+  -- whether it arrives from the dashboard, a hand-written UPDATE or a
+  -- future import.
+  for v_icon in select unnest(array[
+      'https://evil.example/x.png',       -- absolute URL
+      '//evil.example/x.png',             -- protocol-relative
+      'products/icons/../../secret.png',  -- traversal
+      'receipts/x.png',                   -- a different, PRIVATE bucket
+      'products/icons/x.svg',             -- SVG: no magic bytes, runs script
+      'products/icons/X.png',             -- uppercase (slugs are lowercase)
+      'products/icons/.png'               -- empty name
+    ]) loop
+    v_ok := false;
+    begin
+      update products set icon_path = v_icon where slug = 'canva-pro';
+    exception when check_violation then v_ok := true;
+    end;
+    assert v_ok, format('icon_path must reject %L', v_icon);
+  end loop;
+  raise notice 'PASS  icon_path rejects URLs, traversal, other buckets and SVG';
+
+  update products set icon_path = 'products/icons/canva-pro.png' where slug = 'canva-pro';
+  update products set icon_path = 'products/icons/canva-pro.webp' where slug = 'canva-pro';
+  update products set icon_path = null where slug = 'canva-pro';
+  raise notice 'PASS  icon_path accepts png, webp and NULL';
+
+  -- ---------- it reaches the public read path ----------
+  update products set icon_path = 'products/icons/canva-pro.png' where slug = 'canva-pro';
+  select icon_path into v_icon from public_products where slug = 'canva-pro';
+  assert v_icon = 'products/icons/canva-pro.png', 'public_products must expose icon_path';
+  raise notice 'PASS  icon_path is readable through public_products';
+
+  -- ---------- the admin round trip ----------
+  -- The upsert lists columns explicitly. An editor that did not send
+  -- icon_path would blank it on every save, so saving it back has to
+  -- preserve it, and omitting it has to clear it rather than corrupt it.
+  v_admin := gen_random_uuid();
+  insert into auth.users(id) values (v_admin) on conflict (id) do nothing;
+  insert into profiles(id, role) values (v_admin, 'admin')
+    on conflict (id) do update set role = 'admin';
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_admin, 'role','authenticated')::text, true);
+
+  perform admin_upsert_product(jsonb_build_object(
+    'slug', v_slug, 'name', 'اختبار الأيقونة', 'category_slug', v_cat,
+    'status', 'draft', 'icon_path', 'products/icons/icon-test-product.png',
+    'plans', '[]'::jsonb));
+  select icon_path into v_icon from products where slug = v_slug;
+  assert v_icon = 'products/icons/icon-test-product.png',
+    format('upsert must store icon_path, got %L', v_icon);
+
+  select (p->>'icon_path') into v_icon
+    from jsonb_array_elements(admin_list_products()) p where p->>'slug' = v_slug;
+  assert v_icon = 'products/icons/icon-test-product.png',
+    'admin_list_products must return icon_path so the editor can show it';
+  raise notice 'PASS  admin_upsert_product stores it and admin_list_products returns it';
+
+  -- and the invalid path is refused through the RPC too, not just the table
+  v_ok := false;
+  begin
+    perform admin_upsert_product(jsonb_build_object(
+      'slug', v_slug, 'name', 'اختبار', 'category_slug', v_cat,
+      'status', 'draft', 'icon_path', 'https://evil.example/x.png',
+      'plans', '[]'::jsonb));
+  exception when check_violation then v_ok := true;
+  end;
+  assert v_ok, 'admin_upsert_product must not bypass the icon_path constraint';
+  raise notice 'PASS  the RPC cannot bypass the shape constraint';
+
+  raise notice '===== product icon tests passed =====';
+end $$;
+
 -- Nothing is persisted: this is a dry run.
 rollback;
 
