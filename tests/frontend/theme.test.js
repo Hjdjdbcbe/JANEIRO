@@ -279,6 +279,66 @@ const SWEEP = () => {
   check(tight.length === 0, `no negative letter-spacing on Arabic` +
     (tight.length ? ` — ${tight.slice(0, 4).join(", ")}` : ""));
 
+  // ---------- text over imagery ----------
+  /* The sweep above composites background COLOURS. Where the ground is an
+     image it has nothing to composite, so it passes silently -- and the
+     hero now sits on artwork. This samples the real rendered pixels
+     instead: hide the copy, photograph the ground it was sitting on, and
+     score the darkest pixel in it against the inks that print there.
+
+     It caught a splatter blob at #9476D9 reaching into the text column,
+     where the lede measured 1.81:1. */
+  const groundContrast = async (vp) => {
+    const g = await newPage({ viewport: vp });
+    await g.addInitScript(() => localStorage.setItem("janeiro-theme", "light"));
+    await g.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+    await g.waitForTimeout(900);
+    const box = await g.evaluate(() => {
+      const r = document.querySelector(".hero-grid > div").getBoundingClientRect();
+      return { x: Math.max(0, Math.round(r.x)), y: Math.max(0, Math.round(r.y)),
+               width: Math.round(r.width), height: Math.round(r.height) };
+    });
+    await g.evaluate(() => document.querySelectorAll(".hero-grid > div, .hstage")
+      .forEach(e => { e.style.visibility = "hidden"; }));
+    await g.waitForTimeout(150);
+    const shot = (await g.screenshot({ clip: box })).toString("base64");
+    // decode in the page itself rather than pulling in an image library
+    const worst = await g.evaluate(async b64 => {
+      const img = new Image();
+      await new Promise(r => { img.onload = r; img.src = "data:image/png;base64," + b64; });
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      c.getContext("2d").drawImage(img, 0, 0);
+      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      const lum = (r, g, bl) => { const f = v => { v /= 255;
+        return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+        return .2126 * f(r) + .7152 * f(g) + .0722 * f(bl); };
+      let lo = 2, px = null;
+      for (let i = 0; i < d.length; i += 4) {
+        const l = lum(d[i], d[i+1], d[i+2]);
+        if (l < lo) { lo = l; px = [d[i], d[i+1], d[i+2]]; }
+      }
+      return { lum: lo, px };
+    }, shot);
+    await g.close();
+    const on = ink => {
+      const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+      const l = .2126 * f(ink[0]) + .7152 * f(ink[1]) + .0722 * f(ink[2]);
+      const [hi, low] = [l, worst.lum].sort((a, b) => b - a);
+      return +((hi + .05) / (low + .05)).toFixed(2);
+    };
+    return { hex: worst.px.map(v => v.toString(16).padStart(2, "0")).join(""),
+             ink: on([0x16,0x16,0x2A]), ink2: on([0x5C,0x5C,0x72]) };
+  };
+
+  for (const [vp, name] of [[{ width: 1440, height: 900 }, "desktop"],
+                            [{ width: 390, height: 844 }, "mobile"]]) {
+    const r = await groundContrast(vp);
+    check(r.ink >= 4.5 && r.ink2 >= 4.5,
+      `${name}: hero copy stays legible over the artwork ` +
+      `(darkest ground #${r.hex} -> heading ${r.ink}:1, lede ${r.ink2}:1)`);
+  }
+
   check(errs.length === 0, `no page errors: ${errs.slice(0, 3).join(" | ") || "none"}`);
   await browser.close();
   console.log(fail ? `\n${fail} failed` : "\nall passed");

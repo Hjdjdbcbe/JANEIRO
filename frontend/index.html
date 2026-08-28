@@ -378,6 +378,43 @@ header.stuck .hbar{height:48px}
 @media(min-width:900px){.hcta{display:inline-flex;padding:10px 18px;font-size:13.5px}}
 
 /* ============ HERO ============ */
+/* The supplied artwork, minus its logo and tiles -- those are the live
+   orbit's job, and baking four products into a JPEG means an archived
+   product keeps selling itself from the hero. What is left is the
+   atmosphere: the splatter field and the silk waves.
+
+   Light theme only. The artwork is a near-white ground; on the dark theme
+   it would read as a bright purple slab, and the overriding rule below
+   means the file is never even fetched there. */
+.hero::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:url(assets/hero/tex-tall.webp);
+  background-size:cover;background-position:center top;
+}
+@media(min-width:900px){.hero::before{
+  background-image:url(assets/hero/tex-wide.webp);background-position:center}}
+[data-theme="dark"] .hero::before{background-image:none}
+
+/* A readability wash over the artwork, on the side the copy sits.
+
+   Measured, not assumed: sampling the real pixels behind the hero copy
+   found a splatter blob at #9476D9 reaching into the text column. The
+   headings survived it at 4.95:1, but the lede is --ink-2 and landed at
+   1.81:1 -- unreadable. A contrast sweep that composites background
+   COLOURS cannot see this, because the ground here is an image.
+
+   The wash is opaque --bg where the words are and clears completely over
+   the orbit, so the artwork keeps its presence where nothing is read.
+   RTL puts the copy on the right, hence `to left`. */
+.hero::after{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to bottom, var(--bg) 0%, var(--bg) 34%, transparent 74%);
+}
+@media(min-width:900px){
+  .hero::after{background:linear-gradient(to left, var(--bg) 0%, var(--bg) 30%, transparent 68%)}
+}
+[data-theme="dark"] .hero::after{background:none}
+
 .hero{padding:var(--hdr-space) 0 var(--s16);position:relative;overflow:hidden;
   background:
     radial-gradient(circle at 20% 10%, var(--glow-1), transparent 42%),
@@ -386,6 +423,8 @@ header.stuck .hbar{height:48px}
 }
 @media(min-width:900px){.hero{padding-top:calc(var(--hdr-space) + var(--s8));padding-bottom:var(--s20)}}
 .hero-grid{position:relative;z-index:1;display:grid;gap:var(--s12);align-items:center}
+/* the glows sit over the artwork, the content over both */
+.hero>*{position:relative;z-index:1}
 @media(min-width:900px){.hero-grid{grid-template-columns:1.02fr .98fr;gap:var(--s8)}}
 .eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
   color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);

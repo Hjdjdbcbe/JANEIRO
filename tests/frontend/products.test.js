@@ -232,6 +232,19 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(markersAfter === markers - 1,
         `the list stops flagging it once uploaded (${markers} -> ${markersAfter})`);
 
+  /* Put it back. The icon this test uploads is a flat purple square, and
+     leaving it on a real product means the next person to look at the site
+     sees a blank tile in the hero orbit and goes hunting for a rendering
+     bug. A suite that dresses the catalogue up has to undress it again. */
+  await p.locator(`#products .prow[data-slug="${iconSlug}"]`).click();
+  await p.waitForSelector("#iconClear", { timeout: 8000 });
+  await p.click("#iconClear");
+  await p.click("#saveProd");
+  await p.waitForSelector("#products:not(.hidden)", { timeout: 10000 });
+  const restored = await p.locator("#products .noicon").count();
+  check(restored === markers,
+        `the suite leaves the catalogue as it found it (${markersAfter} -> ${restored})`);
+
   check(errs.length === 0, `no JS errors${errs.length ? " -> " + errs.slice(0, 3).join(" | ") : ""}`);
   await p.close();
   await browser.close();
