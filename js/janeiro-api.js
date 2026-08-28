@@ -122,7 +122,7 @@ export async function loadPaymentMethods() {
 /** Product list for the shop grid. */
 export async function loadProducts() {
   const rows = await rest(
-    "products?select=id,name,slug,short_description,accent_color,poster_path,thumbnail_path," +
+    "products?select=id,name,slug,short_description,accent_color,poster_path,thumbnail_path,icon_path," +
     "badge_type,badge_label,status,sort_order,warranty_type,warranty_days,warranty_label," +
     "categories(slug,name),product_plans(id,name,price,old_price,is_active,sort_order)" +
     "&status=in.(published,temporarily_unavailable,coming_soon)" +
@@ -162,6 +162,10 @@ function normalizeProduct(row) {
     accent: row.accent_color ?? "#7357FF",
     image: publicMedia(row.poster_path) || publicMedia(row.thumbnail_path) || null,
     poster: publicMedia(row.poster_path),
+    /* The brand mark, square and on its own. Distinct from `image`: that
+       is the 3:4 card artwork and cropping it into a 56px round tile
+       would land on whatever half of the poster happened to be centred. */
+    icon: publicMedia(row.icon_path),
     thumbnail: publicMedia(row.thumbnail_path),
     badge: row.badge_type ?? null,
     badgeLabel: row.badge_label ?? null,
