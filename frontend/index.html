@@ -424,8 +424,14 @@ header.stuck .hbar{height:48px}
    Layered with grid rather than absolute positioning, so the hero is as
    tall as whichever is taller -- artwork or copy -- and the copy can
    never be clipped by a short image. */
-.hero{padding:0;position:relative;overflow:hidden;display:grid;isolation:isolate;
-  background:var(--bg)}
+/* The header is fixed and opaque, and the phone crop puts the logo right
+   at the top of the artwork -- with no offset the header sat on it and
+   cut it in half. The wide crop opens on empty splatter, so it needs
+   none. Both layers are grid items, so the offset moves the artwork and
+   its gradient together and the vw stops stay aligned. */
+.hero{padding:var(--hdr-space) 0 0;position:relative;overflow:hidden;display:grid;
+  isolation:isolate;background:var(--bg)}
+@media(min-width:900px){.hero{padding:0}}
 .hero>*{grid-area:1/1}
 /* On a phone the artwork keeps its own 4:5 and sits at the top, with the
    page ground continuing beneath it. Stretching it to the hero's height
@@ -441,7 +447,7 @@ header.stuck .hbar{height:48px}
 /* The copy sits where the artwork was composed to leave room: the lower
    half of the tall crop, the right side of the wide one. */
 .hero-grid{position:relative;z-index:2;display:grid;align-content:start;
-  padding-top:86vw;padding-bottom:var(--s12)}
+  padding-top:66vw;padding-bottom:var(--s12)}
 @media(min-width:900px){
   /* One column of copy, sitting in the half the artwork left clear. In
      RTL, grid column 1 IS the physical right -- naming column 2 put the
@@ -463,8 +469,14 @@ header.stuck .hbar{height:48px}
    hero grows with the copy, and percentage stops slid off the image every
    time it did. The tall crop is 125vw high and its subject ends around
    77vw, which is where the copy begins. */
+/* The phone crop is the artwork's subject with its empty lower half
+   removed -- 63vw instead of 125vw, so the heading is on the first screen
+   without scrolling. The copy sits below it rather than on it, and the
+   gradient dissolves the bottom edge into the page instead of cutting it.
+   Stops are in vw so they track the artwork, not the hero: the hero grows
+   with the copy and percentage stops slid off the image when it did. */
 .hero::after{content:"";grid-area:1/1;z-index:1;pointer-events:none;
-  background:linear-gradient(to bottom,transparent 66vw,var(--bg) 82vw,var(--bg) 100%)}
+  background:linear-gradient(to bottom,transparent 40vw,var(--bg) 63vw,var(--bg) 100%)}
 @media(min-width:900px){
   .hero::after{background:linear-gradient(to left,var(--bg) 0%,var(--bg) 47%,transparent 78%)}
 }
@@ -493,6 +505,17 @@ header.stuck .hbar{height:48px}
 
 /* ============ CATEGORY CAROUSEL ============ */
 .catwrap{position:relative}
+/* The row runs off the edge with nothing to say so. This fades the cut
+   edge into the section, which reads as "there is more"; it is removed
+   once the row is actually scrolled to its end, so it never lies. In RTL
+   the row continues to the LEFT, which is inline-end. */
+@media(max-width:899px){
+  .catwrap::after{content:"";position:absolute;inset-block:0;
+    inset-inline-end:calc(var(--s4) * -1);width:52px;pointer-events:none;
+    background:linear-gradient(to right,var(--bg-2),transparent);
+    opacity:1;transition:opacity var(--t-ui) ease}
+  .catwrap.at-end::after{opacity:0}
+}
 .category-carousel{
   display:grid;grid-auto-flow:column;grid-auto-columns:max-content;gap:10px;
   overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:inline proximity;
@@ -500,6 +523,16 @@ header.stuck .hbar{height:48px}
   scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
 .category-carousel::-webkit-scrollbar{display:none}
+
+.homesearch{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s4);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-pill);
+  padding:12px var(--s4);transition:border-color .18s,box-shadow .18s}
+.homesearch:focus-within{border-color:var(--accent-ink);box-shadow:var(--ring)}
+.homesearch svg{color:var(--ink-2);flex:none}
+.homesearch input{border:0;outline:0;background:none;width:100%;font-size:14px;color:var(--ink)}
+.homesearch input::-webkit-search-cancel-button{-webkit-appearance:none}
+/* the header carries a search field of its own from 900px up */
+@media(min-width:900px){.homesearch{display:none}}
 .category-chip{
   min-height:48px;padding:0 17px;display:inline-flex;align-items:center;justify-content:center;
   gap:8px;scroll-snap-align:start;white-space:nowrap;background:var(--light-card);color:var(--text-on-light);
@@ -583,6 +616,15 @@ header.stuck .hbar{height:48px}
   padding-bottom:var(--s2);margin-inline:calc(var(--s4) * -1);padding-inline:var(--s4)}
 .rail::-webkit-scrollbar{display:none}
 .rail>*{scroll-snap-align:start}
+/* A horizontal rail on a phone leaves half a card hanging off the edge,
+   which reads as broken rather than as an invitation to swipe. Below 700px
+   the rails become the same two-column grid the shop uses, so every card
+   is whole. */
+@media(max-width:699px){
+  .rail{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));
+    overflow:visible;scroll-snap-type:none;margin-inline:0;padding-inline:0}
+}
+@media(max-width:359px){.rail{grid-template-columns:1fr}}
 @media(min-width:1000px){
   .rail{grid-auto-flow:row;grid-template-columns:repeat(4,1fr);overflow:visible;margin-inline:0;padding-inline:0}
 }
@@ -1017,9 +1059,9 @@ footer ul button:hover{color:var(--text-on-dark)}
     <picture class="heroArt">
       <source media="(min-width:900px)" type="image/webp" srcset="assets/hero/banner-wide.webp">
       <source media="(min-width:900px)"                   srcset="assets/hero/banner-wide.png">
-      <source type="image/webp" srcset="assets/hero/banner-mobile.webp">
-      <img src="assets/hero/banner-mobile.png" alt=""
-           width="1122" height="1402" fetchpriority="high" decoding="async">
+      <source type="image/webp" srcset="assets/hero/banner-mobile-tight.webp">
+      <img src="assets/hero/banner-mobile-tight.png" alt=""
+           width="1122" height="708" fetchpriority="high" decoding="async">
     </picture>
     <div class="wrap hero-grid">
       <div class="heroCopy">
@@ -1055,6 +1097,14 @@ footer ul button:hover{color:var(--text-on-dark)}
 
   <section class="sec tint" style="padding-bottom:var(--s8)">
     <div class="wrap">
+      <!-- On a phone the header collapses its search behind an icon, which
+           buries the fastest route to a product. This one is always here. -->
+      <label class="homesearch" for="homeSearch">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4" stroke-linecap="round"/></svg>
+        <span class="sr">ابحث عن منتج</span>
+        <input id="homeSearch" type="search" placeholder="ابحث عن ChatGPT، Canva، Discord…"
+               oninput="doSearch(this.value)">
+      </label>
       <div style="margin-bottom:18px">
         <h2 style="font-size:19px">تصفح حسب التصنيف</h2>
         <p style="color:var(--muted-on-dark);font-size:13px;margin-top:4px">وصل للخدمة التي تحتاجها بسرعة.</p>
@@ -1813,8 +1863,18 @@ function updateArrows(){
   const el=$("#catGrid"); if(!el) return;
   const overflow = el.scrollWidth > el.clientWidth + 4;
   $$(".carr").forEach(b=>b.classList.toggle("hidden",!overflow));
+  /* The edge fade promises more to scroll to. Drop it once there is not,
+     so the affordance stays honest. scrollLeft runs negative in RTL. */
+  const wrap = el.closest(".catwrap");
+  if(wrap){
+    const left = Math.abs(el.scrollLeft);
+    wrap.classList.toggle("at-end", !overflow || left >= el.scrollWidth - el.clientWidth - 4);
+  }
 }
 window.addEventListener("resize",()=>updateArrows());
+document.addEventListener("scroll",e=>{
+  if(e.target && e.target.id === "catGrid") updateArrows();
+}, true);
 
 /* Fills the hero slots from the requested slugs, topping up with any
    other published product so the composition keeps its shape even if
@@ -1884,6 +1944,7 @@ function doSearch(v){
   shopQuery=v.trim().toLowerCase();
   if($("#shop").classList.contains("hidden")) go("shop");
   $("#shopSearch").value=v; $("#deskSearch").value=v;
+  if($("#homeSearch") && $("#homeSearch").value !== v) $("#homeSearch").value=v;
   renderShop();
 }
 function openSearch(){ go("shop"); setTimeout(()=>$("#shopSearch").focus(),320); }
