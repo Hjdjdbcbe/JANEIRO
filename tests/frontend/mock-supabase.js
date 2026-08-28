@@ -155,6 +155,10 @@ async function adminRpc(name, req, res) {
       const rows = await asUser("select admin_order_counts() as r", [], uid);
       return send(res, 200, rows[0].r);
     }
+    if (name === "admin_dashboard_stats") {
+      const rows = await asUser("select admin_dashboard_stats() as r", [], uid);
+      return send(res, 200, rows[0].r);
+    }
     if (name === "admin_update_order_status") {
       const rows = await asUser(
         "select admin_update_order_status($1::uuid, $2::order_status, $3) as r",

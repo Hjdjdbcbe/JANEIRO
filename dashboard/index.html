@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>لوحة الطلبات — Janeiro</title>
+<title>لوحة Janeiro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- keys live outside the tracked tree; see config.example.js -->
+<script src="config.js" onerror="/* not configured yet */"></script>
 <style>
 /* ============================================================
    لوحة الطلبات — أداة تشغيل، لا واجهة متجر.
@@ -41,8 +43,12 @@ input,select,textarea{font:inherit}
 /* ---------- top bar ---------- */
 header{position:sticky;top:0;z-index:20;background:rgba(16,16,24,.92);
   backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+/* the top bar. Do not reuse this class name -- a later .bar rule for
+   the chart columns once overrode flex-direction here and stacked it. */
 .bar{max-width:940px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px}
-.bar h1{font-family:var(--f-display);font-size:16px;font-weight:700;margin:0;flex:1}
+.bar h1{font-family:var(--f-display);font-size:16px;font-weight:700;margin:0;flex:1;white-space:nowrap}
+/* on a narrow phone the email is the first thing to give way */
+@media(max-width:420px){.bar .who{display:none}}
 .bar .who{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:40vw;white-space:nowrap}
 .linkbtn{font-size:13px;color:var(--accent);padding:6px 10px;border-radius:9px}
 .linkbtn:hover{background:var(--accent-soft)}
@@ -129,6 +135,56 @@ textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-rad
   padding:11px;color:var(--ink);resize:vertical;min-height:62px;font-size:14px}
 label.fl{font-size:12.5px;color:var(--muted)}
 
+/* ---------- view switch ---------- */
+.tabs{display:flex;gap:6px;padding:14px 0 0}
+.tab{padding:8px 15px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted)}
+.tab[aria-current="true"]{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+
+/* ---------- overview ---------- */
+/* What needs the owner comes first and is the loudest thing on screen;
+   everything below it is context. */
+.attention{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-top:14px}
+.att{background:var(--surface);border:1px solid var(--line);border-radius:13px;
+  padding:14px;text-align:start;border-inline-start:3px solid var(--tone,var(--muted));
+  display:flex;flex-direction:column;gap:2px;transition:border-color .15s,transform .12s}
+.att:hover{border-color:var(--accent)}
+.att:active{transform:scale(.99)}
+.att b{font-family:var(--f-mono);font-size:25px;font-weight:600;color:var(--tone,var(--ink));
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.att span{font-size:12.5px;color:var(--muted)}
+.allclear{background:var(--surface);border:1px solid var(--line);border-radius:13px;
+  padding:20px;text-align:center;color:var(--muted);font-size:14px;margin-top:14px}
+.allclear b{display:block;color:var(--done);font-family:var(--f-display);font-size:16px;margin-bottom:4px}
+
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:15px;
+  display:flex;flex-direction:column;gap:3px}
+.tile .lbl{font-size:12.5px;color:var(--muted)}
+.tile .v{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.delta{font-size:12px;font-family:var(--f-mono);display:inline-flex;align-items:center;gap:3px}
+.delta.up{color:var(--done)} .delta.down{color:var(--dead)} .delta.flat{color:var(--muted)}
+
+/* seven-day bars: drawn from the daily rows, no library */
+.chart{display:flex;align-items:flex-end;gap:6px;height:104px;padding-top:8px}
+/* min-width:0 matters: a flex item will not shrink below its content's
+   width by default, so the day labels were forcing the chart wider than
+   the phone and pushing the whole page sideways. */
+.daybar{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;height:100%}
+.daybar i{display:block;background:var(--accent-soft);border:1px solid var(--accent);
+  border-radius:5px 5px 3px 3px;min-height:3px;transition:height .3s}
+.daybar.today i{background:var(--accent)}
+.daybar em{font-style:normal;font-size:10.5px;color:var(--muted);text-align:center;
+  font-family:var(--f-mono)}
+.daybar b{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-2);text-align:center;
+  font-variant-numeric:tabular-nums}
+
+.toplist{display:flex;flex-direction:column;gap:0}
+.top{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.top:last-child{border-bottom:0}
+.top .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .sold{font-size:12px;color:var(--muted);font-family:var(--f-mono);flex:none}
+.top .rev{font-family:var(--f-mono);font-weight:600;font-size:13.5px;flex:none}
+
 /* ---------- login ---------- */
 .login{max-width:360px;margin:14vh auto;padding:0 16px;display:flex;flex-direction:column;gap:16px}
 .login h1{font-family:var(--f-display);font-size:22px;margin:0}
@@ -166,7 +222,7 @@ label.fl{font-size:12.5px;color:var(--muted)}
 <div id="app" class="hidden">
   <header>
     <div class="bar">
-      <h1>لوحة الطلبات</h1>
+      <h1>لوحة Janeiro</h1>
       <span class="who" id="who"></span>
       <button class="linkbtn" id="refresh">تحديث</button>
       <button class="linkbtn" id="logout">خروج</button>
@@ -174,8 +230,16 @@ label.fl{font-size:12.5px;color:var(--muted)}
   </header>
 
   <main class="wrap">
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-v="overview" aria-current="true">نظرة عامة</button>
+      <button class="tab" data-v="queue" aria-current="false">الطلبات</button>
+    </nav>
+
+    <!-- overview -->
+    <section id="overview"></section>
+
     <!-- queue -->
-    <section id="queue">
+    <section id="queue" class="hidden">
       <div class="chips" id="chips" role="group" aria-label="تصفية الطلبات"></div>
       <div class="rows" id="rows"></div>
     </section>
@@ -279,13 +343,133 @@ const tone  = s => (STATUS[s] || ["", "t-wait"])[1];
 const QUEUE_ORDER = ["pending_payment_review","payment_confirmed","activating",
                      "needs_info","awaiting_receipt","completed","cancelled","refunded"];
 
-const money = (n, c) => Number(n).toLocaleString("en-US") + " " + (c || "دج");
+const money = (n, c) => Math.round(Number(n) || 0).toLocaleString("en-US") + " " + (c || "دج");
 const when  = t => new Date(t).toLocaleString("en-GB", { day:"2-digit", month:"2-digit",
                     year:"2-digit", hour:"2-digit", minute:"2-digit" });
 const esc = s => String(s ?? "").replace(/[&<>"']/g, m =>
   ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
 
 /* ---------------- queue ---------------- */
+/* ---------- overview ---------- */
+/* Every figure here comes from admin_dashboard_stats(). Nothing is
+   computed in the browser and nothing is estimated: if the database
+   cannot answer it, it is not on this screen. */
+const ATT_TONE = {
+  pending_payment_review: "t-wait", needs_info: "t-wait",
+  payment_confirmed: "t-work", activating: "t-work",
+};
+
+function delta(now, before) {
+  const a = Number(now) || 0, b = Number(before) || 0;
+  if (!b) return a ? `<span class="delta up">جديد</span>` : "";
+  const pct = Math.round(((a - b) / b) * 100);
+  if (pct === 0) return `<span class="delta flat">مثل أمس</span>`;
+  return `<span class="delta ${pct > 0 ? "up" : "down"}" dir="ltr">${pct > 0 ? "+" : ""}${pct}%</span>`;
+}
+
+function chart(daily) {
+  const max = Math.max(1, ...daily.map(d => Number(d.orders) || 0));
+  /* The conventional Arabic weekday initials. Full names cannot fit
+     seven across a phone, and clipping them mid-word reads as broken. */
+  const names = ["ح","ن","ث","ر","خ","ج","س"];
+  return `<div class="chart">${daily.map((d, i) => {
+    const n = Number(d.orders) || 0;
+    const day = new Date(d.day);
+    const full = day.toLocaleDateString("ar", { weekday: "long" });
+    return `<span class="daybar ${i === daily.length - 1 ? "today" : ""}">
+      <b>${n || ""}</b>
+      <i style="height:${Math.round((n / max) * 100)}%"></i>
+      <em title="${full} — ${n} طلب">${names[day.getDay()]}</em>
+    </span>`;
+  }).join("")}</div>`;
+}
+
+async function loadOverview() {
+  const st = await rpc("admin_dashboard_stats");
+  const needs = st.needs_you || {};
+  const waiting = Object.entries(needs).filter(([, n]) => n > 0);
+  const hours = st.oldest_waiting_hours;
+
+  $("#overview").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <h2>يحتاجك الآن</h2>
+      ${waiting.length ? `
+        <div class="attention" style="margin-top:0">${waiting
+          .sort((a, b) => QUEUE_ORDER.indexOf(a[0]) - QUEUE_ORDER.indexOf(b[0]))
+          .map(([s, n]) => `<button class="att ${ATT_TONE[s] || "t-wait"}" data-goq="${s}">
+              <b>${n}</b><span>${label(s)}</span></button>`).join("")}</div>
+        ${hours != null && hours >= 12 ? `<p style="margin:0;font-size:13px;color:var(--wait)">
+            أقدم طلب ينتظر المراجعة منذ ${hours} ساعة.</p>` : ""}`
+        : `<div class="allclear" style="margin-top:0"><b>لا شيء ينتظرك</b>
+             كل الطلبات في حالتها النهائية.</div>`}
+    </div>
+
+    <div class="card">
+      <h2>اليوم</h2>
+      <div class="tiles">
+        <div class="tile"><span class="lbl">طلبات</span>
+          <span class="v">${st.today.orders}</span>${delta(st.today.orders, st.yesterday.orders)}</div>
+        <div class="tile"><span class="lbl">دخل مؤكَّد</span>
+          <span class="v">${money(st.today.revenue)}</span>${delta(st.today.revenue, st.yesterday.revenue)}</div>
+        <div class="tile"><span class="lbl">اكتمل</span>
+          <span class="v">${st.today.completed}</span></div>
+      </div>
+      <p style="margin:0;font-size:12.5px;color:var(--muted)">
+        الدخل يُحتسب من تأكيد الدفع، ويخرج منه المسترجع. الطلبات تحت المراجعة ليست دخلاً بعد.</p>
+    </div>
+
+    <div class="card">
+      <h2>آخر سبعة أيام</h2>
+      ${chart(st.daily || [])}
+      <div class="tiles" style="margin-top:4px">
+        <div class="tile"><span class="lbl">طلبات الأسبوع</span>
+          <span class="v">${st.week.orders}</span></div>
+        <div class="tile"><span class="lbl">دخل الأسبوع</span>
+          <span class="v">${money(st.week.revenue)}</span></div>
+      </div>
+    </div>
+
+    ${(st.top_products || []).length ? `
+    <div class="card">
+      <h2>الأكثر مبيعاً — 30 يوماً</h2>
+      <div class="toplist">${st.top_products.map(t => `
+        <div class="top">
+          <span class="nm">${esc(t.name)}</span>
+          <span class="sold">${t.sold}×</span>
+          <span class="rev">${money(t.revenue)}</span>
+        </div>`).join("")}</div>
+    </div>` : ""}
+
+    <div class="card">
+      <h2>الإجمالي</h2>
+      <div class="tiles">
+        <div class="tile"><span class="lbl">طلبات</span>
+          <span class="v">${st.totals.orders}</span></div>
+        <div class="tile"><span class="lbl">عملاء</span>
+          <span class="v">${st.totals.customers}</span></div>
+        <div class="tile"><span class="lbl">دخل</span>
+          <span class="v">${money(st.totals.revenue)}</span></div>
+        ${Number(st.totals.refunded) > 0 ? `<div class="tile"><span class="lbl">مسترجع</span>
+          <span class="v" style="color:var(--dead)">${money(st.totals.refunded)}</span></div>` : ""}
+      </div>
+    </div>`;
+
+  /* the attention tiles are the fast path into the work */
+  $$("[data-goq]").forEach(b => b.onclick = () => { filter = b.dataset.goq; showView("queue"); });
+}
+
+/* ---------- view switch ---------- */
+let view = "overview";
+function showView(v) {
+  view = v;
+  $("#overview").classList.toggle("hidden", v !== "overview");
+  $("#queue").classList.toggle("hidden", v !== "queue");
+  $("#detail").classList.add("hidden");
+  $$("#tabs .tab").forEach(t => t.setAttribute("aria-current", String(t.dataset.v === v)));
+  window.scrollTo({ top: 0, behavior: "instant" });
+  (v === "overview" ? loadOverview() : loadQueue()).catch(e => toast(e.message));
+}
+/* ---------- queue ---------- */
 let filter = "pending_payment_review";
 
 async function loadQueue() {
@@ -422,6 +606,7 @@ async function openOrder(id) {
   });
 
   $("#queue").classList.add("hidden");
+  $("#overview").classList.add("hidden");
   $("#detail").classList.remove("hidden");
   window.scrollTo({ top: 0, behavior: "instant" });
 }
@@ -444,8 +629,9 @@ function showApp(email) {
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#who").textContent = email || "";
-  loadQueue().catch(e => toast(e.message));
+  showView("overview");
 }
+$$("#tabs .tab").forEach(t => t.onclick = () => showView(t.dataset.v));
 
 $("#loginBtn").onclick = async () => {
   const btn = $("#loginBtn");
@@ -471,12 +657,17 @@ $("#loginBtn").onclick = async () => {
 };
 $("#pass").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
 $("#logout").onclick = signOut;
-$("#refresh").onclick = () => loadQueue().catch(e => toast(e.message));
+$("#refresh").onclick = () => showView(view);
 $("#back").onclick = () => {
   $("#detail").classList.add("hidden");
   $("#queue").classList.remove("hidden");
+  $$("#tabs .tab").forEach(t => t.setAttribute("aria-current", String(t.dataset.v === "queue")));
+  view = "queue";
   loadQueue().catch(e => toast(e.message));
 };
+
+/* the module scope is not global; the browser tests drive these */
+Object.assign(window, { showView, loadOverview, loadQueue });
 
 if (session?.access_token) showApp(session?.user?.email);
 </script>

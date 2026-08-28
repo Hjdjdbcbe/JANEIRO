@@ -1,4 +1,4 @@
-/* Drives admin/index.html in Chromium against mock-supabase.js.
+/* Drives dashboard/index.html in Chromium against mock-supabase.js.
    Needs fixtures.sql applied (it seeds the admin account and orders). */
 const { chromium } = require("playwright");
 const BASE = process.env.BASE || "http://127.0.0.1:8808";
@@ -62,7 +62,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
 
   // ---------- a non-admin must not get in ----------
   const p1 = await newPage({ viewport: { width: 390, height: 844 } });
-  await p1.goto(`${BASE}/admin/index.html`, { waitUntil: "networkidle" });
+  await p1.goto(`${BASE}/dashboard/index.html`, { waitUntil: "networkidle" });
   check(await p1.locator("#login").isVisible(), "the console opens on a login screen, not the queue");
 
   await login(p1, "admin@janeiro.test", "wrong-pass");
@@ -78,16 +78,70 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(await p1.locator("#app").isHidden(), "a non-admin never reaches the console");
   const leaked = await p1.evaluate(() => sessionStorage.getItem("janeiro_admin_session"));
   check(!leaked, "a refused non-admin session is not left behind in storage");
+
+  // the figures are guarded server-side, not merely hidden in the UI
+  const statsAsNobody = await p1.evaluate(async (b) => {
+    const s = await (await fetch(`${b}/auth/v1/token?grant_type=password`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "nobody@janeiro.test", password: "nobody-pass-123" }) })).json();
+    const r = await fetch(`${b}/rest/v1/rpc/admin_dashboard_stats`, {
+      method: "POST", headers: { Authorization: `Bearer ${s.access_token}`, "Content-Type": "application/json" },
+      body: "{}" });
+    return r.status;
+  }, BASE);
+  check(statsAsNobody === 403, `a non-admin calling the figures directly is refused (HTTP ${statsAsNobody})`);
   await p1.close();
 
   // ---------- the admin works the queue ----------
   const p = await newPage({ viewport: { width: 390, height: 844 } });
-  await p.goto(`${BASE}/admin/index.html`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/dashboard/index.html`, { waitUntil: "networkidle" });
   const seeded = await seedOwnOrder(p);
   await login(p, "admin@janeiro.test", "admin-pass-123");
   await p.waitForSelector("#app:not(.hidden)", { timeout: 10000 });
   check(true, "the admin reaches the console");
 
+  // ---------- the overview is what it opens on ----------
+  await p.waitForFunction(() => document.querySelector("#overview")?.children.length > 0,
+                          { timeout: 10000 });
+  const ov = await p.locator("#overview").innerText();
+  check(/يحتاجك الآن/.test(ov), "the overview leads with what needs the owner now");
+  check(/دخل مؤكَّد/.test(ov), "today's confirmed revenue is shown");
+
+  /* The figures must match the database, not merely render. Compare the
+     tiles against the same RPC read straight from the API. */
+  const stats = await p.evaluate(async (b) => {
+    const t = JSON.parse(sessionStorage.getItem("janeiro_admin_session")).access_token;
+    const r = await fetch(`${b}/rest/v1/rpc/admin_dashboard_stats`, {
+      method: "POST", headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: "{}" });
+    return r.json();
+  }, BASE);
+  const tiles = await p.locator("#overview .tile .v").allInnerTexts();
+  check(tiles[0].trim() === String(stats.today.orders),
+        `the orders tile matches the database (${tiles[0].trim()} = ${stats.today.orders})`);
+  check(await p.locator("#overview .chart .daybar").count() === 7, "the week chart has seven days");
+  /* The header is one row. A chart rule that reused the .bar class once
+     overrode flex-direction here and stacked the whole top bar. */
+  const barDir = await p.evaluate(() => getComputedStyle(document.querySelector("header .bar")).flexDirection);
+  check(barDir === "row", `the top bar stays a single row (flex-direction: ${barDir})`);
+
+  // revenue must exclude money that has not been confirmed yet
+  const underReview = Number(stats.needs_you?.pending_payment_review || 0);
+  check(underReview >= 1, "there is at least one order still under review to test with");
+  const confirmedTotal = Number(stats.totals.revenue);
+  const allOrders = await p.evaluate(async (b) => {
+    const t = JSON.parse(sessionStorage.getItem("janeiro_admin_session")).access_token;
+    const r = await fetch(`${b}/rest/v1/orders?select=status,total`,
+      { headers: { Authorization: `Bearer ${t}` } });
+    return r.json();
+  }, BASE);
+  const naiveTotal = allOrders.reduce((s, o) => s + Number(o.total), 0);
+  check(confirmedTotal < naiveTotal,
+        `revenue counts only confirmed money (${confirmedTotal} < ${naiveTotal} across all orders)`);
+
+  // an attention tile is the fast path into that queue
+  await p.locator('[data-goq="pending_payment_review"]').click();
+  await p.waitForSelector("#queue:not(.hidden)");
   await p.waitForFunction(() => document.querySelectorAll("#chips .chip[data-s]").length > 0);
   /* Assert what must be true, not how many statuses happen to be
      populated: the queue this run's order landed in has to be there and
@@ -171,6 +225,23 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(await p.locator("#login").isVisible(), "signing out returns to the login screen");
   check(!(await p.evaluate(() => sessionStorage.getItem("janeiro_admin_session"))),
         "signing out clears the stored session");
+
+  // ---------- the dashboard is used on a phone ----------
+  for (const w of [375, 390, 430]) {
+    await p.setViewportSize({ width: w, height: 844 });
+    await p.evaluate(() => window.showView?.("overview"));
+    await p.waitForTimeout(600);
+    const r = await p.evaluate(() => ({
+      doc: document.documentElement.scrollWidth, win: window.innerWidth,
+      worst: [...document.querySelectorAll("body *")]
+        .map(e => ({ e, b: e.getBoundingClientRect() }))
+        .filter(({ b }) => b.left < -1 || b.width > window.innerWidth + 1)
+        .slice(0, 2).map(({ e }) => e.tagName + "." + (e.className || "").toString().trim().slice(0, 24)),
+    }));
+    check(r.doc <= r.win + 1,
+          `${w}px: no horizontal scroll (doc ${r.doc} vs win ${r.win})${r.worst.length ? " -> " + r.worst : ""}`);
+  }
+  await p.setViewportSize({ width: 390, height: 844 });
 
   check(errs.length === 0, `no JS errors${errs.length ? " -> " + errs.slice(0, 3).join(" | ") : ""}`);
   await p.screenshot({ path: "/tmp/claude-0/-home-user-JANEIRO/68cc013f-a073-5abe-9b55-e7d0bdbc6503/scratchpad/admin-390.png" });

@@ -13,3 +13,6 @@ tests/local/*.log
 
 node_modules/
 .DS_Store
+
+# لوحة التحكم: مفاتيح النشر الحقيقية
+dashboard/config.js
