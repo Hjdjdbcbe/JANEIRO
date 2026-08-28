@@ -578,6 +578,133 @@ begin
 end $$;
 
 -- ============================================================
+-- PRODUCT MANAGEMENT — one call writes a product and its children.
+-- ============================================================
+do $$
+declare
+  v jsonb; v_id uuid; v_plan uuid; v_order uuid; v_ok boolean;
+  v_admin constant uuid := '11111111-1111-4111-8111-111111111111';
+begin
+  insert into auth.users(id) values (v_admin) on conflict (id) do nothing;
+  insert into profiles(id, role) values (v_admin,'admin')
+    on conflict (id) do update set role='admin';
+
+  -- ---------- a non-admin cannot touch the catalogue ----------
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    perform admin_upsert_product(jsonb_build_object('slug','x','name','x','category_slug','ai'));
+    raise exception 'FAILED: an anonymous caller wrote a product';
+  exception when others then
+    assert sqlerrm not like 'FAILED%', 'anon must not write products';
+  end;
+  raise notice 'PASS  only an admin can write the catalogue';
+
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_admin, 'role','authenticated')::text, true);
+
+  -- ---------- a published product must be buyable ----------
+  begin
+    perform admin_upsert_product(jsonb_build_object(
+      'slug','t-noplan','name','بلا خطة','category_slug','ai',
+      'status','published','plans','[]'::jsonb));
+    raise exception 'FAILED: published a product with nothing to buy';
+  exception when others then
+    assert sqlerrm like '%PUBLISHED_NEEDS_A_PLAN%',
+           'expected PUBLISHED_NEEDS_A_PLAN, got: ' || sqlerrm;
+  end;
+
+  -- ---------- the slug is what the URL and the seed key on ----------
+  begin
+    perform admin_upsert_product(jsonb_build_object(
+      'slug','Bad Slug!','name','x','category_slug','ai'));
+    raise exception 'FAILED: accepted a malformed slug';
+  exception when others then
+    assert sqlerrm like '%INVALID_SLUG%', 'expected INVALID_SLUG';
+  end;
+
+  begin
+    perform admin_upsert_product(jsonb_build_object(
+      'slug','t-nocat','name','x','category_slug','does-not-exist'));
+    raise exception 'FAILED: accepted an unknown category';
+  exception when others then
+    assert sqlerrm like '%CATEGORY_NOT_FOUND%', 'expected CATEGORY_NOT_FOUND';
+  end;
+  raise notice 'PASS  a product must be buyable, slugged and categorised';
+
+  -- ---------- one call writes all five tables ----------
+  v := admin_upsert_product(jsonb_build_object(
+    'slug','t-prod','name','منتج اختبار','category_slug','ai',
+    'short_description','وصف','accent_color','#123456','status','published',
+    'warranty_type','subscription_duration',
+    'plans', jsonb_build_array(
+      jsonb_build_object('name','شهر','price',1000),
+      jsonb_build_object('name','سنة','price',9000,'old_price',12000)),
+    'features', jsonb_build_array('ميزة أولى','ميزة ثانية'),
+    'requirements', jsonb_build_array(
+      jsonb_build_object('label','البريد','field_type','email','is_required',true))));
+  v_id := (v->>'id')::uuid;
+  assert (select count(*) from product_plans        where product_id=v_id) = 2, 'both plans written';
+  assert (select count(*) from product_features     where product_id=v_id) = 2, 'both features written';
+  assert (select count(*) from product_requirements where product_id=v_id) = 1, 'the activation field written';
+  raise notice 'PASS  one call fills all five tables';
+
+  -- ---------- editing must not destroy order history ----------
+  -- product_plans is referenced by order_items, and daily_deals cascades
+  -- on delete, so a dropped plan is retired rather than removed.
+  select id into v_plan from product_plans where product_id=v_id order by sort_order limit 1;
+  insert into orders (order_number, customer_name, customer_phone, normalized_phone,
+                      subtotal, total, idempotency_key)
+    values ('JNR-260101-TST1','عميل','0550111222','213550111222',1000,1000,'prod-edit-test-1')
+    returning id into v_order;
+  insert into order_items (order_id, product_id, plan_id, product_name_snapshot,
+                           plan_name_snapshot, unit_price, quantity, total_price)
+    values (v_order, v_id, v_plan, 'منتج اختبار','شهر',1000,1,1000);
+
+  insert into daily_deals (product_id, plan_id, deal_price, ends_at)
+    values (v_id, v_plan, 700, now() + interval '2 hours');
+
+  -- save again, listing only the other plan
+  perform admin_upsert_product(jsonb_build_object(
+    'slug','t-prod','name','منتج اختبار','category_slug','ai','status','published',
+    'plans', jsonb_build_array(jsonb_build_object('name','سنة','price',9000))));
+
+  assert (select count(*) from product_plans where id = v_plan) = 1,
+         'a dropped plan must be kept, not deleted';
+  assert (select is_active from product_plans where id = v_plan) = false,
+         'a dropped plan must be deactivated';
+  assert (select count(*) from order_items where plan_id = v_plan) = 1,
+         'the order line must still point at its plan';
+  assert (select count(*) from daily_deals where plan_id = v_plan) = 1,
+         'deleting the plan would have cascaded its deal away';
+  raise notice 'PASS  editing retires a plan without touching order history';
+
+  -- ---------- saving again edits rather than duplicating ----------
+  perform admin_upsert_product(jsonb_build_object(
+    'slug','t-prod','name','اسم جديد','category_slug','ai','status','draft',
+    'plans', jsonb_build_array(jsonb_build_object('name','سنة','price',9500))));
+  assert (select count(*) from products where slug='t-prod') = 1, 'saving must not duplicate';
+  assert (select name from products where slug='t-prod') = 'اسم جديد', 'the edit must apply';
+  raise notice 'PASS  saving twice edits one product';
+
+  -- ---------- archiving keeps it out of the shop but on the orders ----------
+  perform admin_archive_product('t-prod');
+  assert (select archived_at from products where slug='t-prod') is not null, 'archived';
+  assert (select count(*) from public_products where slug='t-prod') = 0,
+         'an archived product must leave the public catalogue';
+  assert (select count(*) from order_items where product_id = v_id) = 1,
+         'archiving must not touch past orders';
+  raise notice 'PASS  archiving hides a product without erasing its history';
+
+  -- ---------- a draft is invisible to customers ----------
+  perform set_config('request.jwt.claims', '', true);
+  assert (select count(*) from public_products where slug='t-prod') = 0,
+         'the public never sees a draft or archived product';
+
+  raise notice '';
+  raise notice '===== product management tests passed =====';
+end $$;
+
+-- ============================================================
 -- RLS  (§39) — run as the anon role
 -- ============================================================
 do $$

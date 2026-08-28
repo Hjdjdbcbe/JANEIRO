@@ -185,6 +185,54 @@ label.fl{font-size:12.5px;color:var(--muted)}
 .top .sold{font-size:12px;color:var(--muted);font-family:var(--f-mono);flex:none}
 .top .rev{font-family:var(--f-mono);font-weight:600;font-size:13.5px;flex:none}
 
+/* ---------- products ---------- */
+.plist{display:grid;gap:10px;margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.prow{display:flex;gap:12px;align-items:center;text-align:start;width:100%;
+  background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:11px;
+  transition:border-color .15s,transform .12s}
+.prow:hover{border-color:var(--accent)}
+.prow:active{transform:scale(.995)}
+/* 3:4, the same ratio the shop uses, so what you see here is the crop
+   the customer gets */
+.pthumb{width:48px;aspect-ratio:3/4;border-radius:8px;flex:none;overflow:hidden;
+  background:var(--surface-2);display:grid;place-items:center;
+  font-family:var(--f-display);font-weight:700;color:var(--muted);font-size:16px}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.prow .pi{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.prow b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .meta{font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+
+/* ---------- editor ---------- */
+.ed{display:flex;flex-direction:column;gap:8px}
+.ed label{font-size:12.5px;color:var(--muted)}
+.ed input,.ed select,.ed textarea{width:100%;background:var(--bg);border:1px solid var(--line);
+  border-radius:10px;padding:10px;color:var(--ink);font-size:14px}
+.ed input:disabled{opacity:.55}
+.two{display:grid;gap:8px;grid-template-columns:1fr 1fr}
+.three{display:grid;gap:8px;grid-template-columns:1fr 1fr auto}
+/* one repeating row: a plan, a feature, an activation field */
+.rep{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;
+  padding:11px;display:flex;flex-direction:column;gap:8px}
+.rep .hd{display:flex;align-items:center;gap:8px}
+.rep .hd b{flex:1;font-size:13px}
+.del{font-size:11.5px;color:var(--dead);padding:4px 9px;border-radius:8px;flex:none}
+.del:hover{background:color-mix(in srgb,var(--dead) 14%,transparent)}
+.addrow{border:1px dashed var(--line);border-radius:11px;padding:11px;width:100%;
+  color:var(--accent);font-size:13.5px;font-weight:600;transition:border-color .15s}
+.addrow:hover{border-color:var(--accent);background:var(--accent-soft)}
+.inactive{opacity:.6}
+.hint{font-size:12px;color:var(--muted);line-height:1.6}
+.drop{border:1px dashed var(--line);border-radius:12px;padding:16px;text-align:center;
+  cursor:pointer;display:block;transition:border-color .15s}
+.drop:hover{border-color:var(--accent)}
+.drop b{display:block;font-size:13.5px;margin-bottom:3px}
+.drop span{font-size:12px;color:var(--muted)}
+.posterprev{width:96px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex:none;
+  background:var(--surface-2)}
+.posterprev img{width:100%;height:100%;object-fit:cover;display:block}
+.sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);
+  padding:14px 0 0;display:flex;gap:9px;flex-wrap:wrap;z-index:5}
+
 /* ---------- login ---------- */
 .login{max-width:360px;margin:14vh auto;padding:0 16px;display:flex;flex-direction:column;gap:16px}
 .login h1{font-family:var(--f-display);font-size:22px;margin:0}
@@ -233,7 +281,12 @@ label.fl{font-size:12.5px;color:var(--muted)}
     <nav class="tabs" id="tabs">
       <button class="tab" data-v="overview" aria-current="true">نظرة عامة</button>
       <button class="tab" data-v="queue" aria-current="false">الطلبات</button>
+      <button class="tab" data-v="products" aria-current="false">المنتجات</button>
     </nav>
+
+    <!-- products -->
+    <section id="products" class="hidden"></section>
+    <section id="editor" class="hidden"></section>
 
     <!-- overview -->
     <section id="overview"></section>
@@ -458,16 +511,377 @@ async function loadOverview() {
   $$("[data-goq]").forEach(b => b.onclick = () => { filter = b.dataset.goq; showView("queue"); });
 }
 
+/* ---------- products ---------- */
+/* The catalogue spans five tables. The editor holds one draft object in
+   memory and sends it to admin_upsert_product, which writes all five in
+   one transaction -- so a failed save leaves nothing half-built. */
+const STATUS_LABEL = {
+  published: "معروض للبيع", coming_soon: "قريباً", temporarily_unavailable: "غير متوفر مؤقتاً",
+  draft: "مسودة", hidden: "مخفي", archived: "مؤرشف",
+};
+const WARRANTY_LABEL = {
+  none: "بلا ضمان", activation: "ضمان التفعيل", days: "بعدد أيام",
+  subscription_duration: "طوال مدة الاشتراك", custom: "نص مخصص",
+};
+const FIELD_LABEL = {
+  email: "بريد إلكتروني", phone: "هاتف", username: "اسم مستخدم",
+  text: "نص", number: "رقم", account_id: "معرّف حساب", custom: "مخصص",
+};
+let PRODUCTS = [], CATS = [], draft = null;
+
+const money0 = n => Math.round(Number(n) || 0).toLocaleString("en-US");
+const posterUrl = path =>
+  path ? `${CFG.SUPABASE_URL}/storage/v1/object/public/product-media/${path}` : null;
+
+async function loadProducts() {
+  [PRODUCTS, CATS] = await Promise.all([
+    rpc("admin_list_products"),
+    rest("categories?select=slug,name&order=sort_order"),
+  ]);
+
+  $("#products").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="flex:1">المنتجات <span class="meta">(${PRODUCTS.length})</span></h2>
+        <button class="btn go" id="newProd">+ منتج جديد</button>
+      </div>
+      <div class="plist">${PRODUCTS.map(p => {
+        const active = (p.plans || []).filter(x => x.is_active);
+        const prices = active.map(x => Number(x.price));
+        const range = prices.length
+          ? (prices.length > 1 ? `${money0(Math.min(...prices))}–${money0(Math.max(...prices))}` : money0(prices[0]))
+          : "بلا سعر";
+        const url = posterUrl(p.poster_path);
+        return `<button class="prow" data-slug="${esc(p.slug)}">
+          <span class="pthumb">${url
+            ? `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.remove()">`
+            : esc(p.name[0] || "?")}</span>
+          <span class="pi">
+            <b>${esc(p.name)}</b>
+            <span class="meta">${range} · ${active.length} خطة</span>
+          </span>
+          <span class="pill ${p.status === "published" ? "t-done"
+              : p.status === "draft" || p.status === "hidden" ? "t-dead" : "t-wait"}">
+            ${STATUS_LABEL[p.status] || p.status}</span>
+        </button>`;
+      }).join("") || `<div class="empty"><b>لا منتجات بعد</b>ابدأ بإضافة واحد.</div>`}</div>
+    </div>`;
+
+  $("#newProd").onclick = () => openEditor(null);
+  $$("#products .prow").forEach(b => b.onclick = () => openEditor(b.dataset.slug));
+}
+
+/* ---------- the editor ---------- */
+function blankProduct() {
+  return {
+    slug: "", name: "", category_slug: CATS[0]?.slug || "", short_description: "",
+    description: "", accent_color: "#7357FF", status: "draft", sort_order: 0,
+    poster_path: "", warranty_type: "subscription_duration", warranty_days: "",
+    warranty_label: "", badge_type: "", badge_label: "",
+    delivery_min: "", delivery_max: "", delivery_unit: "", delivery_label: "",
+    plans: [{ name: "", price: "", old_price: "", is_active: true }],
+    features: [""],
+    requirements: [{ label: "", field_type: "email", placeholder: "", is_required: true }],
+  };
+}
+
+function openEditor(slug) {
+  const found = slug ? PRODUCTS.find(p => p.slug === slug) : null;
+  draft = found ? JSON.parse(JSON.stringify(found)) : blankProduct();
+  draft.plans        = draft.plans?.length ? draft.plans : [{ name: "", price: "", is_active: true }];
+  draft.features     = draft.features?.length ? draft.features : [""];
+  draft.requirements = draft.requirements?.length ? draft.requirements : [];
+  draft.__isNew      = !found;
+  renderEditor();
+  $("#products").classList.add("hidden");
+  $("#editor").classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+function renderEditor() {
+  const d = draft;
+  const sel = (val, opts) => Object.entries(opts).map(([k, v]) =>
+    `<option value="${k}" ${k === val ? "selected" : ""}>${v}</option>`).join("");
+  const url = posterUrl(d.poster_path);
+
+  $("#editor").innerHTML = `
+    <div class="chips"><button class="chip" id="edBack">→ رجوع للمنتجات</button></div>
+
+    <div class="card">
+      <h2>${d.__isNew ? "منتج جديد" : esc(d.name)}</h2>
+      <div class="ed">
+        <div><label for="f_name">الاسم</label>
+          <input id="f_name" data-f="name" value="${esc(d.name)}" placeholder="مثال: Canva Pro"></div>
+        <div><label for="f_slug">المعرّف (slug)</label>
+          <input id="f_slug" data-f="slug" value="${esc(d.slug)}" ${d.__isNew ? "" : "disabled"}
+                 placeholder="canva-pro" dir="ltr">
+          <p class="hint">حروف لاتينية صغيرة وأرقام وشرطات. ${d.__isNew
+            ? "يُستعمل في الرابط ولا يتغيّر بعد الحفظ."
+            : "لا يمكن تغييره — الطلبات والروابط تعتمد عليه."}</p></div>
+        <div class="two">
+          <div><label for="f_cat">التصنيف</label>
+            <select id="f_cat" data-f="category_slug">${CATS.map(c =>
+              `<option value="${esc(c.slug)}" ${c.slug === d.category_slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
+          <div><label for="f_status">الحالة</label>
+            <select id="f_status" data-f="status">${sel(d.status, {
+              draft: "مسودة", published: "معروض للبيع", coming_soon: "قريباً",
+              temporarily_unavailable: "غير متوفر مؤقتاً", hidden: "مخفي" })}</select></div>
+        </div>
+        <div><label for="f_desc">وصف قصير</label>
+          <input id="f_desc" data-f="short_description" maxlength="200" value="${esc(d.short_description || "")}"
+                 placeholder="سطر واحد يظهر تحت الاسم في البطاقة"></div>
+        <div class="two">
+          <div><label for="f_accent">لون المنتج</label>
+            <input id="f_accent" data-f="accent_color" value="${esc(d.accent_color || "#7357FF")}" dir="ltr"
+                   placeholder="#7357FF"></div>
+          <div><label for="f_order">ترتيب الظهور</label>
+            <input id="f_order" data-f="sort_order" type="number" value="${d.sort_order ?? 0}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>صورة المنتج</h2>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <span class="posterprev">${url ? `<img src="${esc(url)}" alt="">` : ""}</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+          <label class="drop" for="posterFile">
+            <b id="dropTxt">${d.poster_path ? "تغيير الصورة" : "اختر صورة البوستر"}</b>
+            <span>نسبة 3:4 · PNG أو WebP · حتى 5 ميغابايت</span>
+            <input type="file" id="posterFile" accept="image/png,image/jpeg,image/webp" hidden>
+          </label>
+          <p class="hint">${d.poster_path
+            ? `الحالية: <span class="mono">${esc(d.poster_path)}</span>`
+            : "بلا صورة يظهر البوستر البديل المصمَّم — ليس عطلاً."}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>الخطط والأسعار</h2>
+      <p class="hint">خطة واحدة نشطة على الأقل حتى يُعرض المنتج للبيع.</p>
+      <div id="plans" class="ed">${d.plans.map((pl, i) => `
+        <div class="rep ${pl.is_active === false ? "inactive" : ""}">
+          <div class="hd">
+            <b>خطة ${i + 1}${pl.is_active === false ? " — معطّلة" : ""}</b>
+            <button class="del" data-del="plans" data-i="${i}">حذف</button>
+          </div>
+          <input data-p="${i}" data-k="name" value="${esc(pl.name || "")}" placeholder="اسم الخطة — مثال: شهر واحد">
+          <div class="two">
+            <input data-p="${i}" data-k="price" type="number" inputmode="numeric"
+                   value="${pl.price ?? ""}" placeholder="السعر">
+            <input data-p="${i}" data-k="old_price" type="number" inputmode="numeric"
+                   value="${pl.old_price ?? ""}" placeholder="السعر قبل الخصم (اختياري)">
+          </div>
+          <div class="two">
+            <input data-p="${i}" data-k="duration_value" type="number"
+                   value="${pl.duration_value ?? ""}" placeholder="المدة (رقم)">
+            <select data-p="${i}" data-k="duration_unit">
+              ${sel(pl.duration_unit || "", { "": "الوحدة", day: "يوم", week: "أسبوع", month: "شهر", year: "سنة" })}
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" data-p="${i}" data-k="is_active" style="width:auto"
+                   ${pl.is_active !== false ? "checked" : ""}> نشطة
+          </label>
+        </div>`).join("")}</div>
+      <button class="addrow" data-add="plans">+ أضف خطة</button>
+    </div>
+
+    <div class="card">
+      <h2>المزايا</h2>
+      <div id="feats" class="ed">${d.features.map((f, i) => `
+        <div class="three">
+          <input data-ft="${i}" value="${esc(f || "")}" placeholder="ميزة تظهر في صفحة المنتج"
+                 style="grid-column:1/3">
+          <button class="del" data-del="features" data-i="${i}">حذف</button>
+        </div>`).join("")}</div>
+      <button class="addrow" data-add="features">+ أضف ميزة</button>
+    </div>
+
+    <div class="card">
+      <h2>بيانات التفعيل المطلوبة من العميل</h2>
+      <p class="hint">ما يُدخله العميل عند الطلب ويصلك في اللوحة. لا تطلب كلمة السر — القاعدة ترفضها.</p>
+      <div id="reqs" class="ed">${d.requirements.map((r, i) => `
+        <div class="rep">
+          <div class="hd"><b>حقل ${i + 1}</b>
+            <button class="del" data-del="requirements" data-i="${i}">حذف</button></div>
+          <input data-r="${i}" data-k="label" value="${esc(r.label || "")}"
+                 placeholder="مثال: البريد الإلكتروني للحساب">
+          <div class="two">
+            <select data-r="${i}" data-k="field_type">${sel(r.field_type || "text", FIELD_LABEL)}</select>
+            <input data-r="${i}" data-k="placeholder" value="${esc(r.placeholder || "")}"
+                   placeholder="نص إرشادي">
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" data-r="${i}" data-k="is_required" style="width:auto"
+                   ${r.is_required !== false ? "checked" : ""}> إجباري
+          </label>
+        </div>`).join("")}</div>
+      <button class="addrow" data-add="requirements">+ أضف حقل</button>
+    </div>
+
+    <div class="card">
+      <h2>الضمان</h2>
+      <div class="ed">
+        <select data-f="warranty_type">${sel(d.warranty_type || "none", WARRANTY_LABEL)}</select>
+        <div class="two">
+          <input data-f="warranty_days" type="number" value="${d.warranty_days ?? ""}"
+                 placeholder="عدد الأيام — لنوع «بعدد أيام»">
+          <input data-f="warranty_label" value="${esc(d.warranty_label || "")}"
+                 placeholder="نص الضمان — لنوع «مخصص»">
+        </div>
+      </div>
+    </div>
+
+    <div class="sticky">
+      <button class="btn go" id="saveProd">حفظ</button>
+      ${d.__isNew ? "" : `<button class="btn warn" id="archProd">أرشفة</button>`}
+      <button class="btn" id="cancelProd">إلغاء</button>
+    </div>`;
+
+  wireEditor();
+}
+
+function wireEditor() {
+  const d = draft;
+  $("#edBack").onclick = $("#cancelProd").onclick = backToProducts;
+
+  $$("#editor [data-f]").forEach(el => el.oninput = el.onchange = () => { d[el.dataset.f] = el.value; });
+  $$("#editor [data-p]").forEach(el => el.oninput = el.onchange = () => {
+    const pl = d.plans[+el.dataset.p];
+    pl[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  $$("#editor [data-r]").forEach(el => el.oninput = el.onchange = () => {
+    const r = d.requirements[+el.dataset.r];
+    r[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  $$("#editor [data-ft]").forEach(el => el.oninput = () => { d.features[+el.dataset.ft] = el.value; });
+
+  $$("#editor [data-add]").forEach(b => b.onclick = () => {
+    const k = b.dataset.add;
+    if (k === "plans") d.plans.push({ name: "", price: "", is_active: true });
+    if (k === "features") d.features.push("");
+    if (k === "requirements") d.requirements.push({ label: "", field_type: "text", is_required: true });
+    renderEditor();
+  });
+  $$("#editor [data-del]").forEach(b => b.onclick = () => {
+    d[b.dataset.del].splice(+b.dataset.i, 1);
+    renderEditor();
+  });
+
+  $("#posterFile").onchange = e => uploadPoster(e.target.files?.[0]);
+  $("#saveProd").onclick = saveProduct;
+  if ($("#archProd")) $("#archProd").onclick = archiveProduct;
+}
+
+function backToProducts() {
+  draft = null;
+  $("#editor").classList.add("hidden");
+  $("#products").classList.remove("hidden");
+  loadProducts().catch(e => toast(e.message));
+}
+
+/* Uploads straight into the public product-media bucket. The storage
+   policy already limits writes there to admins, so no extra endpoint. */
+async function uploadPoster(file) {
+  if (!file) return;
+  if (!draft.slug) { toast("اكتب المعرّف (slug) أولاً — اسم الملف يعتمد عليه."); return; }
+  if (file.size > 5 * 1024 * 1024) { toast("الصورة أكبر من 5 ميغابايت."); return; }
+
+  const ext = ({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" })[file.type];
+  if (!ext) { toast("الصيغة يجب أن تكون PNG أو JPG أو WebP."); return; }
+
+  const path = `products/${draft.slug}.${ext}`;
+  $("#dropTxt").textContent = "جارٍ الرفع…";
+  try {
+    const r = await fetch(
+      `${CFG.SUPABASE_URL}/storage/v1/object/product-media/${path}?upsert=true`, {
+        method: "POST",
+        headers: { apikey: CFG.SUPABASE_ANON_KEY,
+                   Authorization: `Bearer ${session?.access_token}`,
+                   "x-upsert": "true", "Content-Type": file.type },
+        body: file,
+      });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || `فشل الرفع (${r.status})`);
+    draft.poster_path = path;
+    toast("رُفعت الصورة. لا تنسَ الحفظ.");
+    renderEditor();
+  } catch (e) {
+    toast(e.message);
+    $("#dropTxt").textContent = "اختر صورة البوستر";
+  }
+}
+
+async function saveProduct() {
+  const d = draft;
+  const btn = $("#saveProd");
+
+  /* Mirror the server's rules here so the message names the field, and
+     drop the empty rows the editor always leaves at the end. */
+  if (!d.name.trim()) return toast("اكتب اسم المنتج.");
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(d.slug.trim()))
+    return toast("المعرّف: حروف لاتينية صغيرة وأرقام وشرطات فقط.");
+
+  const payload = {
+    ...d,
+    slug: d.slug.trim(),
+    plans: d.plans.filter(p => String(p.name).trim() && String(p.price).trim() !== ""),
+    features: d.features.map(f => String(f).trim()).filter(Boolean),
+    requirements: d.requirements.filter(r => String(r.label).trim()),
+  };
+  delete payload.__isNew; delete payload.order_count;
+
+  if (payload.status === "published" && !payload.plans.some(p => p.is_active !== false))
+    return toast("منتج معروض للبيع يحتاج خطة نشطة واحدة على الأقل.");
+  for (const p of payload.plans)
+    if (p.old_price && Number(p.old_price) <= Number(p.price))
+      return toast(`«${p.name}»: السعر قبل الخصم يجب أن يكون أكبر من السعر.`);
+
+  btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
+  try {
+    await rpc("admin_upsert_product", { p_payload: payload });
+    toast("حُفظ المنتج.");
+    backToProducts();
+  } catch (e) {
+    toast(PRODUCT_ERRORS[String(e.message).split(":")[0].trim()] || e.message);
+    btn.disabled = false; btn.textContent = "حفظ";
+  }
+}
+
+const PRODUCT_ERRORS = {
+  INVALID_SLUG: "المعرّف غير صالح: حروف لاتينية صغيرة وأرقام وشرطات فقط.",
+  INVALID_NAME: "اسم المنتج مطلوب.",
+  CATEGORY_NOT_FOUND: "التصنيف المختار غير موجود.",
+  PUBLISHED_NEEDS_A_PLAN: "منتج معروض للبيع يحتاج خطة نشطة واحدة على الأقل.",
+  PLAN_NOT_ON_THIS_PRODUCT: "خطة لا تخص هذا المنتج.",
+};
+
+async function archiveProduct() {
+  const d = draft;
+  const used = d.order_count || 0;
+  if (!confirm(used
+    ? `«${d.name}» عليه ${used} طلب سابق. الأرشفة تخفيه من المتجر وتُبقي الطلبات كما هي. متابعة؟`
+    : `أرشفة «${d.name}»؟ سيختفي من المتجر.`)) return;
+  try {
+    await rpc("admin_archive_product", { p_slug: d.slug });
+    toast("أُرشف المنتج.");
+    backToProducts();
+  } catch (e) { toast(e.message); }
+}
+
 /* ---------- view switch ---------- */
 let view = "overview";
+const VIEWS = { overview: loadOverview, queue: loadQueue, products: loadProducts };
 function showView(v) {
   view = v;
-  $("#overview").classList.toggle("hidden", v !== "overview");
-  $("#queue").classList.toggle("hidden", v !== "queue");
+  for (const id of ["overview", "queue", "products"])
+    $("#" + id).classList.toggle("hidden", id !== v);
   $("#detail").classList.add("hidden");
+  $("#editor").classList.add("hidden");
   $$("#tabs .tab").forEach(t => t.setAttribute("aria-current", String(t.dataset.v === v)));
   window.scrollTo({ top: 0, behavior: "instant" });
-  (v === "overview" ? loadOverview() : loadQueue()).catch(e => toast(e.message));
+  (VIEWS[v] || loadOverview)().catch(e => toast(e.message));
 }
 /* ---------- queue ---------- */
 let filter = "pending_payment_review";
@@ -607,6 +1021,7 @@ async function openOrder(id) {
 
   $("#queue").classList.add("hidden");
   $("#overview").classList.add("hidden");
+  $("#products").classList.add("hidden");
   $("#detail").classList.remove("hidden");
   window.scrollTo({ top: 0, behavior: "instant" });
 }
@@ -667,7 +1082,7 @@ $("#back").onclick = () => {
 };
 
 /* the module scope is not global; the browser tests drive these */
-Object.assign(window, { showView, loadOverview, loadQueue });
+Object.assign(window, { showView, loadOverview, loadQueue, loadProducts, openEditor });
 
 if (session?.access_token) showApp(session?.user?.email);
 </script>

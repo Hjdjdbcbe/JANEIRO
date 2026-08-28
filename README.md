@@ -287,6 +287,7 @@ PGUSER="$(whoami)" node tests/frontend/mock-supabase.js &
 node tests/frontend/e2e.test.js    # الكتالوج والسلة والطلب والتتبع
 node tests/frontend/ui.test.js     # الأيقونات والعروض والحركة والعرض الضيق
 node tests/frontend/admin.test.js  # اللوحة: الأرقام والصلاحيات والطلبات
+node tests/frontend/products.test.js # إضافة منتج من اللوحة ثم شراؤه
 ```
 
 في Chromium على `frontend/index.html` نفسه، مقابل Supabase وهمي مدعوم
@@ -476,6 +477,10 @@ update categories set icon_path = 'categories/ai.png' where slug = 'ai';
 
 **الطلبات** — الطابور بحسب الحالة، وتفاصيل الطلب ببيانات التفعيل وأزرار
 نسخ ورابط موقّت للوصل، ونقل الحالة بالأسباب.
+
+**المنتجات** — إضافة وتعديل منتج كامل من شاشة واحدة: البيانات، البوستر
+(يُرفع مباشرة إلى `product-media`)، الخطط والأسعار، المزايا، وحقول
+التفعيل. `docs/add-product.sql` يبقى بديلاً لمن يفضّل SQL.
 
 ### كيف يُحتسب الدخل
 

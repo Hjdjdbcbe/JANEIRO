@@ -159,6 +159,19 @@ async function adminRpc(name, req, res) {
       const rows = await asUser("select admin_dashboard_stats() as r", [], uid);
       return send(res, 200, rows[0].r);
     }
+    if (name === "admin_list_products") {
+      const rows = await asUser("select admin_list_products() as r", [], uid);
+      return send(res, 200, rows[0].r);
+    }
+    if (name === "admin_upsert_product") {
+      const rows = await asUser("select admin_upsert_product($1::jsonb) as r",
+                                [JSON.stringify(body.p_payload)], uid);
+      return send(res, 200, rows[0].r);
+    }
+    if (name === "admin_archive_product") {
+      const rows = await asUser("select admin_archive_product($1) as r", [body.p_slug], uid);
+      return send(res, 200, rows[0].r);
+    }
     if (name === "admin_update_order_status") {
       const rows = await asUser(
         "select admin_update_order_status($1::uuid, $2::order_status, $3) as r",
@@ -309,6 +322,18 @@ http.createServer(async (req, res) => {
   if (url.pathname.startsWith("/functions/v1/"))
     return fn(url.pathname.replace("/functions/v1/", ""), req, res);
   if (url.pathname.startsWith("/storage/v1/object/public/")) return storage(url, res);
+  if (req.method === "POST" && url.pathname.startsWith("/storage/v1/object/product-media/")) {
+    const uid = uidFrom(req);
+    const ok = await asUser("select is_admin() as ok", [], uid).catch(() => [{ ok: false }]);
+    if (!ok[0]?.ok) return send(res, 403, { message: "غير مصرّح لك." });
+    const rel = url.pathname.replace("/storage/v1/object/product-media/", "");
+    const abs = path.join(ROOT, "assets/product-media", rel);
+    if (!abs.startsWith(path.join(ROOT, "assets/product-media")))
+      return send(res, 400, { message: "bad path" });
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, await readBody(req));
+    return send(res, 200, { Key: `product-media/${rel}` });
+  }
 
   /* Test-only reset. The browser suites place real orders, and the
      2-active-order cap is real, so without this a second run of the
