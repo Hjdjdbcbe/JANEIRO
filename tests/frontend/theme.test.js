@@ -94,6 +94,11 @@ const SWEEP = () => {
   let skipped = 0;
   document.querySelectorAll("*").forEach(el => {
     if (el.closest(".sk, .hidden, [aria-hidden='true']")) return;
+    /* The header is FIXED, so what is behind it is a sibling this walk
+       never reaches -- over the hero it composites against the page's
+       ground and reports a failure that is not there. It gets its own
+       pixel-sampled check below instead of a guess here. */
+    if (el.closest("#hd")) { skipped++; return; }
     /* Text sitting on product artwork has a raster background; there is no
        colour to compute against. Counted and reported, never silently dropped. */
     if (el.closest(".poster") && el.closest(".poster").querySelector("img.pimg")) { skipped++; return; }
@@ -281,62 +286,132 @@ const SWEEP = () => {
 
   // ---------- text over imagery ----------
   /* The sweep above composites background COLOURS. Where the ground is an
-     image it has nothing to composite, so it passes silently -- and the
-     hero now sits on artwork. This samples the real rendered pixels
-     instead: hide the copy, photograph the ground it was sitting on, and
-     score the darkest pixel in it against the inks that print there.
+     image it has nothing to composite, so it passes in silence -- and the
+     hero is a photograph. This samples the real rendered pixels: hide the
+     copy, photograph the ground it was sitting on, and score the WORST
+     pixel in it against the inks that actually print there.
 
-     It caught a splatter blob at #9476D9 reaching into the text column,
-     where the lede measured 1.81:1. */
-  const groundContrast = async (vp) => {
+     Worst is not "darkest": the hero used to be light copy-on-white and is
+     now white-on-dark, so the dangerous pixel is whichever is closest in
+     luminance to the ink. Both the inks and the ground are read from the
+     page rather than hard-coded, so this keeps working when the design
+     flips again. */
+  const heroContrast = async (vp, theme) => {
     const g = await newPage({ viewport: vp });
-    await g.addInitScript(() => localStorage.setItem("janeiro-theme", "light"));
+    await g.addInitScript(t => localStorage.setItem("janeiro-theme", t), theme);
+    await g.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+    await g.waitForTimeout(1000);
+    const info = await g.evaluate(() => {
+      /* The extent of the WORDS, not of .heroCopy: its box starts at the
+         top of the hero and its padding runs under the frosted header, so
+         sampling the whole thing measured the header's own near-white
+         glass and called it the artwork. */
+      const parts = [".eyebrow", "h1", ".lede", ".hero-cta"]
+        .map(q => document.querySelector(".hero " + q))
+        .filter(Boolean).map(e => e.getBoundingClientRect());
+      const x0 = Math.min(...parts.map(p => p.left)), x1 = Math.max(...parts.map(p => p.right));
+      const y0 = Math.min(...parts.map(p => p.top)),  y1 = Math.max(...parts.map(p => p.bottom));
+      return {
+        box: { x: Math.max(0, Math.round(x0)), y: Math.max(0, Math.round(y0)),
+               width: Math.round(x1 - x0), height: Math.round(y1 - y0) },
+        inks: [getComputedStyle(document.querySelector(".hero h1")).color,
+               getComputedStyle(document.querySelector(".hero .lede")).color],
+      };
+    });
+    await g.evaluate(() => { document.querySelector(".heroCopy").style.visibility = "hidden"; });
+    await g.waitForTimeout(150);
+    const shot = (await g.screenshot({ clip: info.box })).toString("base64");
+    const out = await g.evaluate(async ({ b64, inks }) => {
+      const img = new Image();
+      await new Promise(r => { img.onload = r; img.src = "data:image/png;base64," + b64; });
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const cx = c.getContext("2d");
+      cx.drawImage(img, 0, 0);
+      const d = cx.getImageData(0, 0, c.width, c.height).data;
+      const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+      const lum = (r, g, b) => .2126 * f(r) + .7152 * f(g) + .0722 * f(b);
+      const ratio = (a, b) => { const [hi, lo] = [a, b].sort((x, y) => y - x); return (hi + .05) / (lo + .05); };
+      const parsed = inks.map(s => { const m = s.match(/[\d.]+/g); return lum(+m[0], +m[1], +m[2]); });
+      // worst = the ground pixel that gives the lowest ratio, per ink
+      const worst = parsed.map(() => ({ r: 99, px: null }));
+      for (let i = 0; i < d.length; i += 4) {
+        const l = lum(d[i], d[i+1], d[i+2]);
+        parsed.forEach((ink, k) => {
+          const v = ratio(ink, l);
+          if (v < worst[k].r) worst[k] = { r: +v.toFixed(2), px: [d[i], d[i+1], d[i+2]] };
+        });
+      }
+      return worst;
+    }, { b64: shot, inks: info.inks });
+    await g.close();
+    return out;
+  };
+
+  for (const [vp, name] of [[{ width: 1440, height: 900 }, "desktop"],
+                            [{ width: 390, height: 844 }, "mobile"],
+                            [{ width: 380, height: 820 }, "380px"]]) {
+    for (const theme of ["light", "dark"]) {
+      const [h, l] = await heroContrast(vp, theme);
+      check(h.r >= 4.5 && l.r >= 4.5,
+        `${name}/${theme}: hero copy holds against the artwork ` +
+        `(heading ${h.r}:1, lede ${l.r}:1, worst pixel rgb(${l.px})`.concat(")"));
+    }
+  }
+
+  /* The header, measured the same way the hero is. It is excluded from the
+     sweep because it is fixed over a sibling, not because it is exempt:
+     over the hero it is a dark glass with white nav, and once scrolled it
+     is the page's own glass with the page's ink. Both states are sampled. */
+  const headerContrast = async (theme, scrolled) => {
+    const g = await newPage({ viewport: { width: 1440, height: 900 } });
+    await g.addInitScript(t => localStorage.setItem("janeiro-theme", t), theme);
     await g.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
     await g.waitForTimeout(900);
-    const box = await g.evaluate(() => {
-      const r = document.querySelector(".hero-grid > div").getBoundingClientRect();
-      return { x: Math.max(0, Math.round(r.x)), y: Math.max(0, Math.round(r.y)),
-               width: Math.round(r.width), height: Math.round(r.height) };
+    if (scrolled) { await g.evaluate(() => window.scrollTo(0, 1200)); await g.waitForTimeout(500); }
+    const info = await g.evaluate(() => {
+      const parts = [...document.querySelectorAll("#hd .nav button, #hd .brand b")];
+      const r = parts.map(p => p.getBoundingClientRect());
+      return {
+        box: { x: Math.round(Math.min(...r.map(b => b.left))), y: Math.round(Math.min(...r.map(b => b.top))),
+               width: Math.round(Math.max(...r.map(b => b.right)) - Math.min(...r.map(b => b.left))),
+               height: Math.round(Math.max(...r.map(b => b.bottom)) - Math.min(...r.map(b => b.top))) },
+        ink: getComputedStyle(parts[1] || parts[0]).color,
+      };
     });
-    await g.evaluate(() => document.querySelectorAll(".hero-grid > div, .hstage")
+    await g.evaluate(() => document.querySelectorAll("#hd .nav button, #hd .brand b")
       .forEach(e => { e.style.visibility = "hidden"; }));
     await g.waitForTimeout(150);
-    const shot = (await g.screenshot({ clip: box })).toString("base64");
-    // decode in the page itself rather than pulling in an image library
-    const worst = await g.evaluate(async b64 => {
+    const shot = (await g.screenshot({ clip: info.box })).toString("base64");
+    const worst = await g.evaluate(async ({ b64, ink }) => {
       const img = new Image();
       await new Promise(r => { img.onload = r; img.src = "data:image/png;base64," + b64; });
       const c = document.createElement("canvas");
       c.width = img.width; c.height = img.height;
       c.getContext("2d").drawImage(img, 0, 0);
       const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      const lum = (r, g, bl) => { const f = v => { v /= 255;
-        return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
-        return .2126 * f(r) + .7152 * f(g) + .0722 * f(bl); };
-      let lo = 2, px = null;
+      const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+      const lum = (r, g, b) => .2126 * f(r) + .7152 * f(g) + .0722 * f(b);
+      const m = ink.match(/[\d.]+/g);
+      const li = lum(+m[0], +m[1], +m[2]);
+      let lo = 99, px = null;
       for (let i = 0; i < d.length; i += 4) {
         const l = lum(d[i], d[i+1], d[i+2]);
-        if (l < lo) { lo = l; px = [d[i], d[i+1], d[i+2]]; }
+        const [hi, low] = [li, l].sort((a, b) => b - a);
+        const v = (hi + .05) / (low + .05);
+        if (v < lo) { lo = v; px = [d[i], d[i+1], d[i+2]]; }
       }
-      return { lum: lo, px };
-    }, shot);
+      return { r: +lo.toFixed(2), px };
+    }, { b64: shot, ink: info.ink });
     await g.close();
-    const on = ink => {
-      const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
-      const l = .2126 * f(ink[0]) + .7152 * f(ink[1]) + .0722 * f(ink[2]);
-      const [hi, low] = [l, worst.lum].sort((a, b) => b - a);
-      return +((hi + .05) / (low + .05)).toFixed(2);
-    };
-    return { hex: worst.px.map(v => v.toString(16).padStart(2, "0")).join(""),
-             ink: on([0x16,0x16,0x2A]), ink2: on([0x5C,0x5C,0x72]) };
+    return worst;
   };
 
-  for (const [vp, name] of [[{ width: 1440, height: 900 }, "desktop"],
-                            [{ width: 390, height: 844 }, "mobile"]]) {
-    const r = await groundContrast(vp);
-    check(r.ink >= 4.5 && r.ink2 >= 4.5,
-      `${name}: hero copy stays legible over the artwork ` +
-      `(darkest ground #${r.hex} -> heading ${r.ink}:1, lede ${r.ink2}:1)`);
+  for (const theme of ["light", "dark"]) {
+    for (const [scrolled, where] of [[false, "over the hero"], [true, "once scrolled"]]) {
+      const r = await headerContrast(theme, scrolled);
+      check(r.r >= 4.5, `${theme}: header nav holds ${where} (${r.r}:1, worst pixel rgb(${r.px}))`);
+    }
   }
 
   check(errs.length === 0, `no page errors: ${errs.slice(0, 3).join(" | ") || "none"}`);

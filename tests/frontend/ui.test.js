@@ -147,66 +147,87 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   });
   check(animatedProps.length === 0, `nothing transitions layout properties${animatedProps.length ? " -> " + animatedProps.slice(0,3) : ""}`);
 
-  // ---------- the hero banner ----------
+  // ---------- the hero ----------
   await page.evaluate(() => window.go("home"));
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
 
   const hero = await page.evaluate(() => {
-    const img = document.querySelector(".heroArt img");
-    const cs = getComputedStyle(img);
+    const el = document.querySelector(".hero");
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    const best = document.querySelector("#bestSec");
     return {
-      src: img.currentSrc.split("/").pop(),
-      loaded: img.naturalWidth > 0,
-      w: img.getAttribute("width"), h: img.getAttribute("height"),
-      priority: img.getAttribute("fetchpriority"),
-      sources: [...document.querySelectorAll(".heroArt source")].length,
-      webpFirst: document.querySelector(".heroArt source").type === "image/webp",
-      orbitGone: document.querySelectorAll("#horbit,.hoBill,.hoRing,.hstage,.hfeat").length === 0,
+      bg: (cs.backgroundImage.match(/hero-[a-z]+/) || [])[0],
+      size: cs.backgroundSize,
+      height: Math.round(r.height),
+      overlay: getComputedStyle(el, "::after").backgroundImage.includes("gradient"),
+      copy: {
+        badge: !!el.querySelector(".eyebrow"),
+        lines: (el.querySelector("h1")?.innerHTML.match(/<br>/g) || []).length + 1,
+        lede: !!el.querySelector(".lede"),
+        buttons: [...el.querySelectorAll(".hero-cta button")].map(b => b.textContent.trim()),
+      },
+      /* the next section starts under the artwork, not a screen later */
+      gapToNext: best ? Math.round(best.getBoundingClientRect().top - r.bottom) : null,
+      nextIsBest: !!best && !!best.querySelector("#bestRail"),
+      // nothing left from the two heroes this replaces
+      stale: document.querySelectorAll(".heroArt,#horbit,.hoBill,#featGrid,.hstage").length,
     };
   });
-  check(hero.loaded, `the banner renders: ${hero.src}`);
-  check(hero.src.includes("wide"), `a desktop column gets the wide crop: ${hero.src}`);
-  check(!!hero.w && !!hero.h, `dimensions are declared so nothing jumps: ${hero.w}x${hero.h}`);
-  check(hero.priority === "high", "the banner is fetched at high priority");
-  check(hero.sources === 3 && hero.webpFirst, `webp is offered first with a png fallback (${hero.sources} sources)`);
-  check(hero.orbitGone, "no orbit left behind");
+  check(hero.bg === "hero-desktop", `a desktop column gets the wide crop: ${hero.bg}`);
+  check(hero.size === "cover", `the artwork covers its section: ${hero.size}`);
+  check(hero.height <= 640, `desktop height is capped: ${hero.height}px`);
+  check(hero.overlay, "a reading layer sits over the artwork");
+  check(hero.copy.badge && hero.copy.lines === 2 && hero.copy.lede,
+        `badge, a two-line heading and a lede (${hero.copy.lines} lines)`);
+  check(hero.copy.buttons.length === 2,
+        `two real buttons, not painted into the image: ${hero.copy.buttons.join(" / ")}`);
+  check(hero.nextIsBest, "الأكثر طلباً is the section directly under the hero");
+  check(hero.gapToNext !== null && hero.gapToNext <= 4,
+        `no dead space between them: ${hero.gapToNext}px`);
+  check(hero.stale === 0, "nothing left over from the previous heroes");
 
-  /* The copy has to sit in the half the artwork left clear. RTL grid
-     numbering runs right-to-left, and naming the wrong column once put
-     the whole block over the banner's black logo. */
-  const side = await page.evaluate(() => {
-    const c = document.querySelector(".heroCopy").getBoundingClientRect();
-    return { mid: c.left + c.width / 2, vw: window.innerWidth };
-  });
-  check(side.mid > side.vw / 2, `the copy sits on the clear right side (centre at ${Math.round(side.mid)} of ${side.vw})`);
-
-  check(await page.locator(".trustline .tpoint").count() === 4, "four trust badges");
-  check(await page.evaluate(() =>
-    getComputedStyle(document.querySelector(".trustline")).gridTemplateColumns.split(" ").length) === 4,
-    "trust badges sit four across on a desktop column");
-
-  // ---------- the featured strip ----------
-  const feat = await page.evaluate(() => {
-    const cards = [...document.querySelectorAll("#featGrid .pcard")];
+  // ---------- the header ----------
+  const head = await page.evaluate(() => {
+    const h = document.querySelector("#hd");
+    const cs = getComputedStyle(document.querySelector(".hshell"));
     return {
-      n: cards.length,
-      priced: cards.filter(c => /\d/.test(c.querySelector(".pprice")?.textContent || "")).length,
-      buttons: cards.filter(c => c.querySelector(".btn")).length,
-      seeAll: !!document.querySelector("#featuredSec .arclink"),
+      handle: h.textContent.includes("@janeiro_service"),
+      nav: [...h.querySelectorAll(".nav button")].map(b => b.textContent.trim()),
+      navShown: getComputedStyle(h.querySelector(".nav")).display !== "none",
+      burgerShown: getComputedStyle(h.querySelector(".menu-btn")).display !== "none",
+      glass: cs.backdropFilter && cs.backdropFilter !== "none",
+      translucent: !/^rgb\(/.test(cs.backgroundColor),   // rgba, not opaque
+      badge: !!h.querySelector("#cartBadge"),
+      strokes: [...h.querySelectorAll(".ibtn svg")].map(s => s.getAttribute("stroke-width")),
+      iconSize: getComputedStyle(h.querySelector(".ibtn svg")).width,
     };
   });
-  check(feat.n > 0 && feat.n <= 4, `the featured strip shows real products: ${feat.n}`);
-  check(feat.priced === feat.n, `every card carries a price: ${feat.priced}/${feat.n}`);
-  check(feat.buttons === feat.n, `every card has a way to buy: ${feat.buttons}/${feat.n}`);
-  check(feat.seeAll, "a see-all link sits beside the heading");
+  check(!head.handle, "the @handle is gone from the header");
+  check(head.nav.join(" ") === "الرئيسية المنتجات العروض تواصل معنا", `nav reads: ${head.nav.join(" / ")}`);
+  check(head.navShown && !head.burgerShown, "a desktop column shows the links, not the burger");
+  check(head.glass, `the bar is frosted: ${head.glass}`);
+  check(head.translucent, "and translucent, so the artwork shows through");
+  check(head.badge, "the cart carries its badge");
+  check(head.strokes.every(w => +w <= 1.6), `icon strokes are thin: ${[...new Set(head.strokes)].join(",")}`);
+  check(head.iconSize === "21px", `icons share one size: ${head.iconSize}`);
 
-  await page.locator("#featuredSec .arclink").click();
-  await page.waitForTimeout(400);
-  check(await page.evaluate(() => !document.getElementById("shop").classList.contains("hidden")),
-        "see-all opens the shop");
-  await page.evaluate(() => window.go("home"));
+  // the search is an icon until it is asked for
+  check(await page.evaluate(() => !document.getElementById("hsearch").classList.contains("open")),
+        "the search starts collapsed");
+  check(await page.evaluate(() => document.getElementById("deskSearch").tabIndex) === -1,
+        "and is out of the tab order while collapsed");
+  await page.click("#hsToggle");
+  await page.waitForTimeout(350);
+  check(await page.evaluate(() => document.getElementById("hsearch").classList.contains("open")),
+        "clicking the icon expands it");
+  check(await page.evaluate(() => document.activeElement.id) === "deskSearch",
+        "and puts the caret in it");
+  await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
+  check(await page.evaluate(() => !document.getElementById("hsearch").classList.contains("open")),
+        "escape closes it again");
 
   // cart pulse fires once
   await page.evaluate(() => document.querySelector("#cartBadge").classList.remove("cartpulse"));

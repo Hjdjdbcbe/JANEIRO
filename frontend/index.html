@@ -20,6 +20,8 @@
 <meta property="og:description" content="اشتراكات ومنتجات رقمية موثوقة بأسعار مناسبة للسوق الجزائري وتفعيل سريع.">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="ar_DZ">
+<link rel="preload" href="assets/hero/hero-mobile.webp" as="image" media="(max-width:767px)" fetchpriority="high">
+<link rel="preload" href="assets/hero/hero-desktop.webp" as="image" media="(min-width:768px)" fetchpriority="high">
 <link rel="preload" href="assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/lalezar-400-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <script>
@@ -103,6 +105,8 @@
   --tint-2:rgba(26,26,46,.09);
   --scrim:rgba(17,19,26,.42);
   --bar-bg:rgba(255,255,255,.94);
+  --glass:rgba(255,255,255,.62);
+  --glass-solid:rgba(255,255,255,.90);
 
   /* ---- brand ----
      --purple/--blue are the identity and never change: as a BACKGROUND
@@ -217,6 +221,8 @@
   --tint-2:rgba(255,255,255,.12);
   --scrim:rgba(0,0,0,.62);
   --bar-bg:rgba(15,15,26,.94);
+  --glass:rgba(26,26,46,.55);
+  --glass-solid:rgba(26,26,46,.88);
 
   --accent-ink:#B79BFF;      /*  8.2:1 on --bg, 6.3:1 on --accent-soft */
   --accent-ink-2:#8FD2FF;    /* 11.5:1 on --bg */
@@ -329,163 +335,183 @@ img,svg{display:block}
 .btn-soft:hover{background:var(--surface-hover)}
 .btn-block{display:flex;width:100%}
 
-/* ============ HEADER ============ */
+/* ============ HEADER ============
+   Frosted rather than solid: the hero behind it is a dark photograph, and
+   an opaque bar cut a hard line across it. It firms up after the first
+   scroll, when what is behind it is ordinary page rather than artwork. */
 header{position:fixed;top:0;left:0;right:0;z-index:60;padding:12px var(--s3) 0;
   transition:padding .25s}
 header.stuck{padding-top:8px}
-.hshell{max-width:1180px;margin-inline:auto;background:var(--card);
-  border:1px solid var(--line);border-radius:20px;box-shadow:0 6px 20px rgba(8,9,20,.10);transition:box-shadow .25s}
-header.stuck .hshell{box-shadow:0 8px 26px rgba(8,9,20,.14)}
+.hshell{max-width:1180px;margin-inline:auto;border-radius:20px;
+  border:1px solid var(--line);
+  background:var(--glass);
+  box-shadow:0 6px 20px rgba(8,9,20,.10);
+  transition:box-shadow .25s,background .25s}
+@supports(backdrop-filter:blur(1px)){
+  .hshell{backdrop-filter:blur(16px) saturate(140%)}
+}
+header.stuck .hshell{background:var(--glass-solid);box-shadow:0 8px 26px rgba(8,9,20,.16)}
+
+/* At the top the bar floats over the hero, which is a dark photograph in
+   BOTH themes -- a white glass there turns muddy grey and takes the nav
+   down with it. So the bar borrows the hero's world until the first
+   scroll, then returns to the page's. This is the same "less transparent
+   after scrolling" behaviour, doing double duty. */
+html[data-page="home"] header:not(.stuck) .hshell{background:rgba(18,16,38,.44);border-color:rgba(255,255,255,.16)}
+html[data-page="home"] header:not(.stuck) .hbar,
+html[data-page="home"] header:not(.stuck) .brand b,
+html[data-page="home"] header:not(.stuck) .ibtn{color:#fff}
+html[data-page="home"] header:not(.stuck) .nav button{color:rgba(255,255,255,.78)}
+html[data-page="home"] header:not(.stuck) .nav button:hover,
+html[data-page="home"] header:not(.stuck) .nav button.on{color:#fff}
+html[data-page="home"] header:not(.stuck) .ibtn:hover{background:rgba(255,255,255,.14);color:#fff}
+html[data-page="home"] header:not(.stuck) .cbadge{box-shadow:0 0 0 2px rgba(18,16,38,.9)}
 @media(min-width:768px){header{padding-inline:var(--s8)}}
-.hbar{display:flex;align-items:center;gap:var(--s3);height:54px;padding-inline:var(--s4);
-  color:var(--text-on-light);transition:height .25s}
-header.stuck .hbar{height:48px}
-@media(min-width:900px){.hbar{height:62px;padding-inline:var(--s6)}header.stuck .hbar{height:54px}}
-.brand{display:flex;align-items:center;gap:9px;cursor:pointer;flex:none}
-/* the real mark replaces the J monogram; the gradient tile stays as the
-   fallback if the file is ever missing */
+
+.hbar{display:flex;align-items:center;gap:var(--s2);height:60px;padding-inline:var(--s4);
+  color:var(--ink);transition:height .25s}
+header.stuck .hbar{height:54px}
+@media(min-width:900px){.hbar{height:68px;padding-inline:var(--s6);gap:var(--s3)}
+  header.stuck .hbar{height:58px}}
+
+.brand{display:flex;align-items:center;gap:10px;cursor:pointer;flex:none}
 .jmark img{width:100%;height:100%;object-fit:contain;border-radius:inherit;display:block}
 .jmark:has(img){background:none;box-shadow:none}
-.jmark{width:34px;height:34px;border-radius:11px;background:var(--brand-grad);color:#fff;
-  display:grid;place-items:center;font-family:var(--f-display);font-weight:400;font-size:18px;
+.jmark{width:42px;height:42px;border-radius:13px;background:var(--brand-grad);color:#fff;
+  display:grid;place-items:center;font-family:var(--f-display);font-weight:400;font-size:20px;
   box-shadow:0 4px 12px -3px rgba(108,53,255,.55);flex:none}
-.brand b{font-family:var(--f-display);font-weight:400;font-size:16.5px;letter-spacing:normal;color:var(--text-on-light)}
-.brand span{display:block;font-size:10px;color:var(--muted-on-light);line-height:1;margin-top:1px;font-weight:400}
-.nav{display:none;align-items:center;gap:var(--s6);margin-inline-start:var(--s8);font-size:14px;font-weight:500}
-.nav button{color:var(--muted-on-light);transition:color .15s;padding:4px 0;position:relative}
-.nav button:hover,.nav button.on{color:var(--text-on-light)}
+@media(min-width:900px){.jmark{width:46px;height:46px;border-radius:14px}}
+.brand b{font-family:var(--f-display);font-weight:400;font-size:17px;letter-spacing:normal;
+  color:var(--ink);white-space:nowrap}
+@media(min-width:900px){.brand b{font-size:19px}}
+
+.nav{display:none;align-items:center;gap:var(--s6);margin-inline:var(--s6);font-size:14px;font-weight:500}
+.nav button{color:var(--ink-2);transition:color .15s;padding:4px 0;position:relative}
+.nav button:hover,.nav button.on{color:var(--ink)}
 .nav button.on::after{content:"";position:absolute;bottom:-2px;inset-inline:0;height:2px;
   background:var(--brand-grad);border-radius:2px}
 @media(min-width:900px){.nav{display:flex}}
 .hspace{margin-inline-start:auto}
-.hsearch{display:none;align-items:center;gap:var(--s2);background:var(--bg-2);border:1px solid var(--line);
-  border-radius:var(--r-pill);padding:9px 16px;width:230px;transition:border-color .18s,background .18s}
-.hsearch:focus-within{border-color:var(--accent-ink);background:var(--card)}
-.hsearch input{border:0;outline:0;background:none;width:100%;font-size:13.5px;color:var(--text-on-light)}
-.hsearch svg{color:var(--muted-on-light);flex:none}
-@media(min-width:900px){.hsearch{display:flex}}
+
+/* An icon until it is asked for, then a field. The field OVERLAYS the bar
+   rather than widening it: animating width and padding would reflow the
+   whole header every frame, which is exactly what this project's motion
+   rule forbids -- and its test caught it. Only opacity and transform move,
+   both on the compositor. The input stays in the DOM so a typed query
+   survives the collapse, and leaves the tab order while hidden so keyboard
+   users never land on a field they cannot see. */
+.hsearch{position:relative;width:38px;flex:none;display:flex;align-items:center}
+.hsearch input{
+  position:absolute;inset-inline-end:0;top:50%;width:min(250px,52vw);
+  height:38px;padding:0 40px 0 14px;border:1px solid var(--line);border-radius:var(--r-pill);
+  background:var(--surface);color:var(--ink);font-size:13.5px;outline:0;
+  transform:translateY(-50%) translateX(-6px);opacity:0;visibility:hidden;
+  /* visibility is stepped, not faded: transitioning it would keep the
+     field hidden for the whole 200ms on the way IN -- long enough that
+     focus() is dropped on a field that is not there yet. Zero duration,
+     delayed only on the way OUT so the fade still plays. */
+  transition:opacity var(--t-ui) ease,transform var(--t-ui) var(--ease-out),
+             visibility 0s linear var(--t-ui)}
+.hsearch.open input{transform:translateY(-50%);opacity:1;visibility:visible;
+  transition:opacity var(--t-ui) ease,transform var(--t-ui) var(--ease-out),visibility 0s}
+.hsearch.open input:focus{border-color:var(--accent-ink);box-shadow:var(--ring)}
+.hsearch .hsbtn{position:relative;z-index:1}
+.hsearch input::-webkit-search-cancel-button{-webkit-appearance:none}
+
 .ibtn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;
-  color:var(--text-on-light);position:relative;transition:background .15s}
-.ibtn:hover{background:var(--surface)}
-.cbadge{position:absolute;top:2px;inset-inline-end:2px;background:var(--purple);color:#fff;
-  font-family:var(--f-mono);font-size:9.5px;font-weight:600;min-width:16px;height:16px;
-  border-radius:var(--r-pill);display:grid;place-items:center;padding:0 4px;
-  box-shadow:0 0 0 2px var(--light-card)}
+  color:var(--ink);position:relative;transition:background .15s,color .15s}
+.ibtn svg{width:21px;height:21px}
+.ibtn:hover{background:var(--surface);color:var(--accent-ink)}
+.cbadge{position:absolute;top:1px;inset-inline-end:1px;background:var(--purple);color:#fff;
+  font-family:var(--f-mono);font-size:9.5px;font-weight:600;min-width:18px;height:18px;
+  border-radius:50%;display:grid;place-items:center;padding:0 4px;
+  box-shadow:0 0 0 2px var(--card)}
 .menu-btn{display:grid}
 @media(min-width:900px){.menu-btn{display:none}}
-.hcta{display:none}
-@media(min-width:900px){.hcta{display:inline-flex;padding:10px 18px;font-size:13.5px}}
 
-/* ============ HERO ============ */
+/* ============ HERO ============
+   The artwork is the section's ground, and it is dark in both themes --
+   a deliberate fixed surface, like the product poster. Everything printed
+   on it is therefore light, and takes its colours from the hero's own set
+   rather than the page's, which would flip underneath it.
 
-
-.hero{padding:var(--hdr-space) 0 var(--s16);position:relative;overflow:hidden;
-  background:
-    radial-gradient(circle at 20% 10%, var(--glow-1), transparent 42%),
-    radial-gradient(circle at 90% 80%, var(--glow-2), transparent 38%),
-    var(--bg);
+   Two compositions, not two sizes: the wide one carries its logos on the
+   left and leaves the right clear, the square one stacks them above a
+   clear lower half. Preloaded with a media attribute so the right one is
+   requested before the stylesheet resolves it. */
+.hero{
+  --hero-ink:#FFFFFF;
+  --hero-ink-2:#CFCBE8;
+  position:relative;isolation:isolate;display:flex;
+  /* Top-aligned on a phone: the copy is placed by its own padding, just
+     under the ticket line printed in the artwork. Bottom-aligning it
+     pushed that padding down as one block and opened a dead band between
+     the line and the first word. On desktop the artwork fills the section,
+     so the copy is centred in it. */
+  align-items:flex-start;
+  min-height:85vh;
+  /* Fitted to the WIDTH on a phone, not covered. The crop is square and
+     the section is 85vh tall, so cover scaled it until all four logos ran
+     off both edges. At 100% width the composition stays whole, occupying
+     the top square, and the flat ground it already fades to carries the
+     rest -- which is where the copy goes, below the dotted line printed in
+     the artwork itself. */
+  background:#0B0B1A url(assets/hero/hero-mobile.webp) center top/100% auto no-repeat;
 }
-@media(min-width:900px){.hero{padding-top:calc(var(--hdr-space) + var(--s8));padding-bottom:var(--s20)}}
-.hero-grid{position:relative;z-index:1;display:grid;gap:var(--s12);align-items:center}
-/* the glows sit over the artwork, the content over both */
-.hero>*{position:relative;z-index:1}
-@media(min-width:900px){.hero-grid{grid-template-columns:1.02fr .98fr;gap:var(--s8)}}
-.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
-  color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);
-  padding:6px 14px;border-radius:var(--r-pill);margin-bottom:var(--s4)}
-.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent-ink)}
-.hero h1{font-size:clamp(30px,7.6vw,52px);letter-spacing:normal;line-height:1.34;color:var(--ink)}
-.hero h1 .g{background:var(--grad-head);-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero .lede{color:var(--muted-on-dark);font-size:15.5px;margin-top:var(--s4);max-width:46ch}
+@media(min-width:768px){
+  .hero{align-items:flex-end;min-height:60vh;max-height:640px;
+    background-image:url(assets/hero/hero-desktop.webp);
+    background-position:left center;background-size:cover}
+}
+/* Reading layer: the artwork's lower half is dark but not uniform, and the
+   copy sits on it. Measured against the rendered pixels, not guessed. */
+/* stops in vw on the phone so they follow the artwork, which is a square
+   at the top rather than a stretched cover */
+.hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to bottom,
+    rgba(11,11,26,0) 42vw, rgba(11,11,26,.72) 76vw, rgba(11,11,26,.94) 96vw)}
+@media(min-width:768px){
+  .hero::after{background:linear-gradient(to top,
+    rgba(11,11,26,.94) 0%, rgba(11,11,26,.86) 26%,
+    rgba(11,11,26,.55) 52%, rgba(11,11,26,0) 82%)}
+}
+
+.heroCopy{position:relative;z-index:1;width:100%;
+  padding-top:76vw;padding-bottom:var(--s10,40px)}
+@media(min-width:768px){.heroCopy{padding-top:calc(var(--hdr-space) + var(--s8))}}
+/* The wide crop carries its logos on the left, so the copy is held to the
+   clear half. Without this the block spans the full width -- the words
+   still sit right, but the h1 box reaches across the artwork and the first
+   line lands on a lit tile. inline-end is the LEFT here. */
+@media(min-width:768px){
+  .heroCopy{padding-inline-end:46%;padding-bottom:var(--s12)}
+}
+@media(min-width:1220px){.heroCopy{padding-inline-end:48%}}
+
+.hero .eyebrow{color:#D8C9FF;background:rgba(124,58,237,.28);
+  border:1px solid rgba(196,181,253,.42)}
+.hero .eyebrow::before{background:#D8C9FF}
+.hero h1{font-size:clamp(28px,7.6vw,50px);letter-spacing:normal;line-height:1.34;
+  color:var(--hero-ink)}
+.hero h1 .g{background:linear-gradient(120deg,#C4B5FD,#7DD3FC);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lede{color:var(--hero-ink-2);font-size:15.5px;margin-top:var(--s4);max-width:44ch}
 .hero-cta{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
-.hero .btn-ghost{background:var(--tint-1);color:var(--ink);border:1px solid var(--line-2)}
-.hero .btn-ghost:hover{background:var(--tint-2);border-color:var(--accent-line)}
-/* A grid, not wrapping flex. Four items of unequal width wrapped 3+1 at
-   most phone widths and 2+2 at a few, which reads as a mistake rather
-   than a row -- 2x2 on a phone, four across above it, always even. */
-.trustline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:var(--s3) var(--s4);margin-top:var(--s6);
-  padding-top:var(--s6);border-top:1px solid var(--line)}
-@media(min-width:560px){.trustline{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.tpoint{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);
-  font-weight:500;min-width:0}
-.tpoint span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tpoint i{width:26px;height:26px;border-radius:9px;background:var(--tint-1);color:var(--accent-ink);
-  display:grid;place-items:center;flex:none}
-.tpoint svg{width:14px;height:14px}
+/* The blue stop is #2563EB, not #3B82F6. White on #3B82F6 measures
+   3.68:1 -- the label fails where the gradient reaches its blue end. Same
+   hue, one step darker, and the white clears 5.2:1. The purple start is
+   untouched at 5.7:1. */
+.hbtn-1{background:linear-gradient(120deg,#7C3AED,#2563EB);color:#fff;border-radius:12px;
+  box-shadow:0 10px 26px -10px rgba(124,58,237,.9)}
+.hbtn-1:hover{box-shadow:0 12px 30px -8px rgba(124,58,237,1)}
+.hbtn-2{background:rgba(255,255,255,.10);color:var(--hero-ink);border-radius:12px;
+  border:1px solid rgba(255,255,255,.34)}
+@supports(backdrop-filter:blur(1px)){.hbtn-2{backdrop-filter:blur(8px)}}
+.hbtn-2:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)}
 
-/* ============ HERO BANNER ============
-   The artwork is a real <img>, not a CSS background: it is the largest
-   thing on the page and the first thing painted, so it carries
-   width/height to reserve its box and fetchpriority to be requested ahead
-   of the stylesheet's own assets. A background-image would not be
-   discovered until the CSS parsed.
-
-   Layered with grid rather than absolute positioning, so the hero is as
-   tall as whichever is taller -- artwork or copy -- and the copy can
-   never be clipped by a short image. */
-/* The header is fixed and opaque, and the phone crop puts the logo right
-   at the top of the artwork -- with no offset the header sat on it and
-   cut it in half. The wide crop opens on empty splatter, so it needs
-   none. Both layers are grid items, so the offset moves the artwork and
-   its gradient together and the vw stops stay aligned. */
-.hero{padding:var(--hdr-space) 0 0;position:relative;overflow:hidden;display:grid;
-  isolation:isolate;background:var(--bg)}
-@media(min-width:900px){.hero{padding:0}}
-.hero>*{grid-area:1/1}
-/* On a phone the artwork keeps its own 4:5 and sits at the top, with the
-   page ground continuing beneath it. Stretching it to the hero's height
-   instead would rescale it every time the copy grew a line -- and cover
-   was enlarging the logo down into the words. */
-.heroArt{display:block;z-index:0;align-self:start}
-.heroArt img{display:block;width:100%;height:auto}
-@media(min-width:900px){
-  .heroArt{align-self:stretch;height:100%}
-  .heroArt img{height:100%;object-fit:cover;object-position:left center}
-}
-
-/* The copy sits where the artwork was composed to leave room: the lower
-   half of the tall crop, the right side of the wide one. */
-.hero-grid{position:relative;z-index:2;display:grid;align-content:start;
-  padding-top:66vw;padding-bottom:var(--s12)}
-@media(min-width:900px){
-  /* One column of copy, sitting in the half the artwork left clear. In
-     RTL, grid column 1 IS the physical right -- naming column 2 put the
-     text over the banner's black logo, where it measured 1.18:1. The
-     empty second column is what holds it there. */
-  .hero-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-content:center;
-    padding-top:calc(var(--hdr-space) + var(--s8));padding-bottom:var(--s16)}
-}
-
-/* Readability, measured rather than assumed. The artwork is light and
-   busy; --ink-2 over its splatter measured 1.8:1 before a wash existed.
-   This one fades to the page's own ground, so the dark theme resolves it
-   without a second rule. */
-/* The stops are where they are because the copy is measured against what
-   is actually behind it, not because they looked about right: the wash
-   has to be FULLY opaque everywhere a word lands, and only then fade.
-   Half-covering left the lede on splatter at 2.9:1. */
-/* Stops in vw, not %, so they track the ARTWORK rather than the hero: the
-   hero grows with the copy, and percentage stops slid off the image every
-   time it did. The tall crop is 125vw high and its subject ends around
-   77vw, which is where the copy begins. */
-/* The phone crop is the artwork's subject with its empty lower half
-   removed -- 63vw instead of 125vw, so the heading is on the first screen
-   without scrolling. The copy sits below it rather than on it, and the
-   gradient dissolves the bottom edge into the page instead of cutting it.
-   Stops are in vw so they track the artwork, not the hero: the hero grows
-   with the copy and percentage stops slid off the image when it did. */
-.hero::after{content:"";grid-area:1/1;z-index:1;pointer-events:none;
-  background:linear-gradient(to bottom,transparent 40vw,var(--bg) 63vw,var(--bg) 100%)}
-@media(min-width:900px){
-  .hero::after{background:linear-gradient(to left,var(--bg) 0%,var(--bg) 47%,transparent 78%)}
-}
-
-/* Dark theme: the banner is a near-white ground and cannot simply be
-   dropped on. Dimming it keeps the composition -- the logo and the tiles
-   still read -- and lets the page's own surface set the level. A dark
-   frame around a bright rectangle would only make the rectangle louder. */
-[data-theme="dark"] .heroArt img{filter:brightness(.36) saturate(.85)}
+/* the first section starts right under the artwork, not a screen later */
+#bestSec{padding-top:var(--s6)}
+@media(min-width:900px){#bestSec{padding-top:var(--s12)}}
 
 /* ============ HOME — DARK PREMIUM CANVAS ============ */
 #home{background:var(--page-bg);color:var(--text-on-dark)}
@@ -970,37 +996,45 @@ footer ul button:hover{color:var(--text-on-dark)}
 <header id="hd">
   <div class="hshell">
   <div class="wrap hbar">
-    <button class="ibtn menu-btn" onclick="openPanel('menu')" aria-label="القائمة">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
+    <!-- right in RTL: the mark and the name -->
     <div class="brand" onclick="go('home')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')go('home')">
-      <div class="jmark" aria-hidden="true"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div>
-      <div><b>Janeiro Store</b><span class="mono">@janeiro_service</span></div>
+      <div class="jmark" aria-hidden="true"><img src="assets/janeiro-logo.png" alt="" width="42" height="42"></div>
+      <b>Janeiro Store</b>
     </div>
+
+    <!-- centre: desktop only -->
     <nav class="nav" id="mainNav" aria-label="التنقل الرئيسي">
       <button data-nav="home" onclick="go('home')">الرئيسية</button>
-      <button data-nav="shop" onclick="go('shop','all')">كل المنتجات</button>
-      <button data-nav="about" onclick="go('about')">من نحن</button>
-      <button data-nav="track" onclick="go('track')">تتبع الطلب</button>
+      <button data-nav="shop" onclick="go('shop','all')">المنتجات</button>
+      <button data-nav="offers" onclick="go('shop','__offers')">العروض</button>
+      <button onclick="contactWhatsApp()">تواصل معنا</button>
     </nav>
+
     <div class="hspace"></div>
-    <div class="hsearch">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
-      <label class="sr" for="deskSearch">بحث</label>
-      <input id="deskSearch" placeholder="ابحث عن ChatGPT، Canva…" oninput="doSearch(this.value)">
+
+    <!-- left in RTL: the actions -->
+    <div class="hsearch" id="hsearch">
+      <button class="ibtn hsbtn" onclick="toggleHeaderSearch()" aria-label="بحث" aria-expanded="false" id="hsToggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6" stroke-linecap="round"/></svg>
+      </button>
+      <label class="sr" for="deskSearch">ابحث عن منتج</label>
+      <input id="deskSearch" type="search" placeholder="ابحث عن ChatGPT، Canva…"
+             oninput="doSearch(this.value)" tabindex="-1">
     </div>
-    <button class="ibtn" onclick="openSearch()" aria-label="بحث" id="mSearchBtn">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4" stroke-linecap="round"/></svg>
-    </button>
-    <button class="ibtn themebtn" onclick="toggleTheme()" id="themeBtn" aria-label="تبديل المظهر" aria-pressed="false" title="تبديل المظهر">
-      <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
-      <svg class="moon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z"/></svg>
-    </button>
+
     <button class="ibtn" onclick="openPanel('cart')" aria-label="سلة المشتريات">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.3 10.8a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.3 10.8a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
       <span class="cbadge hidden" id="cartBadge">0</span>
     </button>
-    <button class="btn btn-primary hcta" onclick="go('shop','all')">تصفح المنتجات</button>
+
+    <button class="ibtn themebtn" onclick="toggleTheme()" id="themeBtn" aria-label="تبديل المظهر" aria-pressed="false" title="تبديل المظهر">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z"/></svg>
+    </button>
+
+    <button class="ibtn menu-btn" onclick="openPanel('menu')" aria-label="القائمة">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
   </div>
   </div>
 </header>
@@ -1023,6 +1057,8 @@ footer ul button:hover{color:var(--text-on-dark)}
       <button onclick="go('shop','__offers');closePanels()">العروض</button>
       <button onclick="go('about');closePanels()">من نحن</button>
       <button onclick="go('track');closePanels()">تتبع الطلب</button>
+      <button onclick="contactWhatsApp();closePanels()">تواصل معنا</button>
+      <button onclick="toggleTheme()" id="menuTheme">تبديل المظهر</button>
       <button onclick="go('policies');closePanels()">السياسات والشروط</button>
     </div>
     <div class="mlabel">تصفح حسب التصنيف</div>
@@ -1051,49 +1087,27 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= HOME ================= -->
 <main id="home">
   <section class="hero">
-    <!-- Two crops, chosen by media rather than by srcset widths: they are
-         different compositions, not two sizes of one. The wide one leaves
-         its right side clear for the copy, the tall one leaves its bottom.
-         Dimensions sit on the img so the box is reserved before it decodes
-         and nothing below it jumps. -->
-    <picture class="heroArt">
-      <source media="(min-width:900px)" type="image/webp" srcset="assets/hero/banner-wide.webp">
-      <source media="(min-width:900px)"                   srcset="assets/hero/banner-wide.png">
-      <source type="image/webp" srcset="assets/hero/banner-mobile-tight.webp">
-      <img src="assets/hero/banner-mobile-tight.png" alt=""
-           width="1122" height="708" fetchpriority="high" decoding="async">
-    </picture>
-    <div class="wrap hero-grid">
-      <div class="heroCopy">
-        <span class="eyebrow">متجر رقمي جزائري</span>
-        <h1>كل أدواتك الرقمية،<br><span class="g">في مكان واحد.</span></h1>
-        <p class="lede">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
-        <div class="hero-cta">
-          <button class="btn btn-primary" onclick="go('shop','all')">تصفح المنتجات</button>
-          <button class="btn btn-ghost" onclick="go('shop','__offers')">اكتشف العروض</button>
-        </div>
-        <div class="trustline">
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/></svg></i><span>تفعيل سريع</span></div>
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></i><span>دفع آمن</span></div>
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/></svg></i><span>دعم مباشر</span></div>
-          <div class="tpoint"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5 4.5 6v6c0 4.5 3.2 8.3 7.5 9.5 4.3-1.2 7.5-5 7.5-9.5V6L12 2.5Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg></i><span>منتجات موثوقة</span></div>
-        </div>
+    <div class="wrap heroCopy">
+      <span class="eyebrow">متجر رقمي جزائري</span>
+      <h1>كل أدواتك الرقمية،<br><span class="g">في مكان واحد.</span></h1>
+      <p class="lede">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
+      <div class="hero-cta">
+        <button class="btn hbtn-1" onclick="go('shop','all')">تصفح المنتجات</button>
+        <button class="btn hbtn-2" onclick="go('shop','__offers')">اكتشف العروض</button>
       </div>
-
     </div>
   </section>
 
-  <section class="sec" id="featuredSec">
+  <section class="sec" id="bestSec">
     <div class="wrap">
       <div class="sechead rv">
-        <div><h2>المنتجات المميّزة</h2><p>مختارة من الكتالوج، بأسعارها الحالية</p></div>
-        <button class="arclink" onclick="go('shop','all')">عرض الكل
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>
-        </button>
+        <div><h2>الأكثر طلباً</h2><p>المنتجات التي يطلبها عملاؤنا أكثر</p></div>
+        <button class="arclink" onclick="go('shop','__best')">عرض الكل ←</button>
       </div>
-      <div class="pgrid rv" id="featGrid"></div>
+      <div class="rail rv" id="bestRail"></div>
     </div>
   </section>
+
 
   <section class="sec tint" style="padding-bottom:var(--s8)">
     <div class="wrap">
@@ -1136,16 +1150,6 @@ footer ul button:hover{color:var(--text-on-dark)}
         </div>
       </div>
       <div class="rail rv" id="dealsRail"></div>
-    </div>
-  </section>
-
-  <section class="sec">
-    <div class="wrap">
-      <div class="sechead rv">
-        <div><h2>الأكثر طلباً</h2><p>المنتجات التي يطلبها عملاؤنا أكثر</p></div>
-        <button class="arclink" onclick="go('shop','__best')">عرض الكل ←</button>
-      </div>
-      <div class="rail rv" id="bestRail"></div>
     </div>
   </section>
 
@@ -1900,29 +1904,9 @@ function renderHome(){
     return `<div class="pbox" style="--rot:${rot}deg">${brandLogo(p,30)}</div>`;
   }).join("");
 
-  renderFeatured();
 }
 
-/* The featured strip under the banner. Real products, real prices, the
-   same card the shop uses -- so what is promoted looks exactly like what
-   is bought, and there is one card component to keep right.
 
-   Chosen from the catalogue, never from a list of slugs here: what the
-   shop is pushing first (hot, then a live offer), then anything else on
-   sale. Renders nothing at all rather than padding the row out with
-   placeholders. */
-function renderFeatured(){
-  const grid = $("#featGrid"), sec = $("#featuredSec");
-  if(!grid || !sec) return;
-  const rank = p => p.badge === "hot" ? 0 : p.badge === "off" ? 1 : p.badge === "new" ? 2 : 3;
-  const picks = PRODUCTS
-    .filter(p => p.available && p.plans.length)
-    .sort((a, b) => rank(a) - rank(b))
-    .slice(0, 4);
-  sec.classList.toggle("hidden", picks.length === 0);
-  grid.innerHTML = picks.map(cardHTML).join("");
-  staggerIn("#featGrid");
-}
 let shopFilter="all", shopQuery="";
 function renderShop(){
   let list=PRODUCTS.slice();
@@ -1949,6 +1933,32 @@ function doSearch(v){
 }
 function openSearch(){ go("shop"); setTimeout(()=>$("#shopSearch").focus(),320); }
 
+/* The header search is an icon until it is asked for. The input stays in
+   the DOM either way so a typed query survives the collapse; it is only
+   taken out of the tab order while hidden, so keyboard users do not land
+   on a field they cannot see. */
+function toggleHeaderSearch(force){
+  const box = $("#hsearch"), btn = $("#hsToggle"), input = $("#deskSearch");
+  if(!box) return;
+  const open = force !== undefined ? force : !box.classList.contains("open");
+  box.classList.toggle("open", open);
+  btn.setAttribute("aria-expanded", String(open));
+  input.tabIndex = open ? 0 : -1;
+  /* Next frame, not now: the field is still visibility:hidden at this
+     point, so focus() is dropped -- and the click that opened it would
+     then hand focus back to the button anyway. */
+  if(open) requestAnimationFrame(() => input.focus());
+}
+/* Clicking away closes it, but not while it still holds a query. */
+document.addEventListener("click", e => {
+  const box = $("#hsearch");
+  if(box && box.classList.contains("open") && !box.contains(e.target) && !$("#deskSearch").value)
+    toggleHeaderSearch(false);
+});
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape" && $("#hsearch")?.classList.contains("open")) toggleHeaderSearch(false);
+});
+
 /* ================================================================
    NAVIGATION
    ================================================================ */
@@ -1971,6 +1981,10 @@ function go(page,filter){
     scrollMemory[currentPage] = window.scrollY;
 
   PAGES.forEach(id=>$("#"+id).classList.toggle("hidden",id!==page));
+  /* The header borrows the hero's dark world only where the hero is. On
+     every other page the top of the document is ordinary light ground,
+     and a dark glass there would put white text on it. */
+  document.documentElement.dataset.page = page;
   if(filter!==undefined){
     shopFilter=filter; shopQuery=""; $("#shopSearch").value="";
     /* The list is about to be replaced, so any remembered offset into
@@ -2513,8 +2527,13 @@ Object.assign(window, {
   openDetail, setPlan, addCurrent,
   chQty, delItem, openPanel, closePanels,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
-  runTrack, contactWhatsApp, toast, toggleTheme, addToCart,
+  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch,
 });
+
+/* The page opens on home without go() ever running, so the flag it sets
+   has to be seeded here -- without it the header spent the first screen
+   in its light glass over the dark hero, at 2.5:1. */
+document.documentElement.dataset.page = "home";
 
 /* label the toggle for whatever <head> resolved before first paint */
 applyTheme(document.documentElement.getAttribute("data-theme") || "light");
