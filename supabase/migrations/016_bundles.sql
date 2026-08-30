@@ -193,6 +193,11 @@ create policy "admin manage bundle items" on bundle_items
 -- struck-through total and the percentage all come from the server
 -- rather than from arithmetic in the browser.
 -- ------------------------------------------------------------
+-- The two helpers above are inlined here rather than called: a view is
+-- read by anon, and EXECUTE on a function is checked against whoever is
+-- reading no matter that the function is SECURITY DEFINER. Granting
+-- anon execute on them would widen the surface for nothing -- one
+-- lateral join computes both in a single pass instead.
 drop view if exists public_bundles;
 create view public_bundles as
 select
@@ -201,28 +206,38 @@ select
   b.name,
   b.short_description,
   b.bundle_price,
-  bundle_list_total(b.id)                       as list_total,
-  bundle_list_total(b.id) - b.bundle_price      as saving,
-  round((1 - b.bundle_price / nullif(bundle_list_total(b.id), 0)) * 100) as saving_pct,
+  agg.list_total,
+  agg.list_total - b.bundle_price                                as saving,
+  round((1 - b.bundle_price / nullif(agg.list_total, 0)) * 100)   as saving_pct,
   b.sort_order,
-  (select jsonb_agg(jsonb_build_object(
-      'product_id', p.id,
-      'plan_id',    pl.id,
-      'name',       p.name,
-      'slug',       p.slug,
-      'plan_name',  pl.name,
-      'price',      pl.price,
-      'icon_path',  p.icon_path,
-      'poster_path', p.poster_path,
-      'accent_color', p.accent_color)
-      order by bi.sort_order, p.name)
-     from bundle_items bi
-     join products      p  on p.id  = bi.product_id
-     join product_plans pl on pl.id = bi.plan_id
-    where bi.bundle_id = b.id)                  as items
+  agg.items
 from bundles b
+cross join lateral (
+  select
+    coalesce(sum(pl.price), 0)                                    as list_total,
+    count(*)                                                      as n,
+    count(*) filter (where p.status = 'published'
+                       and p.archived_at is null
+                       and pl.is_active)                          as n_sellable,
+    jsonb_agg(jsonb_build_object(
+      'product_id',   p.id,
+      'plan_id',      pl.id,
+      'name',         p.name,
+      'slug',         p.slug,
+      'plan_name',    pl.name,
+      'price',        pl.price,
+      'icon_path',    p.icon_path,
+      'poster_path',  p.poster_path,
+      'accent_color', p.accent_color)
+      order by bi.sort_order, p.name)                             as items
+  from bundle_items bi
+  join products      p  on p.id  = bi.product_id
+  join product_plans pl on pl.id = bi.plan_id
+  where bi.bundle_id = b.id
+) agg
 where b.is_active
-  and bundle_is_sellable(b.id);
+  and agg.n >= 2
+  and agg.n_sellable = agg.n;
 
 grant select on public_bundles to anon, authenticated;
 

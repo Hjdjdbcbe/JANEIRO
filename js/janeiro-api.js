@@ -131,6 +131,45 @@ export async function loadProducts() {
   return rows.map(normalizeProduct);
 }
 
+/**
+ * الباقات — active bundles, priced by the server.
+ *
+ * bundle_price, list_total, saving and saving_pct all arrive computed:
+ * the card shows figures the database decided, not arithmetic done in
+ * the browser over numbers the browser could edit.
+ */
+export async function loadBundles() {
+  const rows = await rest(
+    "public_bundles?select=id,slug,name,short_description,bundle_price,list_total,saving," +
+    "saving_pct,sort_order,items&order=sort_order",
+  );
+  return rows.map(normalizeBundle);
+}
+
+function normalizeBundle(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    desc: row.short_description ?? "",
+    price: Number(row.bundle_price),
+    listTotal: Number(row.list_total),
+    saving: Number(row.saving),
+    savingPct: Number(row.saving_pct),
+    items: (row.items || []).map((i) => ({
+      productId: i.product_id,
+      planId: i.plan_id,
+      name: i.name,
+      slug: i.slug,
+      planName: i.plan_name,
+      price: Number(i.price),
+      icon: publicMedia(i.icon_path),
+      poster: publicMedia(i.poster_path),
+      accent: i.accent_color ?? "#7357FF",
+    })),
+  };
+}
+
 /** Full detail for one product. */
 export async function loadProduct(slug) {
   const rows = await rest(
@@ -229,6 +268,9 @@ export async function createOrder({ name, phone, wilaya, paymentMethodId, items,
       product_id: i.productId,
       plan_id: i.planId,
       quantity: i.qty,
+      // only the id: the server reads the bundle's price, contents and
+      // availability itself, and refuses a group that is not whole
+      bundle_id: i.bundleId ?? null,
       activation: i.activation ?? [],
     })),
     idempotency_key: idempotencyKey,

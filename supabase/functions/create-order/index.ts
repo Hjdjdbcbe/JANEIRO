@@ -9,6 +9,7 @@ interface ItemIn {
   product_id: string;
   plan_id: string;
   quantity?: number;
+  bundle_id?: string | null;
   activation?: { label: string; value: string }[];
 }
 
@@ -48,8 +49,12 @@ Deno.serve(async (req) => {
       product_id: String(i.product_id),
       plan_id: String(i.plan_id),
       quantity: Math.max(1, Math.min(10, Number(i.quantity) || 1)),
-      // نوع التفعيل is deliberately absent: the RPC reads it off the
-      // product, so a value sent from here would be ignored anyway.
+      // The bundle this line claims to belong to. Only the id crosses:
+      // the RPC reads the bundle's price, contents and availability
+      // itself and refuses a group that is not whole. Anything
+      // price-like about it is absent for the same reason نوع التفعيل
+      // is -- the server would ignore it.
+      bundle_id: i.bundle_id ? String(i.bundle_id).slice(0, 40) : null,
       activation: Array.isArray(i.activation)
         ? i.activation.slice(0, 10).map((a) => ({
             label: String(a.label ?? "").slice(0, 120),

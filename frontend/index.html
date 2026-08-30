@@ -942,6 +942,60 @@ header.stuck .hbar{height:54px}
   color:#B42318;margin-top:8px}
 [data-theme="dark"] .cherr{color:#FF9A92}
 .pay2.bad ~ .cherr{visibility:visible}
+/* ---------- الباقات ---------- */
+.bgrid{display:grid;gap:var(--s4);margin-top:var(--s6)}
+@media(min-width:700px){.bgrid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1050px){.bgrid{grid-template-columns:repeat(3,1fr)}}
+
+.bcard{background:var(--card);border:1px solid var(--line);border-radius:20px;
+  padding:var(--s5);display:flex;flex-direction:column;gap:var(--s3);
+  box-shadow:var(--sh-1);text-align:start;cursor:pointer;
+  transition:border-color .18s,box-shadow .18s,transform .18s var(--ease-out)}
+.bcard:hover{border-color:var(--accent-ink);box-shadow:var(--sh-2);transform:translateY(-2px)}
+.bcard h3{font-size:16.5px;line-height:1.5}
+
+/* the marks of what is inside, overlapped like a small stack of cards.
+   In RTL the row runs right to left, so the negative margin is on the
+   inline START and the first mark ends up on top. */
+/* .bm is the mark itself, sized and clipped wherever it appears. The
+   size rules used to live under .bmarks, so the same markup reused in
+   a detail row had an unconstrained <img> in it -- the product artwork
+   rendered at its natural size and covered the page. */
+.bm{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background:var(--surface);border:1px solid var(--line);overflow:hidden;flex:none}
+.bm img{width:100%;height:100%;object-fit:contain;display:block}
+.bm b{font-family:var(--f-display);font-weight:400;font-size:17px;line-height:1}
+.bmarks{display:flex;align-items:center}
+.bmarks .bm + .bm{margin-inline-start:-10px}
+.bmore{font-size:12px;color:var(--ink-2);margin-inline-start:8px}
+
+.bnames{font-size:13px;color:var(--ink-2);line-height:1.8}
+.bprice{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:auto}
+.bcard .btn{width:100%;margin-top:var(--s1,4px)}
+.bprice b{font-size:20px}
+.bprice s{color:var(--ink-2);font-size:13.5px}
+.bsave{display:inline-flex;align-items:center;font-size:12px;font-weight:700;
+  padding:4px 10px;border-radius:var(--r-pill);
+  color:#0B6B4F;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.3)}
+[data-theme="dark"] .bsave{color:#6EE7B7;background:rgba(16,185,129,.16)}
+
+/* one product inside a bundle, on the detail page */
+.bitem{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) 0;
+  border-bottom:1px solid var(--line)}
+.bitem:last-child{border-bottom:0}
+.bitem .bm{width:44px;height:44px}
+.bitem .n{flex:1;min-width:0}
+.bitem .n b{display:block;font-size:14.5px}
+.bitem .n span{font-size:12.5px;color:var(--ink-2)}
+
+/* a bundle group in the cart */
+.cbundle{border:1px solid var(--accent-line,var(--line));border-radius:16px;
+  padding:var(--s3);margin-bottom:var(--s3);background:var(--surface)}
+.cbundle .bh{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:12.5px;font-weight:700;margin-bottom:6px}
+.cbundle .bh .bsave{font-size:11px;padding:3px 8px}
+.cbundle .citem{background:none;border:0;padding-inline:0}
+
 .pay2{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2)}
 .paybtn{border:1.5px solid var(--line);border-radius:13px;padding:14px 8px;text-align:center;
   font-size:13px;font-weight:600;transition:border-color .15s,background .15s}
@@ -1214,7 +1268,7 @@ footer ul button:hover{color:var(--text-on-dark)}
           <span class="eyebrow">عروض Janeiro</span>
           <h2>وفّر أكثر مع باقات Janeiro</h2>
           <p>خصومات على مجموعة من أشهر الخدمات الرقمية، بنفس التفعيل السريع والدعم المباشر.</p>
-          <button class="btn btn-primary" onclick="go('shop','__offers')">اكتشف الباقات</button>
+          <button class="btn btn-primary" onclick="go('bundles')">اكتشف الباقات</button>
         </div>
         <div class="pboxes" id="promoBoxes"></div>
       </div>
@@ -1332,6 +1386,42 @@ footer ul button:hover{color:var(--text-on-dark)}
       <button class="btn btn-ghost" onclick="addCurrent()">+ السلة</button>
       <button class="btn btn-primary" onclick="addCurrent(true)">اشترِ الآن</button>
     </div>
+  </div>
+</section>
+
+<!-- ================= BUNDLES ================= -->
+<section id="bundles" class="hidden page">
+  <div class="wrap">
+    <button class="crumb" onclick="go('home')">→ الرئيسية</button>
+    <h1 style="font-size:24px">الباقات</h1>
+    <p style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)">
+      عدة منتجات مجمّعة بسعر واحد أقل من مجموعها منفردة.</p>
+    <div id="bundleGrid" class="bgrid"></div>
+  </div>
+</section>
+
+<!-- ================= BUNDLE DETAIL ================= -->
+<section id="bundle" class="hidden page">
+  <div class="wrap" style="max-width:720px">
+    <button class="crumb" onclick="go('bundles')">→ كل الباقات</button>
+    <h1 style="font-size:24px" id="bName"></h1>
+    <p id="bDesc" style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)"></p>
+
+    <div class="card">
+      <h3>ما بداخل الباقة</h3>
+      <div id="bItems"></div>
+    </div>
+
+    <div class="card">
+      <div class="dl">
+        <div><span>مجموع الأسعار منفردة</span><b class="mono"><s id="bList"></s></b></div>
+        <div><span>سعر الباقة</span><b class="mono" id="bPrice"></b></div>
+        <div><span>توفيرك</span><b class="mono" id="bSave"></b></div>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="addBundleToCart()">
+      أضف الباقة للسلة
+    </button>
   </div>
 </section>
 
@@ -2016,7 +2106,7 @@ document.addEventListener("keydown", e => {
 /* ================================================================
    NAVIGATION
    ================================================================ */
-const PAGES=["home","shop","detail","order","sent","track","about","policies"];
+const PAGES=["home","shop","detail","bundles","bundle","order","sent","track","about","policies"];
 /* Pages are swapped in place rather than being real documents, so the
    browser has no history entry to restore the scroll position from --
    go() has to do it. Only the two browsable lists are remembered:
@@ -2025,7 +2115,7 @@ const PAGES=["home","shop","detail","order","sent","track","about","policies"];
    detail/order/sent/track are per-item or per-step, so a remembered
    offset there would land you somewhere arbitrary; they always start at
    the top. */
-const SCROLL_MEMORY_PAGES = new Set(["home","shop"]);
+const SCROLL_MEMORY_PAGES = new Set(["home","shop","bundles"]);
 const scrollMemory = {};
 let currentPage = "home";
 
@@ -2106,6 +2196,102 @@ function addCurrent(buyNow){
 }
 
 /* ================================================================
+   الباقات — BUNDLES
+
+   A separate system from the deals: several products for one price the
+   owner typed. Everything with a number in it -- the price, the list
+   total, the saving, the percentage -- arrives computed from the
+   database. Nothing here multiplies or subtracts to produce a figure
+   the customer is shown, because the server has to agree with it at
+   checkout and only one of the two can be the source.
+   ================================================================ */
+let BUNDLES=[], curBundle=null;
+
+const B = id => BUNDLES.find(b=>b.id===id) || null;
+
+/* the little stack of product marks. Falls back to the product's first
+   letter, the same way a product card without artwork does. */
+function bundleMarks(b, max=4){
+  const shown=b.items.slice(0,max);
+  const rest=b.items.length-shown.length;
+  return `<div class="bmarks">${shown.map(i=>
+    `<span class="bm" style="background:${hex2rgba(i.accent,.12)}">${
+      i.icon ? `<img src="${esc(i.icon)}" alt="" loading="lazy" onerror="this.remove()">`
+             : `<b style="color:${esc(readableInk(i.accent))}">${esc(i.name[0])}</b>`}</span>`).join("")
+  }${rest>0?`<span class="bmore">+${rest}</span>`:""}</div>`;
+}
+
+function renderBundles(){
+  const grid=$("#bundleGrid");
+  if(!BUNDLES.length){
+    grid.innerHTML=`<div class="blank" style="grid-column:1/-1">
+      لا توجد باقات متاحة حالياً<br><span style="font-size:12.5px">تصفّح المنتجات مفردة في هذه الأثناء</span></div>`;
+    return;
+  }
+  grid.innerHTML=BUNDLES.map(b=>`
+    <div class="bcard rv" role="button" tabindex="0"
+         onclick="openBundle('${b.id}')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBundle('${b.id}')}">
+      ${bundleMarks(b)}
+      <h3>${esc(b.name)}</h3>
+      <div class="bnames">${b.items.map(i=>esc(i.name)).join(" · ")}</div>
+      <div class="bprice">
+        <b>${money(b.price)}</b>
+        <s>${money(b.listTotal)}</s>
+        <span class="bsave">وفّر ${b.savingPct}%</span>
+      </div>
+      <button class="btn btn-soft" onclick="event.stopPropagation();openBundle('${b.id}')">عرض التفاصيل</button>
+    </div>`).join("");
+  revealOnScroll();
+}
+
+function openBundle(id){
+  curBundle=B(id);
+  if(!curBundle){ go("bundles"); return; }
+  const b=curBundle;
+  $("#bName").textContent=b.name;
+  $("#bDesc").textContent=b.desc;
+  $("#bDesc").classList.toggle("hidden",!b.desc);
+  $("#bItems").innerHTML=b.items.map(i=>`
+    <div class="bitem">
+      <span class="bm" style="background:${hex2rgba(i.accent,.12)}">${
+        i.icon ? `<img src="${esc(i.icon)}" alt="" loading="lazy" onerror="this.remove()">`
+               : `<b style="color:${esc(readableInk(i.accent))}">${esc(i.name[0])}</b>`}</span>
+      <span class="n"><b>${esc(i.name)}</b><span>${esc(i.planName)}</span></span>
+      <b class="mono">${money(i.price)}</b>
+    </div>`).join("");
+  $("#bList").textContent=money(b.listTotal);
+  $("#bPrice").textContent=money(b.price);
+  $("#bSave").textContent=`${money(b.saving)} (${b.savingPct}%)`;
+  go("bundle");
+}
+
+function addBundleToCart(){
+  if(!curBundle) return;
+  addBundle(curBundle.id);
+}
+
+/* Adds every product of the bundle as its own cart line, tagged with
+   the bundle. Tagged lines are priced as a group; untagging one turns
+   the rest back into ordinary lines at their own prices, which is what
+   removing a product from a bundle means here. */
+function addBundle(id){
+  const b=B(id); if(!b) return;
+  const already=CART.find(c=>c.bundle===id);
+  if(already){ CART.filter(c=>c.bundle===id).forEach(c=>c.qty++); }
+  else {
+    b.items.forEach(i=>{
+      const p=P(i.productId);
+      const plan=p ? p.plans.findIndex(pl=>pl.id===i.planId) : -1;
+      if(!p || plan<0) return;
+      CART.push({id:i.productId, plan, qty:1, bundle:id});
+    });
+  }
+  renderCart(); pulseCart(); toast("أُضيفت الباقة إلى السلة");
+  openPanel("cart");
+}
+
+/* ================================================================
    CART
    ================================================================ */
 let CART=[];
@@ -2118,9 +2304,74 @@ function addToCart(id,plan){
    the store owns this value, so the cart has no business remembering
    its own version of it. */
 const lineActType = c => P(c.id).actType || "";
-function chQty(i,d){ CART[i].qty+=d; if(CART[i].qty<1) CART.splice(i,1); renderCart(); }
-function delItem(i){ CART.splice(i,1); renderCart(); }
-function cartTotal(){ return CART.reduce((s,c)=>s+P(c.id).plans[c.plan].p*c.qty,0); }
+/* ---------------- bundle groups in the cart ----------------
+   A group is the set of lines tagged with one bundle. It is priced as
+   a group only while it is WHOLE -- every product of the bundle
+   present, all at the same quantity. That is the same test the server
+   applies, so the total on screen and the total charged cannot
+   disagree.
+
+   Taking a product out of a bundle unties the rest: they stay in the
+   cart as ordinary lines at their own prices and the saving is gone.
+   The alternative -- refusing to remove it -- would leave the customer
+   arguing with the cart. */
+function bundleGroup(id){
+  const lines=CART.filter(c=>c.bundle===id);
+  const b=B(id);
+  if(!b || !lines.length) return null;
+  const whole = lines.length===b.items.length
+             && b.items.every(i=>lines.some(l=>l.id===i.productId))
+             && lines.every(l=>l.qty===lines[0].qty);
+  return { bundle:b, lines, whole, qty:lines[0].qty };
+}
+const cartBundleIds = () => [...new Set(CART.filter(c=>c.bundle).map(c=>c.bundle))];
+
+/* Unties a group: the lines survive, the bundle price does not. */
+function untieBundle(id){ CART.forEach(c=>{ if(c.bundle===id) c.bundle=null; }); }
+
+function chQty(i,d){
+  const line=CART[i];
+  if(line.bundle){
+    /* the whole group moves together: one bundle bought twice is two
+       of everything in it, and the server refuses lines that disagree */
+    const g=bundleGroup(line.bundle);
+    if(g && g.whole){
+      if(g.qty+d<1){ const id=line.bundle; untieBundle(id); CART=CART.filter(c=>!(g.lines.includes(c))); }
+      else g.lines.forEach(l=>l.qty+=d);
+      renderCart(); return;
+    }
+  }
+  line.qty+=d; if(line.qty<1) CART.splice(i,1);
+  renderCart();
+}
+function delItem(i){
+  const line=CART[i];
+  if(line.bundle) untieBundle(line.bundle);   // the rest stay, unbundled
+  CART.splice(i,1);
+  renderCart();
+}
+/* Removes a whole bundle in one go, which is what its own delete does. */
+function delBundle(id){ CART=CART.filter(c=>c.bundle!==id); renderCart(); }
+
+function cartTotal(){
+  let t=0;
+  const counted=new Set();
+  for(const id of cartBundleIds()){
+    const g=bundleGroup(id);
+    if(g && g.whole){ t += g.bundle.price*g.qty; g.lines.forEach(l=>counted.add(l)); }
+  }
+  for(const c of CART) if(!counted.has(c)) t += P(c.id).plans[c.plan].p*c.qty;
+  return t;
+}
+/* What the bundles took off the total, for the line that says so. */
+function cartSaving(){
+  let s=0;
+  for(const id of cartBundleIds()){
+    const g=bundleGroup(id);
+    if(g && g.whole) s += g.bundle.saving*g.qty;
+  }
+  return s;
+}
 function renderCart(){
   const n=CART.reduce((s,c)=>s+c.qty,0);
   const b=$("#cartBadge"); b.textContent=n; b.classList.toggle("hidden",!n);
@@ -2130,17 +2381,58 @@ function renderCart(){
       سلتك فارغة<br><span style="font-size:12.5px">تصفّح المنتجات وأضف ما يعجبك</span></div>`;
     $("#cartFoot").classList.add("hidden"); return;
   }
-  $("#cartList").innerHTML=CART.map((c,i)=>{
+  /* One line of markup per cart line, then the lines of a whole bundle
+     are wrapped together under its name and its own price. The index
+     each button carries is the line's index in CART, so untying a
+     group cannot make a stale button delete the wrong thing. */
+  const lineHTML=(c,i,inBundle)=>{
     const p=P(c.id),pl=p.plans[c.plan];
+    /* Inside a whole bundle the line shows the LIST price, not the
+       deal price applyDeals wrote onto the plan. Two reasons: the
+       server charges bundle lines at list price too, so this is what
+       the order will record; and the lines have to add up to the
+       struck-through total the bundle is measured against, or the
+       group reads as arithmetic that does not work. Untie the bundle
+       and the line goes back to its ordinary, deal-aware price. */
+    const item=inBundle ? inBundle.bundle.items.find(x=>x.productId===c.id) : null;
+    const unit=item ? item.price : pl.p;
     return `<div class="citem">
       <div class="cthumb" style="background:${hex2rgba(p.accent,.1)}">${brandLogo(p,24)}</div>
       <div class="cinfo">
         <b>${p.name}</b><div class="pl">${pl.n}${p.actType?` · ${esc(p.actType)}`:""}</div>
-        <div class="pr">${money(pl.p*c.qty)}</div>
-        <div class="qty"><button onclick="chQty(${i},-1)" aria-label="إنقاص">−</button><span>${c.qty}</span><button onclick="chQty(${i},1)" aria-label="زيادة">+</button></div>
+        <div class="pr">${money(unit*c.qty)}</div>
+        ${c.bundle?"":`<div class="qty"><button onclick="chQty(${i},-1)" aria-label="إنقاص">−</button><span>${c.qty}</span><button onclick="chQty(${i},1)" aria-label="زيادة">+</button></div>`}
       </div>
       <button class="cdel" onclick="delItem(${i})">حذف</button>
-    </div>`;}).join("");
+    </div>`;
+  };
+
+  const done=new Set();
+  let html="";
+  CART.forEach((c,i)=>{
+    if(done.has(c)) return;
+    const g=c.bundle ? bundleGroup(c.bundle) : null;
+    if(g && g.whole){
+      g.lines.forEach(l=>done.add(l));
+      const first=CART.indexOf(g.lines[0]);
+      html+=`<div class="cbundle">
+        <div class="bh"><span>${esc(g.bundle.name)}</span>
+          <span class="bsave">وفّر ${money(g.bundle.saving*g.qty)}</span></div>
+        ${g.lines.map(l=>lineHTML(l,CART.indexOf(l),g)).join("")}
+        <div class="citem" style="border:0;padding-top:6px">
+          <div class="cinfo" style="flex:1">
+            <div class="pr">${money(g.bundle.price*g.qty)}</div>
+            <div class="qty"><button onclick="chQty(${first},-1)" aria-label="إنقاص">−</button><span>${g.qty}</span><button onclick="chQty(${first},1)" aria-label="زيادة">+</button></div>
+          </div>
+          <button class="cdel" onclick="delBundle('${g.bundle.id}')">حذف الباقة</button>
+        </div>
+      </div>`;
+    } else {
+      done.add(c);
+      html+=lineHTML(c,i);
+    }
+  });
+  $("#cartList").innerHTML=html;
   $("#cartTotal").textContent=money(cartTotal());
   $("#cartFoot").classList.remove("hidden");
 }
@@ -2338,6 +2630,9 @@ function cartForApi(){
       productId: p.id,
       planId:    p.plans[c.plan].id,
       qty:       c.qty,
+      /* only while the group is whole: the server refuses half a
+         bundle at a bundle price, and it is right to */
+      bundleId:  (c.bundle && (bundleGroup(c.bundle)||{}).whole) ? c.bundle : null,
       activation: p.fields.map((f,fi)=>({
         label: f.l,                                     // must match product_requirements.label
         value: (($(`[data-af="${ci}_${fi}"]`)||{}).value||"").trim()
@@ -2392,6 +2687,7 @@ function buildReview(){
     + `<div class="r"><span>قناة المتابعة</span><b>${o.channel}</b></div>`
     + `<div class="r"><span>الاسم</span><b>${o.name}</b></div>`
     + `<div class="r"><span>الهاتف</span><b class="mono">${o.phone}</b></div>`
+    + (cartSaving()>0 ? `<div class="r"><span>توفير الباقات</span><b class="mono">− ${money(cartSaving())}</b></div>` : "")
     + `<div class="r t"><span>الإجمالي</span><b class="mono">${money(o.total)}</b></div>`;
   $("#waPreview").textContent=orderMessage(o);
 }
@@ -2564,12 +2860,13 @@ async function boot(){
   }
   showSkeletons();
   try{
-    const [settings, cats, prods, pays, deals] = await Promise.all([
+    const [settings, cats, prods, pays, deals, bundles] = await Promise.all([
       API.loadStoreSettings(),
       API.loadCategories(),
       API.loadProducts(),
       API.loadPaymentMethods(),
       API.loadDailyDeals(),
+      API.loadBundles(),
     ]);
 
     SETTINGS = settings;
@@ -2595,7 +2892,15 @@ async function boot(){
     if(deals.length) clockOffset = deals[0].serverNow - Date.now();
     applyDeals();
 
-    renderCats(); renderDeals(); renderHome(); renderCart(); renderShop();
+    /* A bundle whose products are not in the catalogue we just loaded
+       cannot be added to a cart, so it is dropped here rather than
+       failing silently when someone taps it. */
+    BUNDLES = bundles.filter(b => b.items.every(i => {
+      const p = PRODUCTS.find(x => x.id === i.productId);
+      return p && p.plans.some(pl => pl.id === i.planId);
+    }));
+
+    renderCats(); renderDeals(); renderHome(); renderCart(); renderShop(); renderBundles();
     revealOnScroll();
   }catch(err){
     console.error("boot failed", err);
@@ -2660,7 +2965,8 @@ if(window.matchMedia){
 Object.assign(window, {
   go, selectCat, scrollCats, doSearch, openSearch,
   openDetail, setPlan, addCurrent,
-  chQty, delItem, openPanel, closePanels,
+  chQty, delItem, delBundle, openPanel, closePanels,
+  openBundle, addBundle, addBundleToCart,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
   nextFromDetails, validateName, validatePhone, validateChannel, validateDetails, clearErr,
   runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch,

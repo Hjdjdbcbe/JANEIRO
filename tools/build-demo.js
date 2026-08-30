@@ -51,6 +51,7 @@ const QUERIES = [
   queryFromApi("products"),
   queryFromApi("payment_methods"),
   queryFromApi("public_daily_deals"),
+  queryFromApi("public_bundles"),
 ];
 
 const MIME = { ".webp":"image/webp", ".png":"image/png", ".jpg":"image/jpeg",
@@ -175,7 +176,7 @@ const dataUri = (file) => {
   const injected =
     `/* ---- demo build: the api module, inlined, with its transports swapped ---- */\n` +
     preamble + api + `\nconst API = { isConfigured, loadStoreSettings, loadCategories, loadProducts,\n` +
-    `  loadProduct, loadPaymentMethods, loadDailyDeals, mediaUrl, newIdempotencyKey,\n` +
+    `  loadProduct, loadPaymentMethods, loadDailyDeals, loadBundles, mediaUrl, newIdempotencyKey,\n` +
     `  createOrder, uploadReceipt, submitOrder, buildWhatsAppUrl, trackOrder, revalidateCart };\n`;
   html = html.replace('import * as API from "../js/janeiro-api.js";', () => injected);
   html = html.replace(/^\s*export (async function|function|const)/gm, "$1");

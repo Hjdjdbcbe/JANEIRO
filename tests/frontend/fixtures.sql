@@ -71,6 +71,32 @@ declare
   i int;
 begin
   select id into v_pm   from payment_methods where is_active order by sort_order limit 1;
+  -- ---------- باقة معاينة ----------
+  -- Sample data so the preview and the browser tests have a bundle to
+  -- work on. Real bundles are the owner's, made in the dashboard or in
+  -- docs/bundles.sql; the catalogue migration ships none.
+  delete from bundles where slug = 'ai-tools';
+  insert into bundles (slug, name, short_description, bundle_price, is_active, sort_order)
+  select 'ai-tools', 'باقة أدوات الذكاء الاصطناعي',
+         'ثلاث أدوات تستعملها كل يوم، بسعر واحد.',
+         round(sum(pl.price) * 0.79), false, 1
+    from products p join product_plans pl on pl.product_id = p.id
+   where p.slug in ('gemini-pro','notion-plus','canva-pro')
+     and pl.id = (select id from product_plans where product_id = p.id
+                   and is_active order by sort_order limit 1);
+
+  insert into bundle_items (bundle_id, product_id, plan_id, sort_order)
+  select (select id from bundles where slug = 'ai-tools'), p.id, pl.id,
+         row_number() over (order by p.name)
+    from products p join product_plans pl on pl.product_id = p.id
+   where p.slug in ('gemini-pro','notion-plus','canva-pro')
+     and pl.id = (select id from product_plans where product_id = p.id
+                   and is_active order by sort_order limit 1);
+
+  -- activated last: the shape triggers only let a bundle go live once
+  -- it holds two products and undercuts their list total
+  update bundles set is_active = true where slug = 'ai-tools';
+
   -- ---------- نوع التفعيل (بيانات معاينة) ----------
   -- Sample values so the preview has something to show. These are the
   -- store owner's to set in the dashboard, product by product; nothing

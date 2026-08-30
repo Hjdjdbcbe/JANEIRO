@@ -90,6 +90,11 @@ async function rest(url, res) {
         `select id, product_id, plan_id, deal_price, original_price, plan_name,
                 product_slug, product_name, starts_at, ends_at, sort_order, server_now
            from public_daily_deals order by sort_order`));
+    if (table === "public_bundles")
+      return send(res, 200, await asAnon(
+        `select id, slug, name, short_description, bundle_price, list_total,
+                saving, saving_pct, sort_order, items
+           from public_bundles order by sort_order`));
     if (table === "payment_methods")
       return send(res, 200, await asAnon(
         `select id,type,label,account_holder,account_number,extra_info,instructions
@@ -234,6 +239,7 @@ async function fn(name, req, res) {
       const items = (b.items || []).map(i => ({
         product_id: String(i.product_id), plan_id: String(i.plan_id),
         quantity: Math.max(1, Math.min(10, Number(i.quantity) || 1)),
+        bundle_id: i.bundle_id ? String(i.bundle_id) : null,
         activation: Array.isArray(i.activation) ? i.activation : [],
       }));
       const rows = await asService(
