@@ -419,6 +419,30 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     await pm.close();
   }
 
+  /* Every var() in the stylesheet must resolve to something defined.
+     A typo like var(--s5) on a scale that has no --s5 is not an error
+     anywhere -- the element silently loses that property -- and it is
+     invisible to the CSSOM, because the browser drops the declaration
+     before cssRules is built. So this reads the stylesheet SOURCE.
+     Found the bug it exists for: a bundle card with no padding. */
+  const unresolved = await page.evaluate(() => {
+    /* comments stripped first: this file explains its own tokens in
+       prose, and a comment reading "there is no --s5:" counted as a
+       definition and made the check pass over the very bug it was
+       written for */
+    const css = [...document.querySelectorAll("style")].map(s => s.textContent).join("\n")
+                  .replace(/\/\*[\s\S]*?\*\//g, " ");
+    const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map(m => m[1]));
+    for (const el of document.querySelectorAll("[style]"))
+      for (const p of el.style) if (p.startsWith("--")) defined.add(p);
+    const used = new Set();
+    for (const m of css.matchAll(/var\(\s*(--[\w-]+)\s*([,)])/g))
+      if (m[2] === ")") used.add(m[1]);          // no fallback -> it must exist
+    return [...used].filter(n => !defined.has(n));
+  });
+  check(unresolved.length === 0,
+        `every var() in the stylesheet resolves${unresolved.length ? " -> " + unresolved.join(", ") : ""}`);
+
   check(errs.length === 0, `no JS errors${errs.length ? " -> " + errs.slice(0, 3).join(" | ") : ""}`);
   await page.close();
   await browser.close();

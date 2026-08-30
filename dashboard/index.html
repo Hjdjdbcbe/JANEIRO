@@ -302,11 +302,16 @@ label.fl{font-size:12.5px;color:var(--muted)}
       <button class="tab" data-v="overview" aria-current="true">نظرة عامة</button>
       <button class="tab" data-v="queue" aria-current="false">الطلبات</button>
       <button class="tab" data-v="products" aria-current="false">المنتجات</button>
+      <button class="tab" data-v="bundles" aria-current="false">الباقات</button>
     </nav>
 
     <!-- products -->
     <section id="products" class="hidden"></section>
     <section id="editor" class="hidden"></section>
+
+    <!-- bundles -->
+    <section id="bundles" class="hidden"></section>
+    <section id="bundleEditor" class="hidden"></section>
 
     <!-- overview -->
     <section id="overview"></section>
@@ -563,6 +568,244 @@ let PRODUCTS = [], CATS = [], draft = null;
 const money0 = n => Math.round(Number(n) || 0).toLocaleString("en-US");
 const posterUrl = path =>
   path ? `${CFG.SUPABASE_URL}/storage/v1/object/public/product-media/${path}` : null;
+
+/* ================================================================
+   الباقات
+
+   A bundle is several products for one price the owner types. The
+   price is never derived here: it is entered, saved to the database,
+   and create_order reads it back at checkout. The list total shown
+   beside it is what the chosen plans cost separately, computed by
+   admin_list_bundles, so the owner can see the saving they are about
+   to offer before saving it.
+   ================================================================ */
+let BUNDLES = [], bundleDraft = null;
+
+async function loadBundles() {
+  [BUNDLES, PRODUCTS] = await Promise.all([
+    rpc("admin_list_bundles"),
+    rpc("admin_list_products"),
+  ]);
+
+  $("#bundles").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="flex:1">الباقات <span class="meta">(${BUNDLES.length})</span></h2>
+        <button class="btn go" id="newBundle">+ باقة جديدة</button>
+      </div>
+      <p class="hint">عدة منتجات بسعر واحد أقل من مجموعها. السعر تكتبه أنت، ولا يُحسب كنسبة.</p>
+      ${BUNDLES.length ? "" : `<div class="notice"><b>لا توجد باقات بعد</b>
+        أنشئ باقة من زر «باقة جديدة»، أو من الملف <code>docs/bundles.sql</code>.</div>`}
+      <div class="plist">${BUNDLES.map(b => {
+        const saving = Number(b.list_total) - Number(b.bundle_price);
+        const pct = Number(b.list_total) > 0 ? Math.round(saving / Number(b.list_total) * 100) : 0;
+        /* Why a bundle is not on the storefront, said plainly rather
+           than left to be discovered by looking at the site. */
+        const why = !b.is_active ? "موقوفة"
+                  : !b.sellable  ? "لا تُعرض — أحد منتجاتها غير منشور"
+                  : "";
+        return `<button class="prow" data-bundle="${esc(b.id)}">
+          <span class="pi">
+            <b>${esc(b.name)} ${why ? `<span class="meta">· ${esc(why)}</span>` : ""}</b>
+            <span class="meta">${(b.items || []).map(i => esc(i.product_name)).join(" · ") || "بلا منتجات"}</span>
+          </span>
+          <span class="meta">${money0(b.bundle_price)} <s>${money0(b.list_total)}</s>
+            ${saving > 0 ? `· وفّر ${pct}%` : ""}</span>
+        </button>`;
+      }).join("")}</div>
+    </div>`;
+
+  $("#newBundle").onclick = () => openBundleEditor(null);
+  $$("#bundles .prow").forEach(b => b.onclick = () => openBundleEditor(b.dataset.bundle));
+}
+
+function blankBundle() {
+  return { slug: "", name: "", short_description: "", bundle_price: "",
+           is_active: false, sort_order: 0, items: [], __isNew: true };
+}
+
+function openBundleEditor(id) {
+  const found = id ? BUNDLES.find(b => b.id === id) : null;
+  bundleDraft = found ? JSON.parse(JSON.stringify(found)) : blankBundle();
+  bundleDraft.__isNew = !found;
+  bundleDraft.items = bundleDraft.items || [];
+  $("#bundles").classList.add("hidden");
+  $("#bundleEditor").classList.remove("hidden");
+  renderBundleEditor();
+}
+
+function bundleListTotal(d) {
+  return d.items.reduce((s, i) => s + Number(i.price || 0), 0);
+}
+
+/* Every active plan of every published product, as one flat list of
+   choices. A bundle names a plan, not just a product, because the
+   list total it is measured against depends on which plan. */
+function planChoices() {
+  const out = [];
+  for (const p of PRODUCTS) {
+    if (p.status !== "published") continue;
+    for (const pl of (p.plans || [])) {
+      if (pl.is_active === false) continue;
+      out.push({ product_id: p.id, plan_id: pl.id, product_name: p.name,
+                 plan_name: pl.name, price: Number(pl.price) });
+    }
+  }
+  return out;
+}
+
+function renderBundleEditor() {
+  const d = bundleDraft;
+  const list = bundleListTotal(d);
+  const price = Number(d.bundle_price || 0);
+  const saving = list - price;
+  const choices = planChoices();
+  const taken = new Set(d.items.map(i => i.product_id));
+
+  $("#bundleEditor").innerHTML = `
+    <div class="chips"><button class="chip" id="bEdBack">→ رجوع للباقات</button></div>
+
+    <div class="card">
+      <h2>${d.__isNew ? "باقة جديدة" : esc(d.name)}</h2>
+      <div class="ed">
+        <input data-b="name" value="${esc(d.name || "")}" placeholder="اسم الباقة — مثال: باقة أدوات الذكاء الاصطناعي">
+        <input data-b="slug" value="${esc(d.slug || "")}" ${d.__isNew ? "" : "disabled"}
+               placeholder="المعرّف — حروف لاتينية صغيرة وشرطات، مثال: ai-tools">
+        <input data-b="short_description" value="${esc(d.short_description || "")}"
+               placeholder="وصف قصير — اختياري">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>المنتجات داخل الباقة</h2>
+      <p class="hint">منتجان على الأقل. كل سطر يختار خطة بعينها، لأن سعر المنتج يختلف بين خطة وأخرى.</p>
+      <div class="ed">${d.items.map((i, n) => `
+        <div class="rep">
+          <div class="hd"><b>${esc(i.product_name || "")} — ${esc(i.plan_name || "")}</b>
+            <button class="del" data-bdel="${n}">حذف</button></div>
+          <span class="meta">${money0(i.price)}${
+            i.published === false ? ' · <b style="color:var(--warn,#B42318)">غير منشور</b>' : ""}</span>
+        </div>`).join("")}</div>
+
+      <div class="ed" style="margin-top:10px"><select id="bAdd">
+        <option value="">+ أضف منتجاً…</option>
+        ${choices.filter(c => !taken.has(c.product_id)).map(c =>
+          `<option value="${esc(c.product_id)}|${esc(c.plan_id)}">${esc(c.product_name)} — ${esc(c.plan_name)} · ${money0(c.price)}</option>`).join("")}
+      </select></div>
+    </div>
+
+    <div class="card">
+      <h2>السعر</h2>
+      <p class="hint">اكتب سعر الباقة كاملاً. لا يُحسب كنسبة — أنت تقرّر كم تساوي المجموعة.</p>
+      <div class="ed">
+        <input data-b="bundle_price" type="number" inputmode="numeric" value="${d.bundle_price ?? ""}"
+               placeholder="سعر الباقة">
+        <div class="dl">
+          <div><span>مجموع الخطط منفردة</span><b>${money0(list)}</b></div>
+          <div><span>سعر الباقة</span><b>${price ? money0(price) : "—"}</b></div>
+          <div><span>التوفير</span><b>${
+            price && list ? `${money0(saving)} (${Math.round(saving / list * 100)}%)` : "—"}</b></div>
+        </div>
+        ${price && list && saving <= 0
+          ? `<div class="notice"><b>هذا ليس توفيراً</b> سعر الباقة يجب أن يكون أقل من ${money0(list)}.</div>` : ""}
+        ${d.items.length < 2
+          ? `<div class="notice"><b>الباقة تحتاج منتجين على الأقل</b> أضف منتجاً آخر قبل عرضها.</div>` : ""}
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="bActive" style="width:auto" ${d.is_active ? "checked" : ""}>
+          معروضة في المتجر
+        </label>
+      </div>
+    </div>
+
+    <div class="sticky">
+      <button class="btn go" id="saveBundle">حفظ</button>
+      ${d.__isNew ? "" : `<button class="btn warn" id="delBundle">حذف الباقة</button>`}
+      <button class="btn" id="cancelBundle">إلغاء</button>
+    </div>`;
+
+  $("#bEdBack").onclick = $("#cancelBundle").onclick = backToBundles;
+  $$("#bundleEditor [data-b]").forEach(el =>
+    el.oninput = el.onchange = () => { d[el.dataset.b] = el.value; renderPriceOnly(); });
+  $("#bActive").onchange = e => { d.is_active = e.target.checked; };
+  $("#bAdd").onchange = e => {
+    const [pid, plid] = e.target.value.split("|");
+    if (!pid) return;
+    const c = planChoices().find(x => x.product_id === pid && x.plan_id === plid);
+    if (c) d.items.push({ ...c, published: true });
+    renderBundleEditor();
+  };
+  $$("#bundleEditor [data-bdel]").forEach(b =>
+    b.onclick = () => { d.items.splice(+b.dataset.bdel, 1); renderBundleEditor(); });
+  $("#saveBundle").onclick = saveBundle;
+  if ($("#delBundle")) $("#delBundle").onclick = deleteBundle;
+}
+
+/* The price panel is the only thing that changes as you type, and
+   re-rendering the whole editor would take the caret with it. */
+function renderPriceOnly() {
+  const d = bundleDraft, list = bundleListTotal(d), price = Number(d.bundle_price || 0);
+  const dl = $("#bundleEditor .dl");
+  if (!dl) return;
+  const saving = list - price;
+  dl.innerHTML = `
+    <div><span>مجموع الخطط منفردة</span><b>${money0(list)}</b></div>
+    <div><span>سعر الباقة</span><b>${price ? money0(price) : "—"}</b></div>
+    <div><span>التوفير</span><b>${
+      price && list ? `${money0(saving)} (${Math.round(saving / list * 100)}%)` : "—"}</b></div>`;
+}
+
+function backToBundles() {
+  bundleDraft = null;
+  $("#bundleEditor").classList.add("hidden");
+  $("#bundles").classList.remove("hidden");
+  loadBundles().catch(e => toast(e.message));
+}
+
+async function saveBundle() {
+  const d = bundleDraft, btn = $("#saveBundle");
+  /* The same rules the database enforces, said here so the message
+     names the field instead of arriving as a raised exception. */
+  if (!String(d.name).trim()) return toast("اكتب اسم الباقة.");
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(d.slug).trim()))
+    return toast("المعرّف: حروف لاتينية صغيرة وأرقام وشرطات فقط.");
+  if (d.items.length < 2) return toast("الباقة تحتاج منتجين على الأقل.");
+  if (!String(d.bundle_price).trim()) return toast("اكتب سعر الباقة.");
+  if (d.is_active && Number(d.bundle_price) >= bundleListTotal(d))
+    return toast(`سعر الباقة يجب أن يكون أقل من ${money0(bundleListTotal(d))}.`);
+
+  btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
+  try {
+    await rpc("admin_upsert_bundle", { p_payload: {
+      slug: String(d.slug).trim(), name: d.name, short_description: d.short_description,
+      bundle_price: d.bundle_price, is_active: !!d.is_active, sort_order: d.sort_order || 0,
+      items: d.items.map(i => ({ product_id: i.product_id, plan_id: i.plan_id })),
+    }});
+    toast("حُفظت الباقة.");
+    backToBundles();
+  } catch (e) {
+    toast(BUNDLE_ERRORS[String(e.message).split(":")[0].trim()] || e.message);
+    btn.disabled = false; btn.textContent = "حفظ";
+  }
+}
+
+async function deleteBundle() {
+  if (!confirm("حذف هذه الباقة؟ الطلبات التي بيعت بها تبقى كما هي.")) return;
+  try {
+    await rpc("admin_delete_bundle", { p_id: bundleDraft.id });
+    toast("حُذفت الباقة.");
+    backToBundles();
+  } catch (e) { toast(e.message); }
+}
+
+const BUNDLE_ERRORS = {
+  INVALID_SLUG: "المعرّف غير صالح: حروف لاتينية صغيرة وأرقام وشرطات فقط.",
+  INVALID_NAME: "اسم الباقة مطلوب.",
+  INVALID_BUNDLE_PRICE: "سعر الباقة مطلوب.",
+  BUNDLE_NEEDS_TWO_PRODUCTS: "الباقة تحتاج منتجين على الأقل قبل عرضها.",
+  BUNDLE_PRICE_NOT_LOWER: "سعر الباقة يجب أن يكون أقل من مجموع الخطط منفردة.",
+  BUNDLE_PLAN_PRODUCT_MISMATCH: "الخطة المختارة لا تخص هذا المنتج.",
+  BUNDLE_NOT_FOUND: "لم نعثر على الباقة.",
+};
 
 async function loadProducts() {
   [PRODUCTS, CATS] = await Promise.all([
@@ -1047,13 +1290,14 @@ async function archiveProduct() {
 
 /* ---------- view switch ---------- */
 let view = "overview";
-const VIEWS = { overview: loadOverview, queue: loadQueue, products: loadProducts };
+const VIEWS = { overview: loadOverview, queue: loadQueue, products: loadProducts, bundles: loadBundles };
 function showView(v) {
   view = v;
-  for (const id of ["overview", "queue", "products"])
+  for (const id of ["overview", "queue", "products", "bundles"])
     $("#" + id).classList.toggle("hidden", id !== v);
   $("#detail").classList.add("hidden");
   $("#editor").classList.add("hidden");
+  $("#bundleEditor").classList.add("hidden");
   $$("#tabs .tab").forEach(t => t.setAttribute("aria-current", String(t.dataset.v === v)));
   window.scrollTo({ top: 0, behavior: "instant" });
   (VIEWS[v] || loadOverview)().catch(e => toast(e.message));

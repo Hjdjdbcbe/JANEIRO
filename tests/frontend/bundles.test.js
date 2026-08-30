@@ -220,6 +220,119 @@ const num = s => Number((String(s).match(/[\d,]+(?:\.\d+)?/) || ["0"])[0].replac
   check(await p.evaluate(() => document.querySelectorAll("#dealGrid .deal, #deals .deal").length) >= 0,
         "and the deals section is still on the page");
 
+  await p.close();
+
+  // ============================================================
+  // the dashboard: making a bundle the way the owner will
+  // ============================================================
+  const d = await browser.newPage({ viewport: { width: 430, height: 1000 } });
+  d.on("pageerror", e => errs.push("dash: " + e.message));
+  await d.addInitScript(b => { window.JANEIRO_CONFIG = { SUPABASE_URL: b, SUPABASE_ANON_KEY: "k" }; }, BASE);
+  await d.goto(`${BASE}/dashboard/index.html`, { waitUntil: "networkidle" });
+  await d.fill("#email", "admin@janeiro.test");
+  await d.fill("#pass", "admin-pass-123");
+  await d.click("#loginBtn");
+  await d.waitForSelector("#app:not(.hidden)", { timeout: 15000 });
+
+  await d.locator('#tabs .tab[data-v="bundles"]').click();
+  await d.waitForSelector("#bundles:not(.hidden)");
+  await d.waitForTimeout(600);
+  check(await d.locator("#bundles .prow").count() >= 1,
+        "the console lists the bundles that exist");
+
+  const slug = "test-bundle-ui-" + Date.now().toString(36);
+  await d.click("#newBundle");
+  await d.waitForSelector("#bundleEditor:not(.hidden)");
+  await d.fill('[data-b="name"]', "باقة من اللوحة");
+  await d.fill('[data-b="slug"]', slug);
+
+  // two products, chosen by plan
+  /* two plans of two DIFFERENT products: a bundle holds one plan per
+     product, so taking a product removes all of its plans from the
+     picker -- picking the first two options would often be two plans
+     of the same product and the second choice would no longer exist */
+  const opts = await d.evaluate(() => {
+    const seen = new Set(), out = [];
+    for (const o of [...document.querySelector("#bAdd").options].slice(1)) {
+      const pid = o.value.split("|")[0];
+      if (seen.has(pid)) continue;
+      seen.add(pid); out.push(o.value);
+      if (out.length === 2) break;
+    }
+    return out;
+  });
+  check(opts.length === 2, "the picker offers plans of different products to choose from");
+  /* it sits outside .ed at first, so it kept the browser's own white
+     select on a dark console */
+  const picker = await d.evaluate(() => {
+    const cs = getComputedStyle(document.querySelector("#bAdd"));
+    const page = getComputedStyle(document.body).backgroundColor;
+    const lum = c => { const n = c.match(/[\d.]+/g).map(Number);
+                       return (0.2126*n[0] + 0.7152*n[1] + 0.0722*n[2]) / 255; };
+    return { picker: lum(cs.backgroundColor), page: lum(page) };
+  });
+  check(Math.abs(picker.picker - picker.page) < 0.35,
+        `the picker wears the console's own skin, not the browser's default`);
+  await d.selectOption("#bAdd", opts[0]);
+  await d.waitForTimeout(200);
+  await d.selectOption("#bAdd", opts[1]);
+  await d.waitForTimeout(200);
+  check(await d.locator("#bundleEditor .rep").count() === 2, "both go into the bundle");
+
+  // the list total is the console's own sum of those plans
+  const listShown = await d.evaluate(() =>
+    document.querySelector("#bundleEditor .dl b").textContent);
+  /* the console's own sum of the two rows it is showing, so the total
+     is checked against the parts on screen rather than against a
+     second copy of the arithmetic here */
+  const rowPrices = await d.evaluate(() =>
+    [...document.querySelectorAll("#bundleEditor .rep .meta")].map(e => e.textContent));
+  const rowSum = rowPrices.reduce((s, t) => s + num(t), 0);
+  check(num(listShown) === rowSum,
+        `the list total is the sum of the rows shown: ${listShown} = ${rowSum}`);
+
+  // a price that is not a saving is refused, and says why
+  await d.fill('[data-b="bundle_price"]', String(num(listShown) + 1000));
+  await d.evaluate(() => { document.querySelector("#bActive").click(); });
+  await d.click("#saveBundle");
+  await d.waitForTimeout(500);
+  check((await d.locator("#toast").innerText()).includes("أقل من"),
+        `a price above the list total is refused: "${(await d.locator("#toast").innerText()).slice(0, 60)}"`);
+
+  // a real one saves
+  const price = Math.round(num(listShown) * 0.8);
+  await d.fill('[data-b="bundle_price"]', String(price));
+  await d.click("#saveBundle");
+  await d.waitForSelector("#bundles:not(.hidden)", { timeout: 10000 });
+  await d.waitForTimeout(600);
+  check(await d.locator("#bundles .prow", { hasText: "باقة من اللوحة" }).count() === 1,
+        "the new bundle appears in the list");
+
+  // and the storefront is serving it, at the price that was typed
+  const served = await d.evaluate(async ([b, s]) => {
+    const rows = await (await fetch(`${b}/rest/v1/public_bundles`)).json();
+    return rows.find(x => x.slug === s) || null;
+  }, [BASE, slug]);
+  check(!!served, "the storefront is serving the bundle the console just made");
+  check(served && Number(served.bundle_price) === price,
+        `at the price that was typed, not a percentage: ${served && served.bundle_price}`);
+  check(served && Number(served.list_total) === num(listShown),
+        `with the list total the console showed: ${served && served.list_total}`);
+
+  // deleting it takes it off the storefront
+  await d.locator("#bundles .prow", { hasText: "باقة من اللوحة" }).first().click();
+  await d.waitForSelector("#bundleEditor:not(.hidden)");
+  d.once("dialog", dlg => dlg.accept());
+  await d.click("#delBundle");
+  await d.waitForSelector("#bundles:not(.hidden)", { timeout: 10000 });
+  await d.waitForTimeout(600);
+  const goneFromShop = await d.evaluate(async ([b, s]) => {
+    const rows = await (await fetch(`${b}/rest/v1/public_bundles`)).json();
+    return !rows.some(x => x.slug === s);
+  }, [BASE, slug]);
+  check(goneFromShop, "deleting it takes it off the storefront");
+  await d.close();
+
   check(errs.length === 0, `no JS errors${errs.length ? " -> " + errs.slice(0, 3).join(" | ") : ""}`);
   await browser.close();
   console.log(fail ? `\n\x1b[31m${fail} FAILED\x1b[0m` : "\n\x1b[32mALL BUNDLE CHECKS PASSED\x1b[0m");

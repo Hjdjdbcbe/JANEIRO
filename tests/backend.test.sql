@@ -923,6 +923,7 @@ declare
   v_oid    uuid;
   v_ok     boolean;
   v_items  jsonb;
+  v_admin  uuid;
 begin
   raise notice '===== bundles =====';
   select id into v_pm from payment_methods where is_active limit 1;
@@ -1106,6 +1107,70 @@ begin
   assert (v_res->>'total')::numeric = (v_res->>'subtotal')::numeric,
          'and its total is still its subtotal';
   raise notice 'PASS  an order without a bundle is unchanged';
+
+  -- ---------- the admin RPCs ----------
+  -- editing a LIVE bundle's items: the shape rules must judge the
+  -- finished bundle, not the moment in the middle of the edit when it
+  -- is briefly one product long
+  v_admin := gen_random_uuid();
+  insert into auth.users(id) values (v_admin) on conflict (id) do nothing;
+  insert into profiles(id, role) values (v_admin, 'admin')
+    on conflict (id) do update set role = 'admin';
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_admin, 'role','authenticated')::text, true);
+
+  perform admin_upsert_bundle(jsonb_build_object(
+    'slug','test-bundle-2','name','باقة اختبار ٢','bundle_price', 2800, 'is_active', true,
+    'items', jsonb_build_array(
+      jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1),
+      jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2))));
+  assert (select is_active from bundles where slug='test-bundle-2'), 'the bundle went live';
+  assert (select count(*) from bundle_items bi join bundles b on b.id=bi.bundle_id
+           where b.slug='test-bundle-2') = 2, 'with both products';
+
+  perform admin_upsert_bundle(jsonb_build_object(
+    'slug','test-bundle-2','name','باقة اختبار ٢','bundle_price', 3800, 'is_active', true,
+    'items', jsonb_build_array(
+      jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1),
+      jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2),
+      jsonb_build_object('product_id', v_p3, 'plan_id', v_pl3))));
+  assert (select count(*) from bundle_items bi join bundles b on b.id=bi.bundle_id
+           where b.slug='test-bundle-2') = 3, 'a live bundle can be edited to three products';
+  raise notice 'PASS  a live bundle can have its products replaced';
+
+  -- and the rules still bite through the RPC
+  v_ok := false;
+  begin
+    perform admin_upsert_bundle(jsonb_build_object(
+      'slug','test-bundle-3','name','باقة غالية','bundle_price', 99999, 'is_active', true,
+      'items', jsonb_build_array(
+        jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1),
+        jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2))));
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_PRICE_NOT_LOWER%';
+  end;
+  assert v_ok, 'the RPC cannot bypass the saving rule';
+  raise notice 'PASS  the RPC cannot save a bundle that is not a saving';
+
+  assert (select count(*) from jsonb_array_elements(admin_list_bundles())) >= 1,
+         'admin_list_bundles returns the bundles';
+  assert (select (e->>'list_total')::numeric
+            from jsonb_array_elements(admin_list_bundles()) e
+           where e->>'slug' = 'test-bundle-2') = 4500,
+         'and carries the list total the price is judged against';
+  raise notice 'PASS  admin_list_bundles reports each bundle and its list total';
+
+  -- deleting one leaves the orders that carried it readable
+  perform admin_delete_bundle((select id from bundles where slug='test-bundle'));
+  assert (select count(*) from order_items
+           where bundle_name_snapshot = 'باقة اختبار') > 0,
+         'the lines survive with the bundle name they were sold under';
+  assert (select bundle_id from order_items
+           where bundle_name_snapshot = 'باقة اختبار' limit 1) is null,
+         'and simply lose the pointer';
+  raise notice 'PASS  deleting a bundle keeps the history readable';
+
+  perform set_config('request.jwt.claims', '', true);
 
   raise notice '===== bundle tests passed =====';
 end $$;

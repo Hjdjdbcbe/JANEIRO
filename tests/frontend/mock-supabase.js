@@ -174,6 +174,19 @@ async function adminRpc(name, req, res) {
                                 [JSON.stringify(body.p_payload)], uid);
       return send(res, 200, rows[0].r);
     }
+    if (name === "admin_list_bundles") {
+      const rows = await asUser("select admin_list_bundles() as r", [], uid);
+      return send(res, 200, rows[0].r);
+    }
+    if (name === "admin_upsert_bundle") {
+      const rows = await asUser("select admin_upsert_bundle($1::jsonb) as r",
+                                [JSON.stringify(body.p_payload)], uid);
+      return send(res, 200, rows[0].r);
+    }
+    if (name === "admin_delete_bundle") {
+      const rows = await asUser("select admin_delete_bundle($1::uuid) as r", [body.p_id], uid);
+      return send(res, 200, rows[0].r);
+    }
     if (name === "admin_archive_product") {
       const rows = await asUser("select admin_archive_product($1) as r", [body.p_slug], uid);
       return send(res, 200, rows[0].r);
