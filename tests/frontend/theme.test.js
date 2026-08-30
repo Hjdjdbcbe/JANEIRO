@@ -301,61 +301,98 @@ const SWEEP = () => {
     await g.addInitScript(t => localStorage.setItem("janeiro-theme", t), theme);
     await g.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
     await g.waitForTimeout(1000);
-    const info = await g.evaluate(() => {
-      /* The extent of the WORDS, not of .heroCopy: its box starts at the
-         top of the hero and its padding runs under the frosted header, so
-         sampling the whole thing measured the header's own near-white
-         glass and called it the artwork. */
-      const parts = [".eyebrow", "h1", ".lede", ".hero-cta"]
-        .map(q => document.querySelector(".hero " + q))
-        .filter(Boolean).map(e => e.getBoundingClientRect());
-      const x0 = Math.min(...parts.map(p => p.left)), x1 = Math.max(...parts.map(p => p.right));
-      const y0 = Math.min(...parts.map(p => p.top)),  y1 = Math.max(...parts.map(p => p.bottom));
-      return {
-        box: { x: Math.max(0, Math.round(x0)), y: Math.max(0, Math.round(y0)),
-               width: Math.round(x1 - x0), height: Math.round(y1 - y0) },
-        inks: [getComputedStyle(document.querySelector(".hero h1")).color,
-               getComputedStyle(document.querySelector(".hero .lede")).color],
-      };
+
+    /* One box per line, not one box around all of them. Scoring every ink
+       against the union of their boxes judged the lede by pixels three
+       lines above it and vice versa -- the earlier version of this did
+       exactly that, and reported a failure at the wrong element. */
+    const parts = await g.evaluate(() => {
+      const out = [];
+      /* .hbtn-2 is a translucent white pane, and the badge is another: a
+         label on one of those sits on the photo THROUGH its own fill, so
+         the fill is carried out as a veil and composited over the sampled
+         pixel here. Anything with a transparent background yields a=0 and
+         is scored against the bare photo. The primary button is an opaque
+         gradient and is scored by the sweep above instead. */
+      for (const q of [".eyebrow", "h1", "h1 .g", ".lede", ".hbtn-2"]) {
+        const e = document.querySelector(".hero " + q);
+        if (!e) continue;
+        const r = e.getBoundingClientRect();
+        const cs = getComputedStyle(e);
+        /* The gradient half of the heading paints its glyphs from a
+           background and sets color:transparent, so the computed colour is
+           not its ink. Score every stop it is painted from and keep the
+           worst -- that is the part of the word that is hardest to read. */
+        const clear = /rgba\([^)]*,\s*0\s*\)/.test(cs.color);
+        const inks = clear
+          ? (cs.backgroundImage.match(/rgba?\([^)]*\)/g) || [])
+          : [cs.color];
+        if (!inks.length) continue;
+        /* same WCAG size rule the sweep above uses: a 3:1 floor only for
+           text that is genuinely large, 4.5:1 for everything else */
+        const size = parseFloat(cs.fontSize), weight = +cs.fontWeight || 400;
+        const need = (size >= 24 || (size >= 18.66 && weight >= 700)) ? 3 : 4.5;
+        out.push({ q, inks, need, veil: clear ? "rgba(0,0,0,0)" : cs.backgroundColor,
+                   box: { x: Math.max(0, Math.round(r.left)), y: Math.max(0, Math.round(r.top)),
+                          width: Math.round(r.width), height: Math.round(r.height) } });
+      }
+      return out;
     });
+
+    /* Every line goes at once, not one at a time: a line box overlaps its
+       neighbour's, so hiding only the eyebrow left the top of the heading
+       inside the eyebrow's clip and scored the badge against its own
+       heading's ink. Each element's own translucent tint goes with it,
+       which only ever makes the reading harsher than the truth. */
     await g.evaluate(() => { document.querySelector(".heroCopy").style.visibility = "hidden"; });
     await g.waitForTimeout(150);
-    const shot = (await g.screenshot({ clip: info.box })).toString("base64");
-    const out = await g.evaluate(async ({ b64, inks }) => {
-      const img = new Image();
-      await new Promise(r => { img.onload = r; img.src = "data:image/png;base64," + b64; });
-      const c = document.createElement("canvas");
-      c.width = img.width; c.height = img.height;
-      const cx = c.getContext("2d");
-      cx.drawImage(img, 0, 0);
-      const d = cx.getImageData(0, 0, c.width, c.height).data;
-      const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
-      const lum = (r, g, b) => .2126 * f(r) + .7152 * f(g) + .0722 * f(b);
-      const ratio = (a, b) => { const [hi, lo] = [a, b].sort((x, y) => y - x); return (hi + .05) / (lo + .05); };
-      const parsed = inks.map(s => { const m = s.match(/[\d.]+/g); return lum(+m[0], +m[1], +m[2]); });
-      // worst = the ground pixel that gives the lowest ratio, per ink
-      const worst = parsed.map(() => ({ r: 99, px: null }));
-      for (let i = 0; i < d.length; i += 4) {
-        const l = lum(d[i], d[i+1], d[i+2]);
-        parsed.forEach((ink, k) => {
-          const v = ratio(ink, l);
-          if (v < worst[k].r) worst[k] = { r: +v.toFixed(2), px: [d[i], d[i+1], d[i+2]] };
-        });
-      }
-      return worst;
-    }, { b64: shot, inks: info.inks });
+
+    const results = [];
+    for (const part of parts) {
+      const b64 = (await g.screenshot({ clip: part.box })).toString("base64");
+      const worst = await g.evaluate(async ({ b64, inks, veil }) => {
+        const img = new Image();
+        await new Promise(r => { img.onload = r; img.src = "data:image/png;base64," + b64; });
+        const c = document.createElement("canvas");
+        c.width = img.width; c.height = img.height;
+        const cx = c.getContext("2d");
+        cx.drawImage(img, 0, 0);
+        const d = cx.getImageData(0, 0, c.width, c.height).data;
+        const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+        const lum = (r, g, b) => .2126 * f(r) + .7152 * f(g) + .0722 * f(b);
+        const num = s => (s.match(/[\d.]+/g) || []).map(Number);
+        const lis = inks.map(s => (n => lum(n[0], n[1], n[2]))(num(s)));
+        const v = num(veil);                                  // [r,g,b] or [r,g,b,a]
+        const a = v.length ? (v[3] === undefined ? 1 : v[3]) : 0;
+        let lo = 99, px = null;
+        for (let i = 0; i < d.length; i += 4) {
+          let [r, gg, bb] = [d[i], d[i+1], d[i+2]];
+          if (a) { r = r * (1 - a) + v[0] * a; gg = gg * (1 - a) + v[1] * a; bb = bb * (1 - a) + v[2] * a; }
+          const l = lum(r, gg, bb);
+          for (const li of lis) {
+            const [hi, low] = [li, l].sort((x, y) => y - x);
+            const ratio = (hi + .05) / (low + .05);
+            if (ratio < lo) { lo = ratio, px = [r, gg, bb].map(Math.round); }
+          }
+        }
+        return { r: +lo.toFixed(2), px };
+      }, { b64, inks: part.inks, veil: part.veil });
+      results.push({ q: part.q, need: part.need, ...worst });
+    }
     await g.close();
-    return out;
+    return results;
   };
 
   for (const [vp, name] of [[{ width: 1440, height: 900 }, "desktop"],
                             [{ width: 390, height: 844 }, "mobile"],
                             [{ width: 380, height: 820 }, "380px"]]) {
     for (const theme of ["light", "dark"]) {
-      const [h, l] = await heroContrast(vp, theme);
-      check(h.r >= 4.5 && l.r >= 4.5,
+      const lines = await heroContrast(vp, theme);
+      const under = lines.filter(x => x.r < x.need);
+      check(under.length === 0,
         `${name}/${theme}: hero copy holds against the artwork ` +
-        `(heading ${h.r}:1, lede ${l.r}:1, worst pixel rgb(${l.px})`.concat(")"));
+        `(${lines.map(x => `${x.q} ${x.r}:1/${x.need}`).join(", ")}` +
+        (under.length ? ` — worst ground rgb(${under[0].px})` : "") + ")");
     }
   }
 

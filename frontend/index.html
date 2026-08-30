@@ -20,8 +20,7 @@
 <meta property="og:description" content="اشتراكات ومنتجات رقمية موثوقة بأسعار مناسبة للسوق الجزائري وتفعيل سريع.">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="ar_DZ">
-<link rel="preload" href="assets/hero/hero-mobile.webp" as="image" media="(max-width:767px)" fetchpriority="high">
-<link rel="preload" href="assets/hero/hero-desktop.webp" as="image" media="(min-width:768px)" fetchpriority="high">
+<link rel="preload" href="assets/hero/hero-banner.webp" as="image" fetchpriority="high">
 <link rel="preload" href="assets/fonts/cairo-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/lalezar-400-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <script>
@@ -352,20 +351,19 @@ header.stuck{padding-top:8px}
 }
 header.stuck .hshell{background:var(--glass-solid);box-shadow:0 8px 26px rgba(8,9,20,.16)}
 
-/* At the top the bar floats over the hero, which is a dark photograph in
-   BOTH themes -- a white glass there turns muddy grey and takes the nav
-   down with it. So the bar borrows the hero's world until the first
-   scroll, then returns to the page's. This is the same "less transparent
-   after scrolling" behaviour, doing double duty. */
-html[data-page="home"] header:not(.stuck) .hshell{background:rgba(18,16,38,.44);border-color:rgba(255,255,255,.16)}
-html[data-page="home"] header:not(.stuck) .hbar,
-html[data-page="home"] header:not(.stuck) .brand b,
-html[data-page="home"] header:not(.stuck) .ibtn{color:#fff}
-html[data-page="home"] header:not(.stuck) .nav button{color:rgba(255,255,255,.78)}
-html[data-page="home"] header:not(.stuck) .nav button:hover,
-html[data-page="home"] header:not(.stuck) .nav button.on{color:#fff}
-html[data-page="home"] header:not(.stuck) .ibtn:hover{background:rgba(255,255,255,.14);color:#fff}
-html[data-page="home"] header:not(.stuck) .cbadge{box-shadow:0 0 0 2px rgba(18,16,38,.9)}
+/* While it floats over the hero the bar is over a fixed daylight
+   photograph, and a photograph does not follow the theme -- so over the
+   hero neither does the bar. In dark mode the dark glass composited to
+   mid-grey against the bright banner and left the nav at 1.5:1. The whole
+   header takes its ink from --ink/--ink-2, so scoping those two here turns
+   the brand, the links and the icons together. Once the bar leaves the
+   hero (.stuck, or any other page) it is the page's own glass again. */
+html[data-page="home"] header:not(.stuck) .hshell{
+  --ink:#15152A; --ink-2:#46465E; --accent-ink:#5B21B6;
+  --surface:rgba(21,21,42,.06);
+  background:rgba(255,255,255,.74);
+  border-color:rgba(21,21,42,.12)}
+
 @media(min-width:768px){header{padding-inline:var(--s8)}}
 
 .hbar{display:flex;align-items:center;gap:var(--s2);height:60px;padding-inline:var(--s4);
@@ -430,84 +428,91 @@ header.stuck .hbar{height:54px}
 @media(min-width:900px){.menu-btn{display:none}}
 
 /* ============ HERO ============
-   The artwork is the section's ground, and it is dark in both themes --
-   a deliberate fixed surface, like the product poster. Everything printed
-   on it is therefore light, and takes its colours from the hero's own set
-   rather than the page's, which would flip underneath it.
+   Daylight photography, so the section is a fixed LIGHT surface in both
+   themes -- like the product poster, which is also artwork rather than
+   chrome. Its ink is therefore dark in both, taken from the hero's own
+   set so a theme flip cannot turn it white on white.
 
-   Two compositions, not two sizes: the wide one carries its logos on the
-   left and leaves the right clear, the square one stacks them above a
-   clear lower half. Preloaded with a media attribute so the right one is
-   requested before the stylesheet resolves it. */
+   One image at both sizes. The cards sit on the left of the frame and the
+   desk is empty on the right, which is where the copy goes. */
 .hero{
-  --hero-ink:#FFFFFF;
-  --hero-ink-2:#CFCBE8;
-  position:relative;isolation:isolate;display:flex;
-  /* Top-aligned on a phone: the copy is placed by its own padding, just
-     under the ticket line printed in the artwork. Bottom-aligning it
-     pushed that padding down as one block and opened a dead band between
-     the line and the first word. On desktop the artwork fills the section,
-     so the copy is centred in it. */
-  align-items:flex-start;
-  min-height:85vh;
-  /* Fitted to the WIDTH on a phone, not covered. The crop is square and
-     the section is 85vh tall, so cover scaled it until all four logos ran
-     off both edges. At 100% width the composition stays whole, occupying
-     the top square, and the flat ground it already fades to carries the
-     rest -- which is where the copy goes, below the dotted line printed in
-     the artwork itself. */
-  background:#0B0B1A url(assets/hero/hero-mobile.webp) center top/100% auto no-repeat;
+  --hero-ink:#15152A;
+  --hero-ink-2:#46465E;
+  position:relative;isolation:isolate;display:flex;align-items:flex-end;
+  min-height:60vh;
+  background:#EFEDF6 url(assets/hero/hero-banner.webp) left center/cover no-repeat;
 }
 @media(min-width:768px){
-  .hero{align-items:flex-end;min-height:60vh;max-height:640px;
-    background-image:url(assets/hero/hero-desktop.webp);
-    background-position:left center;background-size:cover}
+  .hero{min-height:55vh;max-height:560px}
 }
-/* Reading layer: the artwork's lower half is dark but not uniform, and the
-   copy sits on it. Measured against the rendered pixels, not guessed. */
-/* stops in vw on the phone so they follow the artwork, which is a square
-   at the top rather than a stretched cover */
+
+/* A light wash, not a dark one: the photograph is bright, and dimming it
+   to carry white text would throw away the daylight that makes it work.
+   Horizontal on a desktop, where the frame really does have an empty
+   right half to sit in. On a phone the frame is cropped to roughly a
+   third of its width and no horizontal band is reliably empty, so the
+   wash runs bottom-up instead and the copy sits under the cards. */
 .hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(to bottom,
-    rgba(11,11,26,0) 42vw, rgba(11,11,26,.72) 76vw, rgba(11,11,26,.94) 96vw)}
+  background:linear-gradient(to top,
+    rgba(255,255,255,.96) 0%, rgba(255,255,255,.94) 42%,
+    rgba(255,255,255,.90) 58%, rgba(255,255,255,.30) 72%,
+    rgba(255,255,255,0) 84%)}
 @media(min-width:768px){
-  .hero::after{background:linear-gradient(to top,
-    rgba(11,11,26,.94) 0%, rgba(11,11,26,.86) 26%,
-    rgba(11,11,26,.55) 52%, rgba(11,11,26,0) 82%)}
+  .hero::after{background:linear-gradient(to left,
+    rgba(255,255,255,.92) 0%, rgba(255,255,255,.86) 34%,
+    rgba(255,255,255,.55) 58%, rgba(255,255,255,0) 82%)}
 }
 
 .heroCopy{position:relative;z-index:1;width:100%;
-  padding-top:76vw;padding-bottom:var(--s10,40px)}
-@media(min-width:768px){.heroCopy{padding-top:calc(var(--hdr-space) + var(--s8))}}
-/* The wide crop carries its logos on the left, so the copy is held to the
-   clear half. Without this the block spans the full width -- the words
-   still sit right, but the h1 box reaches across the artwork and the first
-   line lands on a lit tile. inline-end is the LEFT here. */
+  padding-top:var(--s16);padding-bottom:var(--s8)}
 @media(min-width:768px){
-  .heroCopy{padding-inline-end:46%;padding-bottom:var(--s12)}
+  /* held to the empty half; in RTL the copy is already in the physical
+     right, so the space is reserved on the inline-END side */
+  .heroCopy{padding-inline-end:44%;padding-top:calc(var(--hdr-space) + var(--s6));
+    padding-bottom:var(--s10,40px)}
 }
-@media(min-width:1220px){.heroCopy{padding-inline-end:48%}}
+@media(min-width:1220px){.heroCopy{padding-inline-end:46%}}
 
-.hero .eyebrow{color:#D8C9FF;background:rgba(124,58,237,.28);
-  border:1px solid rgba(196,181,253,.42)}
-.hero .eyebrow::before{background:#D8C9FF}
-.hero h1{font-size:clamp(28px,7.6vw,50px);letter-spacing:normal;line-height:1.34;
+/* The pill three eyebrows share -- the hero, the offers header and the
+   category line on a product page. Its base rule was lost when the hero
+   was rebuilt, which left all three as bare inline spans at body size;
+   restored here on the theme's own tokens, with the hero overriding only
+   the colours it needs over a photograph. */
+.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+  color:var(--accent-ink);background:var(--tint-1);border:1px solid var(--line-2);
+  padding:6px 14px;border-radius:var(--r-pill);margin-bottom:var(--s4)}
+.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+
+/* A purple tint at 13% is not a surface: on a phone the badge sits where
+   the wash has let go, and its ink measured 2.9:1 over the photograph. It
+   carries its own frosted pane now -- the same one the secondary button
+   uses, so the two read as one family. */
+.hero .eyebrow{color:#5B21B6;background:rgba(255,255,255,.78);
+  border:1px solid rgba(124,58,237,.30)}
+@supports(backdrop-filter:blur(1px)){.hero .eyebrow{backdrop-filter:blur(8px)}}
+.hero .eyebrow::before{background:#7C3AED}
+.hero h1{font-size:clamp(27px,7vw,46px);letter-spacing:normal;line-height:1.34;
   color:var(--hero-ink)}
-.hero h1 .g{background:linear-gradient(120deg,#C4B5FD,#7DD3FC);
+/* Painted glyphs, so the gradient IS the ink and its blue end is the
+   thinnest part of it. #2563EB reads 2.8:1 where the phone's wash lets the
+   photograph through; #1D4ED8 is the same hue one step down and clears the
+   3:1 a heading of this size needs. The buttons keep #2563EB, where the
+   ink is white and the gradient is the ground. */
+.hero h1 .g{background:linear-gradient(120deg,#7C3AED,#1D4ED8);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.hero .lede{color:var(--hero-ink-2);font-size:15.5px;margin-top:var(--s4);max-width:44ch}
+.hero .lede{color:var(--hero-ink-2);font-size:15.5px;margin-top:var(--s4);max-width:42ch}
 .hero-cta{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
-/* The blue stop is #2563EB, not #3B82F6. White on #3B82F6 measures
-   3.68:1 -- the label fails where the gradient reaches its blue end. Same
-   hue, one step darker, and the white clears 5.2:1. The purple start is
+/* The blue stop is #2563EB, not the #3B82F6 named in the brief: white on
+   #3B82F6 measures 3.68:1, so the label fails where the gradient reaches
+   its blue end. Same hue one step darker clears 5.2:1; the purple start is
    untouched at 5.7:1. */
 .hbtn-1{background:linear-gradient(120deg,#7C3AED,#2563EB);color:#fff;border-radius:12px;
-  box-shadow:0 10px 26px -10px rgba(124,58,237,.9)}
-.hbtn-1:hover{box-shadow:0 12px 30px -8px rgba(124,58,237,1)}
-.hbtn-2{background:rgba(255,255,255,.10);color:var(--hero-ink);border-radius:12px;
-  border:1px solid rgba(255,255,255,.34)}
+  box-shadow:0 10px 26px -10px rgba(124,58,237,.75)}
+.hbtn-1:hover{box-shadow:0 12px 30px -8px rgba(124,58,237,.95)}
+.hbtn-2{background:rgba(255,255,255,.72);color:var(--hero-ink);border-radius:12px;
+  border:1px solid rgba(124,58,237,.30)}
 @supports(backdrop-filter:blur(1px)){.hbtn-2{backdrop-filter:blur(8px)}}
-.hbtn-2:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)}
+.hbtn-2:hover{background:rgba(255,255,255,.9);border-color:rgba(124,58,237,.5)}
 
 /* the first section starts right under the artwork, not a screen later */
 #bestSec{padding-top:var(--s6)}

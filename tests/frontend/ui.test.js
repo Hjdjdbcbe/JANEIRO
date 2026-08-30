@@ -160,8 +160,38 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     return {
       bg: (cs.backgroundImage.match(/hero-[a-z]+/) || [])[0],
       size: cs.backgroundSize,
+      position: cs.backgroundPosition,
       height: Math.round(r.height),
-      overlay: getComputedStyle(el, "::after").backgroundImage.includes("gradient"),
+      /* the artwork is a daylight photograph, so the reading layer has to
+         be a white wash. A dark stop over it would be the old treatment. */
+      wash: (() => {
+        const g = getComputedStyle(el, "::after").backgroundImage;
+        if (!g.includes("gradient")) return null;
+        const stops = g.match(/rgba?\([^)]*\)/g) || [];
+        const opaque = stops.filter(c => {
+          const n = c.match(/[\d.]+/g).map(Number);
+          return (n[3] === undefined || n[3] > 0.02);
+        });
+        return {
+          any: true,
+          // every visible stop is white; none of them darkens the photo
+          allWhite: opaque.length > 0 && opaque.every(c => {
+            const n = c.match(/[\d.]+/g).map(Number);
+            return n[0] > 240 && n[1] > 240 && n[2] > 240;
+          }),
+          // and it fades right out, so the cards themselves stay uncovered
+          clears: stops.some(c => {
+            const n = c.match(/[\d.]+/g).map(Number);
+            return n[3] !== undefined && n[3] <= 0.02;
+          }),
+        };
+      })(),
+      /* dark ink, not white: the copy sits on a light wash now */
+      inkLum: (() => {
+        const n = getComputedStyle(el.querySelector("h1")).color.match(/[\d.]+/g).map(Number);
+        const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        return 0.2126 * f(n[0]) + 0.7152 * f(n[1]) + 0.0722 * f(n[2]);
+      })(),
       copy: {
         badge: !!el.querySelector(".eyebrow"),
         lines: (el.querySelector("h1")?.innerHTML.match(/<br>/g) || []).length + 1,
@@ -175,10 +205,17 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
       stale: document.querySelectorAll(".heroArt,#horbit,.hoBill,#featGrid,.hstage").length,
     };
   });
-  check(hero.bg === "hero-desktop", `a desktop column gets the wide crop: ${hero.bg}`);
+  check(hero.bg === "hero-banner", `one banner serves both breakpoints: ${hero.bg}`);
   check(hero.size === "cover", `the artwork covers its section: ${hero.size}`);
-  check(hero.height <= 640, `desktop height is capped: ${hero.height}px`);
-  check(hero.overlay, "a reading layer sits over the artwork");
+  check(/^(0%|0px|left)/.test(hero.position),
+        `the crop favours the cards on the left of the frame: ${hero.position}`);
+  check(hero.height <= 560, `desktop height is capped at 560: ${hero.height}px`);
+  check(!!hero.wash, "a reading layer sits over the artwork");
+  check(!!hero.wash && hero.wash.allWhite,
+        "and it is a white wash, not a dark gradient over a daylight photo");
+  check(!!hero.wash && hero.wash.clears,
+        "fading to nothing, so the product cards are never veiled");
+  check(hero.inkLum < 0.12, `the copy is dark ink, not white (luminance ${hero.inkLum.toFixed(3)})`);
   check(hero.copy.badge && hero.copy.lines === 2 && hero.copy.lede,
         `badge, a two-line heading and a lede (${hero.copy.lines} lines)`);
   check(hero.copy.buttons.length === 2,
@@ -339,7 +376,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   await scr.close();
 
   // ---------- narrow viewports ----------
-  for (const w of [375, 390, 430]) {
+  for (const w of [375, 380, 390, 430]) {
     const pm = await newPage({ viewport: { width: w, height: 820 } });
     await pm.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
     await pm.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
@@ -354,6 +391,30 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         .slice(0, 3).map(e => e.tagName + "." + (e.className || "").toString().slice(0, 30)),
     }));
     check(over.doc <= over.win + 1, `${w}px: no horizontal scroll (doc ${over.doc} vs win ${over.win})${over.offenders.length ? " -> " + over.offenders : ""}`);
+
+    /* the banner is the thing that ran away on a phone last time: it has to
+       fill 60vh and then stop, with الأكثر طلباً already on the first screen. */
+    const mh = await pm.evaluate(() => {
+      const el = document.querySelector(".hero");
+      const r = el.getBoundingClientRect();
+      const h1 = el.querySelector("h1").getBoundingClientRect();
+      const cta = [...el.querySelectorAll(".hero-cta button")].map(b => b.getBoundingClientRect());
+      const best = document.querySelector("#bestSec");
+      return {
+        vh: window.innerHeight,
+        height: Math.round(r.height),
+        // the copy stays inside its own section, nothing clipped away
+        fits: h1.top >= r.top - 1 && (cta.length ? cta[cta.length - 1].bottom <= r.bottom + 1 : false),
+        bestTop: best ? Math.round(best.getBoundingClientRect().top) : null,
+        gap: best ? Math.round(best.getBoundingClientRect().top - r.bottom) : null,
+      };
+    });
+    check(mh.height >= Math.round(mh.vh * 0.58) && mh.height <= Math.round(mh.vh * 0.72),
+          `${w}px: the banner holds 60vh without taking the screen (${mh.height}px of ${mh.vh}px)`);
+    check(mh.fits, `${w}px: badge, heading and both buttons sit inside the banner`);
+    check(mh.gap !== null && mh.gap <= 4, `${w}px: no dead space under the banner (${mh.gap}px)`);
+    check(mh.bestTop !== null && mh.bestTop < mh.vh,
+          `${w}px: الأكثر طلباً is already on the first screen (top ${mh.bestTop} of ${mh.vh})`);
     if (w === 390) await pm.screenshot({ path: "/tmp/claude-0/-home-user-JANEIRO/68cc013f-a073-5abe-9b55-e7d0bdbc6503/scratchpad/m390.png" });
     await pm.close();
   }
