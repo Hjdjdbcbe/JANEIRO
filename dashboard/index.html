@@ -1061,7 +1061,7 @@ async function loadQueue() {
 async function openOrder(id) {
   const [o] = await rest(
     "orders?select=*,payment_methods(label,type)," +
-    "order_items(product_name_snapshot,plan_name_snapshot,quantity,unit_price,total_price," +
+    "order_items(product_name_snapshot,plan_name_snapshot,quantity,unit_price,total_price,activation_type," +
     "warranty_label_snapshot,order_activation_data(field_label,field_value))," +
     "order_status_history(old_status,new_status,note,created_at)" +
     `&id=eq.${id}`);
@@ -1102,6 +1102,9 @@ async function openOrder(id) {
           </div>
           <div class="plan">${esc(it.plan_name_snapshot)}${it.quantity > 1 ? ` × ${it.quantity}` : ""}${
             it.warranty_label_snapshot ? ` · ${esc(it.warranty_label_snapshot)}` : ""}</div>
+          ${it.activation_type ? `<div class="act"><div class="r">
+            <span>نوع التفعيل</span><b>${esc(it.activation_type)}</b>
+          </div></div>` : ""}
           ${(it.order_activation_data || []).length ? `<div class="act">${
             it.order_activation_data.map(a => `<div class="r">
               <span>${esc(a.field_label)}</span>

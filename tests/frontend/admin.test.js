@@ -37,7 +37,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         body: JSON.stringify({
           name: "عميل لوحة", phone, payment_method_id: pm.id,
           idempotency_key: "admin-suite-" + Date.now() + "-" + Math.random().toString(36).slice(2),
-          items: [{ product_id: prod.id, plan_id: plan.id, quantity: 1, activation: [
+          items: [{ product_id: prod.id, plan_id: plan.id, quantity: 1,
+            activation_type: "تفعيل عبر دعوة/رابط", activation: [
             { label: "بريد Gmail للتفعيل", value: "console@gmail.com" },
             { label: "رقم الهاتف المرتبط", value: phone }] }],
         }),
@@ -164,6 +165,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   const body = await p.locator("#detailBody").innerText();
   check(body.includes(seeded.number), "the order number is shown");
   check(body.includes("console@gmail.com"), "the activation data the owner must act on is visible");
+  check(body.includes("نوع التفعيل") && body.includes("تفعيل عبر دعوة/رابط"),
+        "the نوع التفعيل the customer chose is on the order the owner works from");
   check(body.includes(seeded.phone), "the customer's phone is shown");
   check(body.includes("4821990"), "the payment reference is shown");
   check(await p.locator("#receiptBtn").count() === 1, "there is a way to open the payment receipt");

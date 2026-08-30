@@ -227,6 +227,7 @@ export async function createOrder({ name, phone, wilaya, paymentMethodId, items,
       plan_id: i.planId,
       quantity: i.qty,
       activation: i.activation ?? [],
+      activation_type: i.activationType ?? null,
     })),
     idempotency_key: idempotencyKey,
   });
@@ -282,7 +283,8 @@ export function buildWhatsAppUrl(number, order, items, currency = "دج") {
     "السلام عليكم، أكملت طلبي من Janeiro Store.", "",
     `رقم الطلب: ${order.order_number}`, "",
   ];
-  items.forEach((i) => lines.push(`المنتج: ${i.name} — ${i.plan}`));
+  items.forEach((i) => lines.push(
+    `المنتج: ${i.name} — ${i.plan}` + (i.act ? ` — ${i.act}` : "")));
   lines.push("", `المبلغ: ${order.total} ${currency}`, "",
     "تم رفع وصل الدفع من الموقع.", "أريد متابعة طلبي.");
   return `https://wa.me/${number}?text=${encodeURIComponent(lines.join("\n"))}`;

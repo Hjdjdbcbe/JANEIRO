@@ -31,7 +31,7 @@ async function buildMessage(db: SupabaseClient, orderId: string): Promise<string
 
   const { data: items } = await db
     .from("order_items")
-    .select(`product_name_snapshot, plan_name_snapshot, quantity, total_price,
+    .select(`product_name_snapshot, plan_name_snapshot, quantity, total_price, activation_type,
              order_activation_data ( field_label, field_value )`)
     .eq("order_id", orderId);
 
@@ -46,6 +46,7 @@ async function buildMessage(db: SupabaseClient, orderId: string): Promise<string
   for (const it of items ?? []) {
     lines.push(`• ${it.product_name_snapshot}`);
     lines.push(`  الخطة: ${it.plan_name_snapshot}`);
+    if (it.activation_type) lines.push(`  نوع التفعيل: ${it.activation_type}`);
     lines.push(`  الكمية: ${it.quantity}`);
     lines.push(`  السعر: ${it.total_price} ${o?.currency ?? "دج"}`);
     const act = (it as { order_activation_data?: { field_label: string; field_value: string }[] })

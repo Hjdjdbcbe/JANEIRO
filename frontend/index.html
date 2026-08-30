@@ -12,6 +12,10 @@
      The anon key is public by design; the service_role key must NEVER
      appear in any file the browser can load. -->
 <script src="config.js" onerror="/* not configured yet */"></script>
+<!-- أنواع التفعيل: قائمة واحدة يعدّلها صاحب المتجر بلا هجرة ولا بناء.
+     onerror يبقي الصفحة تعمل إن غاب الملف -- الكود يعود إلى خيارين
+     افتراضيين بدل أن يعرض قائمة فارغة يستحيل إتمام الطلب منها. -->
+<script src="activation-types.js" onerror="/* falls back to the built-in pair */"></script>
 <link rel="icon" type="image/png" href="assets/janeiro-logo.png">
 <link rel="apple-touch-icon" href="assets/janeiro-logo.png">
 <title>Janeiro Store — كل أدواتك الرقمية في مكان واحد</title>
@@ -903,6 +907,45 @@ header.stuck .hbar{height:54px}
 .field input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
   background:var(--card);outline:0;transition:border-color .15s,box-shadow .15s}
 .field input:focus{border-color:var(--accent-ink);box-shadow:var(--ring)}
+/* The one <select> on the storefront. Same box as an input, with the
+   chevron drawn in so the native arrow does not sit on the wrong side
+   in RTL. currentColor keeps it right in both themes. */
+.field select{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  background:var(--card);color:inherit;font-size:15px;outline:0;appearance:none;
+  transition:border-color .15s,box-shadow .15s;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),
+                   linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-size:6px 6px,6px 6px;
+  background-position:left 16px top calc(50% - 2px),left 22px top calc(50% - 2px);
+  background-repeat:no-repeat;padding-inline-start:38px}
+.field select:focus{border-color:var(--accent-ink);box-shadow:var(--ring)}
+
+/* Validation. The message lives under its own field rather than in a
+   toast: a toast names one problem at a time and then disappears, and
+   three empty fields need three answers on screen at once. */
+/* the body face, not the display one: the asterisk sits inside an h3
+   and a label, and Lalezar has a single weight -- 700 there is a faux
+   bold the browser paints itself */
+.req{font-family:var(--f-body);font-weight:700;color:#D92D20;margin-inline-start:3px}
+[data-theme="dark"] .req{color:#FF7B72}
+/* The line is always in the layout and only its ink is switched on.
+   Revealing it with display:none -> block grew the field by 19px, and
+   that happened on BLUR -- so a customer who typed a bad number and
+   then tapped "التالي" had the button slide out from under their
+   finger between press and release, and the tap was swallowed. Caught
+   by pressing it once in a screenshot run; the regression test now
+   presses it exactly once. */
+.field .err{visibility:hidden;min-height:1.1em;font-size:12.5px;font-weight:600;
+  color:#B42318;margin-top:6px}
+[data-theme="dark"] .field .err{color:#FF9A92}
+.field.bad .err{visibility:visible}
+.field.bad input,.field.bad select{border-color:#D92D20}
+.field.bad input:focus,.field.bad select:focus{box-shadow:0 0 0 3px rgba(217,45,32,.18)}
+.pay2.bad .paybtn{border-color:#D92D20}
+.cherr{visibility:hidden;min-height:1.1em;font-size:12.5px;font-weight:600;
+  color:#B42318;margin-top:8px}
+[data-theme="dark"] .cherr{color:#FF9A92}
+.pay2.bad ~ .cherr{visibility:visible}
 .pay2{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2)}
 .paybtn{border:1.5px solid var(--line);border-radius:13px;padding:14px 8px;text-align:center;
   font-size:13px;font-weight:600;transition:border-color .15s,background .15s}
@@ -1265,6 +1308,15 @@ footer ul button:hover{color:var(--text-on-dark)}
         <div class="card"><h3>اختر الخطة</h3><div id="dPlans" role="radiogroup" aria-label="الخطط"></div></div>
 
         <div class="card">
+          <h3>نوع التفعيل</h3>
+          <div class="field" style="margin:0">
+            <label for="dActType">كيف تريد أن يتم التفعيل؟</label>
+            <select id="dActType" aria-describedby="dActHint"></select>
+            <p class="sub" id="dActHint" style="margin-top:6px">يُحفظ اختيارك مع الطلب.</p>
+          </div>
+        </div>
+
+        <div class="card">
           <h3>ما ستحصل عليه</h3>
           <ul class="feat" id="dFeat"></ul>
         </div>
@@ -1273,7 +1325,6 @@ footer ul button:hover{color:var(--text-on-dark)}
           <h3>معلومات التسليم</h3>
           <div class="dl">
             <div><span>مدة التسليم</span><b id="dDeliv"></b></div>
-            <div><span>ما نطلبه للتفعيل</span><b id="dFields"></b></div>
             <div><span>الضمان</span><b id="dWar"></b></div>
             <div><span>الاسترجاع</span><b>يُسترجع المبلغ كاملاً إذا تعذّر التفعيل</b></div>
           </div>
@@ -1307,19 +1358,28 @@ footer ul button:hover{color:var(--text-on-dark)}
 
     <div id="o1">
       <div class="card" style="margin-top:0">
-        <h3>قناة المتابعة</h3>
-        <div class="pay2" style="grid-template-columns:repeat(2,1fr)" role="radiogroup" aria-label="قناة المتابعة">
-          <button class="paybtn" role="radio" aria-checked="true" onclick="setChannel(this,'واتساب')">واتساب</button>
+        <h3>قناة المتابعة <span class="req" aria-hidden="true">*</span></h3>
+        <div class="pay2" id="chanBox" style="grid-template-columns:repeat(2,1fr)" role="radiogroup" aria-label="قناة المتابعة" aria-required="true">
+          <button class="paybtn" role="radio" aria-checked="false" onclick="setChannel(this,'واتساب')">واتساب</button>
           <button class="paybtn" role="radio" aria-checked="false" onclick="setChannel(this,'إنستغرام')">إنستغرام</button>
         </div>
+        <p class="cherr" id="chanErr" role="alert">الرجاء اختيار قناة المتابعة</p>
       </div>
       <div class="card">
         <h3>بياناتك</h3>
-        <div class="field"><label for="fName">الاسم الكامل</label><input id="fName" placeholder="مثال: أمين ب."></div>
-        <div class="field"><label for="fPhone">رقم الهاتف <span class="sub">— للتواصل فقط</span></label><input id="fPhone" class="mono" inputmode="tel" placeholder="0X XX XX XX XX"></div>
+        <div class="field" id="fldName">
+          <label for="fName">الاسم الكامل <span class="req" aria-hidden="true">*</span></label>
+          <input id="fName" placeholder="مثال: أمين ب." required aria-required="true" aria-describedby="errName" onblur="validateName()" oninput="clearErr('fldName')">
+          <p class="err" id="errName" role="alert">الاسم مطلوب</p>
+        </div>
+        <div class="field" id="fldPhone">
+          <label for="fPhone">رقم الهاتف <span class="req" aria-hidden="true">*</span> <span class="sub">— للتواصل فقط</span></label>
+          <input id="fPhone" class="mono" inputmode="numeric" placeholder="0550123456" required aria-required="true" aria-describedby="errPhone" onblur="validatePhone()" oninput="clearErr('fldPhone')">
+          <p class="err" id="errPhone" role="alert">رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07</p>
+        </div>
         <div class="field" style="margin:0"><label for="fWilaya">الولاية <span class="sub">— اختياري</span></label><input id="fWilaya" placeholder="مثال: الجزائر"></div>
       </div>
-      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(2)">التالي — طريقة الدفع</button>
+      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="nextFromDetails()">التالي — طريقة الدفع</button>
     </div>
 
     <div id="o2" class="hidden">
@@ -2017,6 +2077,27 @@ function go(page,filter){
    DETAIL
    ================================================================ */
 let cur=null,curPlan=0;
+
+/* نوع التفعيل. The list is data the owner edits in one file; these two
+   are the floor under it, used when activation-types.js is missing,
+   empty or full of blanks. An empty <select> would make every order
+   impossible to place, so the page never renders one. */
+const ACT_TYPE_FALLBACK = ["تفعيل مباشر", "تفعيل عبر دعوة/رابط"];
+function activationTypes(){
+  const list = Array.isArray(window.JANEIRO_ACTIVATION_TYPES) ? window.JANEIRO_ACTIVATION_TYPES : [];
+  const clean = list.map(t => String(t ?? "").trim()).filter(t => t && t.length <= 60);
+  return clean.length ? clean : ACT_TYPE_FALLBACK;
+}
+function renderActTypes(){
+  const el=$("#dActType");
+  const opts=activationTypes();
+  el.innerHTML=opts.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  el.value=opts[0];
+}
+/* What a cart line carries when it was added before this field existed,
+   or from a product page that could not render the list. */
+const defaultActType = () => activationTypes()[0];
+
 /* planId lets a deal card open straight onto the discounted plan
    instead of the first one. */
 function openDetail(id, planId){
@@ -2028,7 +2109,7 @@ function openDetail(id, planId){
   $("#dDesc").textContent=cur.desc;
   $("#dDeliv").textContent=cur.delivery;
   $("#dWar").textContent=cur.warranty;
-  $("#dFields").textContent=cur.fields.length?cur.fields.map(f=>f.l).join(" · "):"—";
+  renderActTypes();
   $("#dFeat").innerHTML=cur.features.map(f=>
     `<li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4.5 4.5L19 7"/></svg>${f}</li>`).join("");
   $("#dPlans").innerHTML=cur.plans.length
@@ -2047,7 +2128,7 @@ function setPlan(i){
 }
 function addCurrent(buyNow){
   if(!cur.available||!cur.plans.length){ toast("هذا المنتج غير متوفر حالياً"); return; }
-  addToCart(cur.id,curPlan);
+  addToCart(cur.id,curPlan,($("#dActType")||{}).value);
   if(buyNow) go("order"); 
 }
 
@@ -2055,11 +2136,17 @@ function addCurrent(buyNow){
    CART
    ================================================================ */
 let CART=[];
-function addToCart(id,plan){
-  const ex=CART.find(c=>c.id===id&&c.plan===plan);
-  if(ex) ex.qty++; else CART.push({id,plan,qty:1});
+/* Two lines of the same plan merge only if they also share the
+   activation type: the same product ordered once for a direct
+   activation and once through an invite is two different jobs for
+   whoever fulfils it, so it stays two lines. */
+function addToCart(id,plan,actType){
+  const act=String(actType||"").trim()||defaultActType();
+  const ex=CART.find(c=>c.id===id&&c.plan===plan&&c.act===act);
+  if(ex) ex.qty++; else CART.push({id,plan,qty:1,act});
   renderCart(); pulseCart(); toast("أُضيف إلى السلة");
 }
+const lineActType = c => String(c.act||"").trim() || defaultActType();
 function chQty(i,d){ CART[i].qty+=d; if(CART[i].qty<1) CART.splice(i,1); renderCart(); }
 function delItem(i){ CART.splice(i,1); renderCart(); }
 function cartTotal(){ return CART.reduce((s,c)=>s+P(c.id).plans[c.plan].p*c.qty,0); }
@@ -2077,7 +2164,7 @@ function renderCart(){
     return `<div class="citem">
       <div class="cthumb" style="background:${hex2rgba(p.accent,.1)}">${brandLogo(p,24)}</div>
       <div class="cinfo">
-        <b>${p.name}</b><div class="pl">${pl.n}</div>
+        <b>${p.name}</b><div class="pl">${pl.n} · ${esc(lineActType(c))}</div>
         <div class="pr">${money(pl.p*c.qty)}</div>
         <div class="qty"><button onclick="chQty(${i},-1)" aria-label="إنقاص">−</button><span>${c.qty}</span><button onclick="chQty(${i},1)" aria-label="زيادة">+</button></div>
       </div>
@@ -2104,7 +2191,10 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePanels(); });
 /* ================================================================
    ORDER FLOW
    ================================================================ */
-let orderStep=1, payMethod=null, channel="واتساب";
+/* channel starts null, not "واتساب": a pre-ticked radio is an answer
+   the customer never gave, and the point of making it required is to
+   know which channel they actually want to be reached on. */
+let orderStep=1, payMethod=null, channel=null;
 let receiptFile=null, receiptName="";
 let submitting=false;
 /* The order number is issued by the server when the order is confirmed.
@@ -2128,6 +2218,59 @@ function setChannel(el,c){
   channel=c;
   [...el.parentNode.children].forEach(b=>b.setAttribute("aria-checked","false"));
   el.setAttribute("aria-checked","true");
+  el.parentNode.classList.remove("bad");
+}
+
+/* ---------------- validation ----------------
+   Three rules, checked in two places each: when a field loses focus,
+   so the customer is told early, and again on submit, so nothing
+   reaches the server half-filled. The messages live under the fields
+   they belong to rather than in a toast -- a toast shows one problem,
+   then vanishes; three empty fields need three answers on screen.
+
+   The phone rule is the local form of the one the database already
+   enforces (normalize_dz_phone): ten digits opening 05, 06 or 07.
+   Saying so here only means the customer hears it before the round
+   trip -- the server still refuses anything that does not match. */
+const setFieldErr = (id,bad) => $("#"+id).classList.toggle("bad",!!bad);
+function clearErr(id){ setFieldErr(id,false); }
+
+function validateName(){
+  const ok = $("#fName").value.trim().length > 0;
+  setFieldErr("fldName", !ok);
+  return ok;
+}
+/* Digits only, exactly ten, opening 05/06/07 -- read as typed. Nothing
+   is stripped first: a number written 0550 12 34 56 or +213550123456 is
+   told so and corrected by the customer, rather than silently rewritten
+   into something they never entered. The database is more forgiving
+   than this (it also takes +213 and 00213 forms); the stricter rule
+   here is the one the store asked its customers to follow. */
+const phoneValue = () => $("#fPhone").value.trim();
+function validatePhone(){
+  const ok = /^0[567][0-9]{8}$/.test(phoneValue());
+  setFieldErr("fldPhone", !ok);
+  return ok;
+}
+function validateChannel(){
+  const ok = channel === "واتساب" || channel === "إنستغرام";
+  $("#chanBox").classList.toggle("bad", !ok);
+  return ok;
+}
+/* Every rule runs; the first failure is what gets the caret, but the
+   customer sees all of them at once. */
+function validateDetails(){
+  const okChannel = validateChannel();
+  const okName    = validateName();
+  const okPhone   = validatePhone();
+  if(!okChannel){ $("#chanBox").querySelector(".paybtn").focus(); return false; }
+  if(!okName)   { $("#fName").focus();  return false; }
+  if(!okPhone)  { $("#fPhone").focus(); return false; }
+  return true;
+}
+function nextFromDetails(){
+  if(!validateDetails()) return;
+  step(2);
 }
 function setPay(el,id){
   payMethod=id;
@@ -2208,6 +2351,7 @@ function collectOrder(){
     items:CART.map((c,ci)=>{
       const p=P(c.id);
       return { name:p.name, plan:p.plans[c.plan].n, qty:c.qty, price:p.plans[c.plan].p*c.qty,
+        act:lineActType(c),
         data:p.fields.map((f,fi)=>({l:f.l, v:($(`[data-af="${ci}_${fi}"]`)||{}).value||"—"})) };
     }),
     total:cartTotal()
@@ -2223,6 +2367,7 @@ function cartForApi(){
       productId: p.id,
       planId:    p.plans[c.plan].id,
       qty:       c.qty,
+      activationType: lineActType(c),
       activation: p.fields.map((f,fi)=>({
         label: f.l,                                     // must match product_requirements.label
         value: (($(`[data-af="${ci}_${fi}"]`)||{}).value||"").trim()
@@ -2251,6 +2396,7 @@ function orderMessage(o){
   m+=`———————————\n`;
   o.items.forEach(it=>{
     m+=`• ${it.name} — ${it.plan}${it.qty>1?` ×${it.qty}`:""}\n`;
+    m+=`  نوع التفعيل: ${it.act}\n`;
     m+=`  السعر: ${money(it.price)}\n`;
     it.data.forEach(d=>{ m+=`  ${d.l}: ${d.v}\n`; });
   });
@@ -2269,7 +2415,7 @@ function orderMessage(o){
 function buildReview(){
   const o=collectOrder();
   $("#orderSummary").innerHTML =
-    o.items.map(it=>`<div class="r"><span>${it.name} — ${it.plan}${it.qty>1?` ×${it.qty}`:""}</span><b class="mono">${money(it.price)}</b></div>`).join("")
+    o.items.map(it=>`<div class="r"><span>${esc(it.name)} — ${esc(it.plan)} · ${esc(it.act)}${it.qty>1?` ×${it.qty}`:""}</span><b class="mono">${money(it.price)}</b></div>`).join("")
     + `<div class="r"><span>طريقة الدفع</span><b>${o.pay}</b></div>`
     + (o.ref?`<div class="r"><span>رقم العملية</span><b class="mono">${o.ref}</b></div>`:"")
     + `<div class="r"><span>وصل الدفع</span><b>${o.receipt?"✓ مُختار":"لم يُرفع"}</b></div>`
@@ -2296,9 +2442,19 @@ async function sendOrder(){
   if(submitting) return;                       // guards the double click
   if(!CART.length){ toast("سلتك فارغة"); return; }
 
-  const name=$("#fName").value.trim(), phone=$("#fPhone").value.trim();
-  if(name.length<2){ toast("أدخل اسمك الكامل"); step(1); $("#fName").focus(); return; }
-  if(!phone){ toast("أدخل رقم هاتفك"); step(1); $("#fPhone").focus(); return; }
+  /* The three required answers are checked again here, not only on the
+     way out of step 1: the customer can walk back, empty a field and
+     come forward through the step buttons. Failing sends them to the
+     step that owns the problem, with the messages already showing. */
+  if(!validateDetails()){
+    step(1);
+    validateDetails();                 // step() re-renders; paint them again
+    toast(!validateChannel() ? "الرجاء اختيار قناة المتابعة"
+        : !validateName()    ? "الاسم مطلوب"
+        : "رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07");
+    return;
+  }
+  const name=$("#fName").value.trim(), phone=phoneValue();
   if(!payMethod){ toast("اختر طريقة الدفع"); step(2); return; }
   if(!receiptFile){ toast("ارفع صورة وصل الدفع"); step(3); return; }
 
@@ -2333,7 +2489,7 @@ async function sendOrder(){
     /* 4) and only now do we open WhatsApp */
     const items=CART.map(c=>{
       const p=P(c.id);
-      return { name:p.name, plan:p.plans[c.plan].n };
+      return { name:p.name, plan:p.plans[c.plan].n, act:lineActType(c) };
     });
     const number = whatsappNumber || CONFIG.whatsapp;
     if(number) window.open(API.buildWhatsAppUrl(number, order, items, CONFIG.currency), "_blank");
@@ -2363,6 +2519,10 @@ function resetOrder(){
   /* Finishing an order is a fresh start, not a return to browsing. */
   scrollMemory.home = 0; scrollMemory.shop = 0;
   placedOrder=null; idemKey=null; receiptFile=null; receiptName="";
+  channel=null;
+  $$("#chanBox .paybtn").forEach(b=>b.setAttribute("aria-checked","false"));
+  $("#chanBox").classList.remove("bad");
+  ["fldName","fldPhone"].forEach(clearErr);
   $("#fRef").value=""; $("#dropLabel").classList.remove("filled");
   $("#dropText").textContent="اضغط لاختيار صورة الوصل";
   $("#receiptFile").value="";
@@ -2532,6 +2692,7 @@ Object.assign(window, {
   openDetail, setPlan, addCurrent,
   chQty, delItem, openPanel, closePanels,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
+  nextFromDetails, validateName, validatePhone, validateChannel, validateDetails, clearErr,
   runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch,
 });
 

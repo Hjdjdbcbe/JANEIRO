@@ -170,6 +170,13 @@ const dataUri = (file) => {
   html = html.replace(/<script src="config\.js"[^>]*><\/script>/,
     '<script>window.JANEIRO_CONFIG={SUPABASE_URL:"demo",SUPABASE_ANON_KEY:"demo"};</script>');
 
+  /* activation-types.js is a real file the owner edits, so the demo
+     carries its ACTUAL contents rather than a stand-in: a preview that
+     showed two options the file does not name would be lying about the
+     thing it is previewing. */
+  html = html.replace(/<script src="activation-types\.js"[^>]*><\/script>/, () =>
+    "<script>" + fs.readFileSync(path.join(ROOT, "frontend/activation-types.js"), "utf8") + "</script>");
+
   // ---------- 5. inline every asset the page references ----------
   /* src=, href= and srcset= as well as url(): the <picture> feeds the hero
      banner through <source srcset>, and a build that only rewrote src=

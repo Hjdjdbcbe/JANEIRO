@@ -134,6 +134,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         name: "عميل", phone: "0563" + Math.floor(100000 + Math.random() * 899999),
         payment_method_id: pm.id, idempotency_key: "editor-buy-" + Date.now(),
         items: [{ product_id: prod.id, plan_id: plan.id, quantity: 1,
+                  activation_type: "تفعيل مباشر",
                   activation: [{ label: req.label, value: "buyer@example.com" }] }],
       }) })).json();
     return { ok: r.ok, total: r.order?.total, planPrice: plan.price,

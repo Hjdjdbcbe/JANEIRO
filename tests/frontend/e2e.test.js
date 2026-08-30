@@ -66,9 +66,19 @@ const check = (c, m) => c ? ok(m) : bad(m);
   check((await page.locator("#dName").innerText()) === "Gemini Pro", "detail shows the product from the DB");
   const plans = await page.locator("#dPlans .opt").count();
   check(plans === 3, `detail shows ${plans} plans from the DB (expected 3)`);
-  const fields = await page.locator("#dFields").innerText();
-  check(fields.includes("بريد Gmail للتفعيل") && fields.includes("رقم الهاتف المرتبط"),
-        "activation requirements come from product_requirements");
+  /* نوع التفعيل: a real control on the product page, filled from the
+     one file the owner edits, with the first entry pre-selected. */
+  const act = await page.evaluate(() => {
+    const el = document.querySelector("#dActType");
+    return { tag: el.tagName, opts: [...el.options].map(o => o.value), value: el.value,
+             file: window.JANEIRO_ACTIVATION_TYPES };
+  });
+  check(act.tag === "SELECT", `نوع التفعيل is a dropdown, not free text: <${act.tag.toLowerCase()}>`);
+  check(JSON.stringify(act.opts) === JSON.stringify(act.file),
+        `its options are the file's, verbatim: ${act.opts.join(" / ")}`);
+  check(act.value === act.opts[0], `the first entry is pre-selected: ${act.value}`);
+  check((await page.locator("#detail").innerText()).indexOf("ما نطلبه للتفعيل") === -1,
+        "the old read-only 'ما نطلبه للتفعيل' row is gone");
   const war = await page.locator("#dWar").innerText();
   check(war.includes("ضمان طوال مدة الاشتراك"), `warranty derived from warranty_type: "${war}"`);
 
@@ -78,9 +88,86 @@ const check = (c, m) => c ? ok(m) : bad(m);
   await page.evaluate(() => window.go("order"));
   await page.waitForSelector("#order:not(.hidden)");
 
+  /* ---------- required fields on step 1 ----------
+     Everything empty: the step must not advance, and each rule must
+     say so under its own field rather than in a toast that vanishes. */
+  await page.click("#o1 .btn-primary");
+  await page.waitForTimeout(250);
+  const empty = await page.evaluate(() => ({
+    stillHere: !document.querySelector("#o1").classList.contains("hidden"),
+    chan:  document.querySelector("#chanBox").classList.contains("bad"),
+    chanMsg: getComputedStyle(document.querySelector("#chanErr")).visibility,
+    name:  document.querySelector("#fldName").classList.contains("bad"),
+    nameMsg: document.querySelector("#errName").textContent.trim(),
+    phone: document.querySelector("#fldPhone").classList.contains("bad"),
+    phoneMsg: document.querySelector("#errPhone").textContent.trim(),
+  }));
+  check(empty.stillHere, "an empty step 1 does not advance");
+  check(empty.chan && empty.chanMsg !== "hidden", "قناة المتابعة is flagged and its message shows");
+  check(empty.name && empty.nameMsg === "الاسم مطلوب", `name message: ${empty.nameMsg}`);
+  check(empty.phone && empty.phoneMsg === "رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07",
+        `phone message: ${empty.phoneMsg}`);
+
+  /* the phone rule, measured on blur -- not only on submit */
+  const phoneCases = [
+    ["055012345",   false, "nine digits"],
+    ["05501234567", false, "eleven digits"],
+    ["0450123456",  false, "starts 04"],
+    ["0850123456",  false, "starts 08"],
+    ["05a0123456",  false, "letters in it"],
+    ["0550123456",  true,  "05 + ten digits"],
+    ["0660123456",  true,  "06 + ten digits"],
+    ["0770123456",  true,  "07 + ten digits"],
+    ["0550 12 34 56", false, "spaces between the groups"],
+    ["+213550123456", false, "the +213 form"],
+    ["0550-123456",   false, "a dash in it"],
+  ];
+  for (const [value, ok, what] of phoneCases) {
+    await page.fill("#fPhone", value);
+    await page.locator("#fPhone").blur();
+    await page.waitForTimeout(60);
+    const bad = await page.evaluate(() => document.querySelector("#fldPhone").classList.contains("bad"));
+    check(bad !== ok, `${ok ? "accepts" : "rejects"} ${what}: ${value}`);
+  }
+
+  /* One press, not two. Revealing a message used to grow the field on
+     blur, which moved the button between press and release and threw
+     the tap away: typing a bad number and then reaching straight for
+     "التالي" did nothing at all. So this types into the phone, leaves
+     the caret there, and presses the button exactly once. */
+  /* Showing a message must not move anything. It used to: the line was
+     revealed with display:none -> block, which grew the field by 19px
+     ON BLUR -- so a customer who typed a bad number and reached
+     straight for "التالي" had the button slide out from under their
+     finger between press and release, and the press did nothing at
+     all. Measured here rather than described: the button's position is
+     read with the errors off, then with all three on. */
+  const shift = await page.evaluate(() => {
+    const btn = () => document.querySelector("#o1 .btn-primary").getBoundingClientRect().top;
+    document.querySelector("#chanBox").classList.remove("bad");
+    ["fldName","fldPhone"].forEach(id => document.querySelector("#"+id).classList.remove("bad"));
+    const clean = btn();
+    document.querySelector("#chanBox").classList.add("bad");
+    ["fldName","fldPhone"].forEach(id => document.querySelector("#"+id).classList.add("bad"));
+    const shown = btn();
+    return Math.round(shown - clean);
+  });
+  check(shift === 0, `three messages appearing move the button by ${shift}px`);
+
   await page.fill("#fName", "أمين بلقاسم");
+  await page.locator("#fName").blur();
   await page.fill("#fPhone", "0550123456");
   await page.fill("#fWilaya", "الجزائر");
+
+  // name and phone right, channel still unchosen -> still blocked
+  await page.click("#o1 .btn-primary");
+  await page.waitForTimeout(250);
+  check(await page.evaluate(() => !document.querySelector("#o1").classList.contains("hidden")),
+        "no channel means no order, even with the rest filled in");
+
+  await page.locator("#chanBox .paybtn").first().click();
+  check(await page.evaluate(() => !document.querySelector("#chanBox").classList.contains("bad")),
+        "choosing a channel clears its error");
   await page.click("#o1 .btn-primary");
 
   await page.waitForSelector("#o2:not(.hidden)");
@@ -126,6 +213,8 @@ const check = (c, m) => c ? ok(m) : bad(m);
   check(waUrl.startsWith("https://wa.me/213555123456"), `WhatsApp opened with the number from store_settings: ${waUrl.slice(0,34)}`);
   check(waUrl.includes(oid), "WhatsApp message carries the server's order number");
   check(!waUrl.includes("undefined") && !waUrl.includes("null"), "WhatsApp message has no undefined/null placeholders");
+  check(decodeURIComponent(waUrl).includes("تفعيل مباشر"),
+        "the chosen نوع التفعيل travels with the order to WhatsApp");
 
   // ---------- tracking ----------
   await page.evaluate(() => window.go("track"));

@@ -10,6 +10,7 @@ interface ItemIn {
   plan_id: string;
   quantity?: number;
   activation?: { label: string; value: string }[];
+  activation_type?: string;
 }
 
 Deno.serve(async (req) => {
@@ -48,6 +49,9 @@ Deno.serve(async (req) => {
       product_id: String(i.product_id),
       plan_id: String(i.plan_id),
       quantity: Math.max(1, Math.min(10, Number(i.quantity) || 1)),
+      // نوع التفعيل: trimmed to the column's limit, then judged by the
+      // RPC, which refuses a line that carries none.
+      activation_type: String(i.activation_type ?? "").trim().slice(0, 60),
       activation: Array.isArray(i.activation)
         ? i.activation.slice(0, 10).map((a) => ({
             label: String(a.label ?? "").slice(0, 120),

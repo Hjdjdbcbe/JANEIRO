@@ -43,6 +43,7 @@ begin
   -- ========== valid order ==========
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
       jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111'))));
@@ -53,6 +54,13 @@ begin
   assert (v_res->>'total')::numeric = (select price from product_plans where id = v_plan),
          'server computed total matches DB price';
   raise notice 'PASS  create valid order';
+
+  -- the choice made on the product page is stored on the line itself,
+  -- snapshotted like the plan name so editing the list later cannot
+  -- rewrite what an old order said
+  assert (select activation_type from order_items where order_id = v_oid) = 'تفعيل مباشر',
+         'نوع التفعيل stored on the order line';
+  raise notice 'PASS  نوع التفعيل stored on the line';
 
   -- ========== price tampering is ignored ==========
   -- The RPC signature accepts no price at all, so a manipulated cart
@@ -175,6 +183,7 @@ begin
     perform create_order('عميل','0550999008',null,v_pm,
       jsonb_build_array(jsonb_build_object(
         'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
+        'activation_type', 'تفعيل مباشر',
         'activation', '[]'::jsonb)),
       'test-key-009');
     raise exception 'FAILED: missing activation data accepted';
@@ -183,11 +192,62 @@ begin
   end;
   raise notice 'PASS  missing activation field rejected';
 
+  -- ========== نوع التفعيل: a line without one is refused ==========
+  begin
+    perform create_order('عميل','0550999011',null,v_pm,
+      jsonb_build_array(jsonb_build_object(
+        'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
+        'activation', jsonb_build_array(
+          jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
+          jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
+      'test-key-011');
+    raise exception 'FAILED: order without نوع التفعيل accepted';
+  exception when others then
+    assert sqlerrm like '%MISSING_ACTIVATION_TYPE%',
+           'expected MISSING_ACTIVATION_TYPE, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  order without نوع التفعيل rejected';
+
+  -- whitespace is not a choice either
+  begin
+    perform create_order('عميل','0550999012',null,v_pm,
+      jsonb_build_array(jsonb_build_object(
+        'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
+        'activation_type', '   ',
+        'activation', jsonb_build_array(
+          jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
+          jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
+      'test-key-012');
+    raise exception 'FAILED: blank نوع التفعيل accepted';
+  exception when others then
+    assert sqlerrm like '%MISSING_ACTIVATION_TYPE%',
+           'expected MISSING_ACTIVATION_TYPE, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  blank نوع التفعيل rejected';
+
+  -- and one longer than the column allows
+  begin
+    perform create_order('عميل','0550999013',null,v_pm,
+      jsonb_build_array(jsonb_build_object(
+        'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
+        'activation_type', repeat('ت', 61),
+        'activation', jsonb_build_array(
+          jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
+          jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
+      'test-key-013');
+    raise exception 'FAILED: over-long نوع التفعيل accepted';
+  exception when others then
+    assert sqlerrm like '%ACTIVATION_TYPE_TOO_LONG%',
+           'expected ACTIVATION_TYPE_TOO_LONG, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  over-long نوع التفعيل rejected';
+
   -- ========== invalid email in an email field ==========
   begin
     perform create_order('عميل','0550999009',null,v_pm,
       jsonb_build_array(jsonb_build_object(
         'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
+        'activation_type', 'تفعيل مباشر',
         'activation', jsonb_build_array(
           jsonb_build_object('label','بريد Gmail للتفعيل','value','not-an-email'),
           jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
@@ -218,6 +278,7 @@ begin
 
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 
@@ -302,6 +363,7 @@ begin
   select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 
@@ -384,6 +446,7 @@ begin
 
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 2,
+    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 
@@ -481,6 +544,7 @@ begin
   select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 

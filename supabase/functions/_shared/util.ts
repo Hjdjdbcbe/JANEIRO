@@ -55,6 +55,8 @@ const MESSAGES: Record<string, string> = {
   PLAN_INACTIVE: "الخطة المختارة لم تعد متاحة.",
   INVALID_QUANTITY: "الكمية غير صالحة.",
   MISSING_ACTIVATION_FIELD: "يرجى إكمال بيانات التفعيل المطلوبة.",
+  MISSING_ACTIVATION_TYPE: "يرجى اختيار نوع التفعيل من صفحة المنتج.",
+  ACTIVATION_TYPE_TOO_LONG: "نوع التفعيل طويل جداً.",
   INVALID_EMAIL_FIELD: "البريد الإلكتروني المدخل غير صحيح.",
   ACTIVATION_VALUE_TOO_LONG: "أحد الحقول طويل جداً.",
   RATE_LIMITED: "عدد المحاولات كبير. انتظر قليلاً ثم أعد المحاولة.",

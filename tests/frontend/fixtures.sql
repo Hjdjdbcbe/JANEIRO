@@ -77,6 +77,7 @@ begin
   for i in 1..4 loop
     v_items := jsonb_build_array(jsonb_build_object(
       'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
+    'activation_type', 'تفعيل مباشر',
       'activation', jsonb_build_array(
         jsonb_build_object('label','بريد Gmail للتفعيل','value','customer'||i||'@gmail.com'),
         jsonb_build_object('label','رقم الهاتف المرتبط','value', phones[i]))));
