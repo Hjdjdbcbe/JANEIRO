@@ -25,18 +25,32 @@ const ROOT = path.join(__dirname, "..");
 const ARTIFACT = process.argv.includes("--artifact");
 const OUT = path.join(ROOT, "demo", ARTIFACT ? "janeiro-demo.artifact.html" : "janeiro-demo.html");
 
-/* the exact queries the page issues, captured from a real page load */
+/* The snapshot is keyed by the EXACT query string the page asks for, so
+   any query restated here is a copy waiting to drift from the real one.
+   That is not hypothetical: adding one column to the products select in
+   janeiro-api.js left this file asking for the old string, the snapshot
+   missed, and the built demo rendered an empty catalogue with the reason
+   only in the console. So the queries are read out of janeiro-api.js
+   itself. They are plain concatenated literals; anything else in there
+   fails the build loudly instead of quietly producing an empty demo. */
+function queryFromApi(table) {
+  const src = fs.readFileSync(path.join(ROOT, "js/janeiro-api.js"), "utf8");
+  const at = src.indexOf(`"${table}?select=`);
+  if (at < 0) throw new Error(`build-demo: no ${table} query in janeiro-api.js`);
+  const call = src.slice(at, src.indexOf(");", at));
+  const parts = call.match(/"(?:[^"\\]|\\.)*"/g) || [];
+  const joined = parts.map(x => JSON.parse(x)).join("");
+  const rest = call.replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/[\s+,]/g, "");
+  if (rest !== "") throw new Error(`build-demo: ${table} query is no longer plain literals: ${rest}`);
+  return joined;
+}
+
 const QUERIES = [
   "store_settings?select=key,value",
-  "categories?select=id,name,slug,icon,icon_path,accent_color&is_active=eq.true&order=sort_order",
-  "products?select=id,name,slug,short_description,accent_color,poster_path,thumbnail_path,icon_path," +
-    "badge_type,badge_label,status,sort_order,warranty_type,warranty_days,warranty_label," +
-    "categories(slug,name),product_plans(id,name,price,old_price,is_active,sort_order)" +
-    "&status=in.(published,temporarily_unavailable,coming_soon)&archived_at=is.null&order=sort_order",
-  "payment_methods?select=id,type,label,account_holder,account_number,extra_info,instructions" +
-    "&is_active=eq.true&order=sort_order",
-  "public_daily_deals?select=id,product_id,plan_id,deal_price,original_price,plan_name,product_slug," +
-    "product_name,starts_at,ends_at,sort_order,server_now&order=sort_order",
+  queryFromApi("categories"),
+  queryFromApi("products"),
+  queryFromApi("payment_methods"),
+  queryFromApi("public_daily_deals"),
 ];
 
 const MIME = { ".webp":"image/webp", ".png":"image/png", ".jpg":"image/jpeg",
@@ -170,12 +184,6 @@ const dataUri = (file) => {
   html = html.replace(/<script src="config\.js"[^>]*><\/script>/,
     '<script>window.JANEIRO_CONFIG={SUPABASE_URL:"demo",SUPABASE_ANON_KEY:"demo"};</script>');
 
-  /* activation-types.js is a real file the owner edits, so the demo
-     carries its ACTUAL contents rather than a stand-in: a preview that
-     showed two options the file does not name would be lying about the
-     thing it is previewing. */
-  html = html.replace(/<script src="activation-types\.js"[^>]*><\/script>/, () =>
-    "<script>" + fs.readFileSync(path.join(ROOT, "frontend/activation-types.js"), "utf8") + "</script>");
 
   // ---------- 5. inline every asset the page references ----------
   /* src=, href= and srcset= as well as url(): the <picture> feeds the hero

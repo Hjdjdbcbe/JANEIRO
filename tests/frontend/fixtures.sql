@@ -71,13 +71,22 @@ declare
   i int;
 begin
   select id into v_pm   from payment_methods where is_active order by sort_order limit 1;
+  -- ---------- نوع التفعيل (بيانات معاينة) ----------
+  -- Sample values so the preview has something to show. These are the
+  -- store owner's to set in the dashboard, product by product; nothing
+  -- here claims to know how a real Janeiro product is activated, and
+  -- the catalogue migration deliberately leaves the column empty.
+  update products set activation_type = 'تفعيل مباشر'
+   where slug in ('gemini-pro','canva-pro','snapchat-plus');
+  update products set activation_type = 'تفعيل عبر دعوة/رابط'
+   where slug in ('notion-plus','n8n');
+
   select id into v_prod from products where slug = 'gemini-pro';
   select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
 
   for i in 1..4 loop
     v_items := jsonb_build_array(jsonb_build_object(
       'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
-    'activation_type', 'تفعيل مباشر',
       'activation', jsonb_build_array(
         jsonb_build_object('label','بريد Gmail للتفعيل','value','customer'||i||'@gmail.com'),
         jsonb_build_object('label','رقم الهاتف المرتبط','value', phones[i]))));

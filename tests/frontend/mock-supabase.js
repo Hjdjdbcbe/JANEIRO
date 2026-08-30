@@ -234,7 +234,6 @@ async function fn(name, req, res) {
       const items = (b.items || []).map(i => ({
         product_id: String(i.product_id), plan_id: String(i.plan_id),
         quantity: Math.max(1, Math.min(10, Number(i.quantity) || 1)),
-        activation_type: String(i.activation_type ?? "").trim().slice(0, 60),
         activation: Array.isArray(i.activation) ? i.activation : [],
       }));
       const rows = await asService(

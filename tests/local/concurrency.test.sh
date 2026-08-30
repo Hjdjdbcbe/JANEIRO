@@ -23,7 +23,7 @@ q() { psql -d "$DB" -X -A -t -q -c "$1"; }
 PM=$(q "select id from payment_methods where is_active order by sort_order limit 1;")
 PROD=$(q "select id from products where slug='discord-nitro';")
 PLAN=$(q "select id from product_plans where product_id='$PROD' order by sort_order limit 1;")
-ITEMS="jsonb_build_array(jsonb_build_object('product_id','$PROD'::uuid,'plan_id','$PLAN'::uuid,'quantity',1,'activation_type','تفعيل مباشر','activation',jsonb_build_array(jsonb_build_object('label','اسم المستخدم في ديسكورد','value','racer'))))"
+ITEMS="jsonb_build_array(jsonb_build_object('product_id','$PROD'::uuid,'plan_id','$PLAN'::uuid,'quantity',1,'activation',jsonb_build_array(jsonb_build_object('label','اسم المستخدم في ديسكورد','value','racer'))))"
 
 cleanup() {
   q "delete from orders where normalized_phone in ('213${PHONE_A:1}','213${PHONE_B:1}','213${PHONE_C:1}');" >/dev/null

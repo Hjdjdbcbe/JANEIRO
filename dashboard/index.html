@@ -10,6 +10,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- keys live outside the tracked tree; see config.example.js -->
 <script src="config.js" onerror="/* not configured yet */"></script>
+<!-- أنواع التفعيل: الملف الوحيد الذي يعدّله صاحب المتجر. مكانه هنا لا
+     في الموقع، لأن اللوحة وحدها تحتاج القائمة — الموقع يقرأ ما هو
+     محفوظ على المنتج نفسه. onerror يبقي اللوحة تعمل إن غاب الملف. -->
+<script src="activation-types.js" onerror="/* falls back to the built-in pair */"></script>
 <style>
 /* ============================================================
    لوحة الطلبات — أداة تشغيل، لا واجهة متجر.
@@ -539,6 +543,17 @@ const WARRANTY_LABEL = {
   none: "بلا ضمان", activation: "ضمان التفعيل", days: "بعدد أيام",
   subscription_duration: "طوال مدة الاشتراك", custom: "نص مخصص",
 };
+/* نوع التفعيل: the values the owner picks from, read from the one file
+   both apps share. The pair below is the floor under it, used when the
+   file is missing, empty or full of blanks -- an empty dropdown would
+   leave the owner unable to set the field at all. */
+const ACT_TYPE_FALLBACK = ["تفعيل مباشر", "تفعيل عبر دعوة/رابط"];
+function activationTypes() {
+  const list = Array.isArray(window.JANEIRO_ACTIVATION_TYPES) ? window.JANEIRO_ACTIVATION_TYPES : [];
+  const clean = list.map(t => String(t ?? "").trim()).filter(t => t && t.length <= 40);
+  return clean.length ? clean : ACT_TYPE_FALLBACK;
+}
+
 const FIELD_LABEL = {
   email: "بريد إلكتروني", phone: "هاتف", username: "اسم مستخدم",
   text: "نص", number: "رقم", account_id: "معرّف حساب", custom: "مخصص",
@@ -607,7 +622,8 @@ function blankProduct() {
   return {
     slug: "", name: "", category_slug: CATS[0]?.slug || "", short_description: "",
     description: "", accent_color: "#7357FF", status: "draft", sort_order: 0,
-    poster_path: "", icon_path: "", warranty_type: "subscription_duration", warranty_days: "",
+    poster_path: "", icon_path: "", activation_type: "",
+    warranty_type: "subscription_duration", warranty_days: "",
     warranty_label: "", badge_type: "", badge_label: "",
     delivery_min: "", delivery_max: "", delivery_unit: "", delivery_label: "",
     plans: [{ name: "", price: "", old_price: "", is_active: true }],
@@ -770,6 +786,22 @@ function renderEditor() {
           </label>
         </div>`).join("")}</div>
       <button class="addrow" data-add="requirements">+ أضف حقل</button>
+    </div>
+
+    <div class="card">
+      <h2>نوع التفعيل</h2>
+      <p class="hint">كيف يُفعَّل هذا المنتج. يظهر للزبون في صفحة المنتج للقراءة فقط — هو لا يختاره — ويُحفظ مع سطر الطلب. اتركه «لم يُحدَّد» إن لم تحسم أمره بعد؛ عندها لا يظهر السطر أصلاً والبيع يستمر. الخيارات تُحرَّر في <code>dashboard/activation-types.js</code>.</p>
+      <div class="ed">
+        <select data-f="activation_type">
+          <option value="" ${d.activation_type ? "" : "selected"}>— لم يُحدَّد —</option>
+          ${activationTypes().map(t =>
+            `<option value="${esc(t)}" ${t === d.activation_type ? "selected" : ""}>${esc(t)}</option>`).join("")}
+          ${d.activation_type && !activationTypes().includes(d.activation_type)
+            /* a value set before the file was edited must not vanish
+               silently on the next save just because it left the list */
+            ? `<option value="${esc(d.activation_type)}" selected>${esc(d.activation_type)} — خارج القائمة</option>` : ""}
+        </select>
+      </div>
     </div>
 
     <div class="card">

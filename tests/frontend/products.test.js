@@ -105,6 +105,18 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   await p.fill('[data-r="0"][data-k="label"]', "البريد الإلكتروني للحساب");
   await p.selectOption('[data-r="0"][data-k="field_type"]', "email");
 
+  /* نوع التفعيل: the owner's field. Its options must be the ones from
+     the file, with an explicit "not set" first so leaving it blank is a
+     choice rather than an accident. */
+  const actOpts = await p.evaluate(() => ({
+    opts: [...document.querySelector('[data-f="activation_type"]').options].map(o => o.value),
+    file: window.JANEIRO_ACTIVATION_TYPES,
+  }));
+  check(actOpts.opts[0] === "", "نوع التفعيل offers «لم يُحدَّد» first");
+  check(JSON.stringify(actOpts.opts.slice(1)) === JSON.stringify(actOpts.file),
+        `and then the file's values, verbatim: ${actOpts.opts.slice(1).join(" / ")}`);
+  await p.selectOption('[data-f="activation_type"]', "تفعيل عبر دعوة/رابط");
+
   await p.click("#saveProd");
   await p.waitForSelector("#products:not(.hidden)", { timeout: 10000 });
   await p.waitForTimeout(600);
@@ -120,6 +132,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         "the activation field round-trips");
   check(await p.locator('[data-f="slug"]').isDisabled(),
         "the slug is locked once saved — orders and links depend on it");
+  check(await p.locator('[data-f="activation_type"]').inputValue() === "تفعيل عبر دعوة/رابط",
+        "نوع التفعيل round-trips through admin_upsert_product");
 
   // ---------- and a customer can actually buy it ----------
   const bought = await p.evaluate(async ([b, s, price]) => {
@@ -134,14 +148,16 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         name: "عميل", phone: "0563" + Math.floor(100000 + Math.random() * 899999),
         payment_method_id: pm.id, idempotency_key: "editor-buy-" + Date.now(),
         items: [{ product_id: prod.id, plan_id: plan.id, quantity: 1,
-                  activation_type: "تفعيل مباشر",
                   activation: [{ label: req.label, value: "buyer@example.com" }] }],
       }) })).json();
     return { ok: r.ok, total: r.order?.total, planPrice: plan.price,
-             visible: true, fields: prod.product_requirements.length };
+             visible: true, fields: prod.product_requirements.length,
+             actType: prod.activation_type };
   }, [BASE, slug, PRICE]);
 
   check(bought.visible === true, "the published product is visible to customers");
+  check(bought.actType === "تفعيل عبر دعوة/رابط",
+        `the catalogue serves the owner's نوع التفعيل to the storefront: ${bought.actType}`);
   check(bought.ok === true, `a customer can order it${bought.err ? " -> " + bought.err : ""}`);
   check(Number(bought.total) === PRICE,
         `the price charged is the one typed in the editor (${bought.total} = ${PRICE})`);

@@ -41,9 +41,12 @@ begin
   raise notice 'PASS  order number format';
 
   -- ========== valid order ==========
+  -- نوع التفعيل is the owner's to set, so the test sets one the way the
+  -- dashboard would before checking where it ends up.
+  update products set activation_type = 'تفعيل مباشر' where id = v_prod;
+
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
-    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
       jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111'))));
@@ -55,12 +58,13 @@ begin
          'server computed total matches DB price';
   raise notice 'PASS  create valid order';
 
-  -- the choice made on the product page is stored on the line itself,
-  -- snapshotted like the plan name so editing the list later cannot
+  -- نوع التفعيل is the store's, snapshotted onto the line from the
+  -- product the way plan_name_snapshot is, so rewording it later cannot
   -- rewrite what an old order said
-  assert (select activation_type from order_items where order_id = v_oid) = 'تفعيل مباشر',
-         'نوع التفعيل stored on the order line';
-  raise notice 'PASS  نوع التفعيل stored on the line';
+  assert (select activation_type from order_items where order_id = v_oid)
+         = (select activation_type from products where id = v_prod),
+         'نوع التفعيل snapshotted from the product onto the line';
+  raise notice 'PASS  نوع التفعيل comes from the product';
 
   -- ========== price tampering is ignored ==========
   -- The RPC signature accepts no price at all, so a manipulated cart
@@ -183,8 +187,7 @@ begin
     perform create_order('عميل','0550999008',null,v_pm,
       jsonb_build_array(jsonb_build_object(
         'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
-        'activation_type', 'تفعيل مباشر',
-        'activation', '[]'::jsonb)),
+            'activation', '[]'::jsonb)),
       'test-key-009');
     raise exception 'FAILED: missing activation data accepted';
   exception when others then
@@ -192,63 +195,50 @@ begin
   end;
   raise notice 'PASS  missing activation field rejected';
 
-  -- ========== نوع التفعيل: a line without one is refused ==========
+  -- ========== نوع التفعيل sent by the client is ignored ==========
+  -- Same treatment a price gets: the browser has no say in it. The line
+  -- must carry the product's value, whatever the payload claimed.
   begin
-    perform create_order('عميل','0550999011',null,v_pm,
+    v_res2 := create_order('عميل','0550999011',null,v_pm,
       jsonb_build_array(jsonb_build_object(
         'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
+        'activation_type', 'تفعيل مزوّر من المتصفح',
         'activation', jsonb_build_array(
           jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
           jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
       'test-key-011');
-    raise exception 'FAILED: order without نوع التفعيل accepted';
-  exception when others then
-    assert sqlerrm like '%MISSING_ACTIVATION_TYPE%',
-           'expected MISSING_ACTIVATION_TYPE, got: ' || sqlerrm;
+    assert (select activation_type from order_items
+             where order_id = (v_res2->>'order_id')::uuid)
+           = (select activation_type from products where id = v_prod),
+           'a client-sent نوع التفعيل must be ignored';
   end;
-  raise notice 'PASS  order without نوع التفعيل rejected';
+  raise notice 'PASS  نوع التفعيل sent from the browser is ignored';
 
-  -- whitespace is not a choice either
+  -- ========== a product without one still sells ==========
+  -- Refusing to take money because the owner has not filled in an
+  -- informational label would be a worse bug than the missing label.
   begin
-    perform create_order('عميل','0550999012',null,v_pm,
+    update products set activation_type = null where id = v_prod;
+    v_res2 := create_order('عميل','0550999012',null,v_pm,
       jsonb_build_array(jsonb_build_object(
         'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
-        'activation_type', '   ',
         'activation', jsonb_build_array(
           jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
           jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
       'test-key-012');
-    raise exception 'FAILED: blank نوع التفعيل accepted';
-  exception when others then
-    assert sqlerrm like '%MISSING_ACTIVATION_TYPE%',
-           'expected MISSING_ACTIVATION_TYPE, got: ' || sqlerrm;
+    assert (select activation_type from order_items
+             where order_id = (v_res2->>'order_id')::uuid) is null,
+           'a product with no نوع التفعيل stores null on the line';
+    update products set activation_type = 'تفعيل مباشر' where id = v_prod;
   end;
-  raise notice 'PASS  blank نوع التفعيل rejected';
-
-  -- and one longer than the column allows
-  begin
-    perform create_order('عميل','0550999013',null,v_pm,
-      jsonb_build_array(jsonb_build_object(
-        'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
-        'activation_type', repeat('ت', 61),
-        'activation', jsonb_build_array(
-          jsonb_build_object('label','بريد Gmail للتفعيل','value','test@gmail.com'),
-          jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
-      'test-key-013');
-    raise exception 'FAILED: over-long نوع التفعيل accepted';
-  exception when others then
-    assert sqlerrm like '%ACTIVATION_TYPE_TOO_LONG%',
-           'expected ACTIVATION_TYPE_TOO_LONG, got: ' || sqlerrm;
-  end;
-  raise notice 'PASS  over-long نوع التفعيل rejected';
+  raise notice 'PASS  a product without نوع التفعيل still sells';
 
   -- ========== invalid email in an email field ==========
   begin
     perform create_order('عميل','0550999009',null,v_pm,
       jsonb_build_array(jsonb_build_object(
         'product_id', v_prod, 'plan_id', v_plan, 'quantity',1,
-        'activation_type', 'تفعيل مباشر',
-        'activation', jsonb_build_array(
+            'activation', jsonb_build_array(
           jsonb_build_object('label','بريد Gmail للتفعيل','value','not-an-email'),
           jsonb_build_object('label','رقم الهاتف المرتبط','value','0550111111')))),
       'test-key-010');
@@ -278,7 +268,6 @@ begin
 
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
-    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 
@@ -363,7 +352,6 @@ begin
   select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
-    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 
@@ -446,7 +434,6 @@ begin
 
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 2,
-    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 
@@ -544,7 +531,6 @@ begin
   select id into v_plan from product_plans where product_id = v_prod order by sort_order limit 1;
   v_items := jsonb_build_array(jsonb_build_object(
     'product_id', v_prod, 'plan_id', v_plan, 'quantity', 1,
-    'activation_type', 'تفعيل مباشر',
     'activation', jsonb_build_array(
       jsonb_build_object('label','اسم المستخدم في ديسكورد','value','tester'))));
 

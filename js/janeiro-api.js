@@ -123,7 +123,7 @@ export async function loadPaymentMethods() {
 export async function loadProducts() {
   const rows = await rest(
     "products?select=id,name,slug,short_description,accent_color,poster_path,thumbnail_path,icon_path," +
-    "badge_type,badge_label,status,sort_order,warranty_type,warranty_days,warranty_label," +
+    "badge_type,badge_label,status,sort_order,warranty_type,warranty_days,warranty_label,activation_type," +
     "categories(slug,name),product_plans(id,name,price,old_price,is_active,sort_order)" +
     "&status=in.(published,temporarily_unavailable,coming_soon)" +
     "&archived_at=is.null&order=sort_order",
@@ -172,6 +172,9 @@ function normalizeProduct(row) {
     available: row.status === "published",
     status: row.status,
     delivery: row.delivery_label ?? deliveryText(row),
+    /* How this product is activated. The store sets it; the buyer reads
+       it. Null is normal and simply hides the row. */
+    actType: row.activation_type ?? null,
     warranty: warrantyText(row),
     features: (row.product_features || [])
       .sort((a, b) => a.sort_order - b.sort_order).map((f) => f.label),
@@ -227,7 +230,6 @@ export async function createOrder({ name, phone, wilaya, paymentMethodId, items,
       plan_id: i.planId,
       quantity: i.qty,
       activation: i.activation ?? [],
-      activation_type: i.activationType ?? null,
     })),
     idempotency_key: idempotencyKey,
   });

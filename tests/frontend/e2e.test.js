@@ -66,19 +66,37 @@ const check = (c, m) => c ? ok(m) : bad(m);
   check((await page.locator("#dName").innerText()) === "Gemini Pro", "detail shows the product from the DB");
   const plans = await page.locator("#dPlans .opt").count();
   check(plans === 3, `detail shows ${plans} plans from the DB (expected 3)`);
-  /* نوع التفعيل: a real control on the product page, filled from the
-     one file the owner edits, with the first entry pre-selected. */
-  const act = await page.evaluate(() => {
-    const el = document.querySelector("#dActType");
-    return { tag: el.tagName, opts: [...el.options].map(o => o.value), value: el.value,
-             file: window.JANEIRO_ACTIVATION_TYPES };
-  });
-  check(act.tag === "SELECT", `نوع التفعيل is a dropdown, not free text: <${act.tag.toLowerCase()}>`);
-  check(JSON.stringify(act.opts) === JSON.stringify(act.file),
-        `its options are the file's, verbatim: ${act.opts.join(" / ")}`);
-  check(act.value === act.opts[0], `the first entry is pre-selected: ${act.value}`);
+  /* نوع التفعيل: the store's answer, shown to the buyer -- not a control
+     the buyer operates. It has to be the product's own stored value and
+     there must be nothing on the page to change it with. */
+  const act = await page.evaluate(() => ({
+    text: document.querySelector("#dActType").textContent.trim(),
+    rowShown: !document.querySelector("#dActRow").classList.contains("hidden"),
+    controls: document.querySelectorAll("#detail select, #detail input, #detail textarea").length,
+  }));
+  check(act.rowShown && act.text === "تفعيل مباشر",
+        `نوع التفعيل reads from the product: "${act.text}"`);
+  check(act.controls === 0,
+        `nothing on the product page lets the buyer change it (${act.controls} inputs)`);
   check((await page.locator("#detail").innerText()).indexOf("ما نطلبه للتفعيل") === -1,
         "the old read-only 'ما نطلبه للتفعيل' row is gone");
+
+  /* and a product the owner has not set one for shows no row at all,
+     rather than an empty label or a dash */
+  await page.evaluate(() => window.go("shop"));
+  await page.waitForSelector("#shop:not(.hidden)");
+  await page.locator("#shopGrid .pcard", { hasText: "Spotify Premium" }).first()
+            .locator(".pbody .btn").click();
+  await page.waitForSelector("#detail:not(.hidden)");
+  await page.waitForTimeout(200);
+  check(await page.evaluate(() => document.querySelector("#dActRow").classList.contains("hidden")),
+        "a product with no نوع التفعيل set shows no row for it");
+
+  await page.evaluate(() => window.go("shop"));
+  await page.waitForSelector("#shop:not(.hidden)");
+  await page.locator("#shopGrid .pcard", { hasText: "Gemini Pro" }).first()
+            .locator(".pbody .btn").click();
+  await page.waitForSelector("#detail:not(.hidden)");
   const war = await page.locator("#dWar").innerText();
   check(war.includes("ضمان طوال مدة الاشتراك"), `warranty derived from warranty_type: "${war}"`);
 
