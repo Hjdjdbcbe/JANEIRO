@@ -49,8 +49,18 @@ fi
 green "    migrations re-run cleanly, seed rows stable ($after payment methods)"
 
 bold "==> backend.test.sql"
-psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/backend.test.sql" 2>&1 \
-  | grep -E 'PASS|FAIL|ERROR|=====' || true
+# The grep is for readability, but a pipeline reports the LAST command's
+# status -- so for as long as this was `psql ... | grep ... || true`, a
+# backend test that died on a SQL error printed its ERROR line and the
+# run still ended with "ALL LOCAL TESTS PASSED". Found the day a broken
+# trigger did exactly that. psql's own status is what decides now.
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/backend.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: backend.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
 
 bold "==> concurrency.test.sh"
 bash "$HERE/concurrency.test.sh" "$DB"

@@ -908,6 +908,208 @@ begin
   raise notice '===== product icon tests passed =====';
 end $$;
 
+-- ============================================================
+-- الباقات — bundles
+-- ============================================================
+do $$
+declare
+  v_pm     uuid;
+  v_b      uuid;
+  v_p1     uuid; v_pl1 uuid; v_price1 numeric;
+  v_p2     uuid; v_pl2 uuid; v_price2 numeric;
+  v_p3     uuid; v_pl3 uuid;
+  v_list   numeric;
+  v_res    jsonb;
+  v_oid    uuid;
+  v_ok     boolean;
+  v_items  jsonb;
+begin
+  raise notice '===== bundles =====';
+  select id into v_pm from payment_methods where is_active limit 1;
+
+  /* Three products of its own, with no activation requirements. Using
+     catalogue products would make every assertion here depend on which
+     fields the owner happens to ask for on Gemini this week -- the
+     first run of this block died on exactly that. */
+  insert into products (slug, name, category_id, status, activation_type)
+    select 'bundle-test-a', 'منتج باقة أ', c.id, 'published', 'تفعيل مباشر' from categories c limit 1
+    returning id into v_p1;
+  insert into products (slug, name, category_id, status, activation_type)
+    select 'bundle-test-b', 'منتج باقة ب', c.id, 'published', 'تفعيل مباشر' from categories c limit 1
+    returning id into v_p2;
+  insert into products (slug, name, category_id, status, activation_type)
+    select 'bundle-test-c', 'منتج باقة ج', c.id, 'published', 'تفعيل مباشر' from categories c limit 1
+    returning id into v_p3;
+
+  insert into product_plans (product_id, name, price) values (v_p1, 'شهر', 2000) returning id into v_pl1;
+  insert into product_plans (product_id, name, price) values (v_p2, 'شهر', 1500) returning id into v_pl2;
+  insert into product_plans (product_id, name, price) values (v_p3, 'شهر', 1000) returning id into v_pl3;
+  v_price1 := 2000; v_price2 := 1500;
+  v_list := v_price1 + v_price2;
+
+  -- ---------- a bundle must be a group, and must be a saving ----------
+  insert into bundles (slug, name, bundle_price, is_active)
+    values ('test-bundle', 'باقة اختبار', v_list - 500, false) returning id into v_b;
+
+  v_ok := false;
+  begin
+    insert into bundle_items (bundle_id, product_id, plan_id) values (v_b, v_p1, v_pl2);
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_PLAN_PRODUCT_MISMATCH%';
+  end;
+  assert v_ok, 'a plan from another product must be refused';
+  raise notice 'PASS  a bundle item must name a plan of its own product';
+
+  insert into bundle_items (bundle_id, product_id, plan_id, sort_order)
+    values (v_b, v_p1, v_pl1, 1);
+
+  -- one product is not a bundle: activating it must fail
+  v_ok := false;
+  begin
+    update bundles set is_active = true where id = v_b;
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_NEEDS_TWO_PRODUCTS%';
+  end;
+  assert v_ok, 'a one-product bundle must not go live';
+  raise notice 'PASS  a bundle needs two products before it can go live';
+
+  insert into bundle_items (bundle_id, product_id, plan_id, sort_order)
+    values (v_b, v_p2, v_pl2, 2);
+  update bundles set is_active = true where id = v_b;
+
+  -- a price that is not a saving is not a bundle price
+  v_ok := false;
+  begin
+    update bundles set bundle_price = v_list where id = v_b;
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_PRICE_NOT_LOWER%';
+  end;
+  assert v_ok, 'a bundle priced at the list total must be refused';
+  raise notice 'PASS  a bundle price must undercut the list total';
+
+  -- ---------- what the storefront is served ----------
+  assert (select count(*) from public_bundles where slug = 'test-bundle') = 1,
+         'a live bundle is visible';
+  assert (select list_total from public_bundles where slug = 'test-bundle') = v_list,
+         'list_total is the sum of the plans';
+  assert (select saving from public_bundles where slug = 'test-bundle') = 500,
+         'the saving is computed by the server';
+  assert (select jsonb_array_length(items) from public_bundles where slug = 'test-bundle') = 2,
+         'the view carries the products';
+  raise notice 'PASS  public_bundles serves the price, the list total and the saving';
+
+  -- ---------- ordering a bundle ----------
+  v_items := jsonb_build_array(
+    jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1, 'quantity', 1, 'bundle_id', v_b),
+    jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1, 'bundle_id', v_b));
+
+  v_res := create_order('عميل باقة','0559000001',null,v_pm,v_items,'bundle-key-001');
+  v_oid := (v_res->>'order_id')::uuid;
+
+  assert (v_res->>'subtotal')::numeric = v_list, 'subtotal is the list total';
+  assert (v_res->>'discount_total')::numeric = 500, 'the saving is recorded on the order';
+  assert (v_res->>'total')::numeric = v_list - 500, 'the customer is charged the bundle price';
+  raise notice 'PASS  a bundle is charged at its own price, not the sum of its parts';
+
+  assert (select count(*) from order_items where order_id = v_oid and bundle_id = v_b) = 2,
+         'both lines carry the bundle';
+  assert (select sum(total_price) from order_items where order_id = v_oid) = v_list,
+         'the lines keep their own list prices so the fulfilment list stays true';
+  assert (select bundle_name_snapshot from order_items where order_id = v_oid limit 1) = 'باقة اختبار',
+         'the bundle name is snapshotted onto the line';
+  raise notice 'PASS  the lines record what to fulfil and what it lists for';
+
+  -- ---------- a price sent from the browser is ignored ----------
+  v_items := jsonb_build_array(
+    jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1, 'quantity', 1, 'bundle_id', v_b,
+                       'price', 1, 'bundle_price', 1, 'total', 1),
+    jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1, 'bundle_id', v_b,
+                       'price', 1, 'bundle_price', 1, 'total', 1));
+  v_res := create_order('عميل باقة','0559000002',null,v_pm,v_items,'bundle-key-002');
+  assert (v_res->>'total')::numeric = v_list - 500, 'a price in the payload must be ignored';
+  raise notice 'PASS  a bundle price sent from the browser is ignored';
+
+  -- ---------- half a bundle is not a bundle ----------
+  v_ok := false;
+  begin
+    perform create_order('عميل باقة','0559000003',null,v_pm,
+      jsonb_build_array(jsonb_build_object(
+        'product_id', v_p1, 'plan_id', v_pl1, 'quantity', 1, 'bundle_id', v_b)),
+      'bundle-key-003');
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_INCOMPLETE%';
+  end;
+  assert v_ok, 'one line of a two-product bundle must be refused';
+  raise notice 'PASS  an incomplete bundle is refused, not silently discounted';
+
+  -- a product that is not in the bundle cannot be smuggled into it
+  v_ok := false;
+  begin
+    perform create_order('عميل باقة','0559000004',null,v_pm,
+      jsonb_build_array(
+        jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1, 'quantity', 1, 'bundle_id', v_b),
+        jsonb_build_object('product_id', v_p3, 'plan_id', v_pl3, 'quantity', 1, 'bundle_id', v_b)),
+      'bundle-key-004');
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_INCOMPLETE%';
+  end;
+  assert v_ok, 'a foreign product tagged with the bundle must be refused';
+  raise notice 'PASS  a product outside the bundle cannot be tagged into it';
+
+  -- ---------- two of the same bundle ----------
+  v_items := jsonb_build_array(
+    jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1, 'quantity', 2, 'bundle_id', v_b),
+    jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 2, 'bundle_id', v_b));
+  v_res := create_order('عميل باقة','0559000005',null,v_pm,v_items,'bundle-key-005');
+  assert (v_res->>'total')::numeric = (v_list - 500) * 2, 'two bundles cost twice the bundle price';
+  raise notice 'PASS  the same bundle twice is priced twice';
+
+  -- lines that disagree on how many are refused
+  v_ok := false;
+  begin
+    perform create_order('عميل باقة','0559000006',null,v_pm,
+      jsonb_build_array(
+        jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1, 'quantity', 2, 'bundle_id', v_b),
+        jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1, 'bundle_id', v_b)),
+      'bundle-key-006');
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_QUANTITY_MISMATCH%';
+  end;
+  assert v_ok, 'lines of one bundle must agree on quantity';
+  raise notice 'PASS  a bundle whose lines disagree on quantity is refused';
+
+  -- ---------- a bundle that lost a product stops being sold ----------
+  update products set status = 'coming_soon' where id = v_p2;
+  assert not bundle_is_sellable(v_b), 'a bundle with an unpublished product is not sellable';
+  assert (select count(*) from public_bundles where slug = 'test-bundle') = 0,
+         'and it disappears from the storefront rather than shrinking';
+  v_ok := false;
+  begin
+    perform create_order('عميل باقة','0559000007',null,v_pm,
+      jsonb_build_array(
+        jsonb_build_object('product_id', v_p1, 'plan_id', v_pl1, 'quantity', 1, 'bundle_id', v_b),
+        jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1, 'bundle_id', v_b)),
+      'bundle-key-007');
+  exception when others then
+    v_ok := sqlerrm like '%BUNDLE_NOT_AVAILABLE%' or sqlerrm like '%PRODUCT_NOT_PURCHASABLE%';
+  end;
+  assert v_ok, 'a bundle missing a published product must not be sold';
+  update products set status = 'published' where id = v_p2;
+  raise notice 'PASS  a bundle that lost a product is withdrawn, not shrunk';
+
+  -- ---------- the ordinary order is untouched ----------
+  v_res := create_order('عميل عادي','0559000008',null,v_pm,
+    jsonb_build_array(jsonb_build_object(
+      'product_id', v_p1, 'plan_id', v_pl1, 'quantity', 1)),
+    'bundle-key-008');
+  assert (v_res->>'discount_total')::numeric = 0, 'an order with no bundle has no discount';
+  assert (v_res->>'total')::numeric = (v_res->>'subtotal')::numeric,
+         'and its total is still its subtotal';
+  raise notice 'PASS  an order without a bundle is unchanged';
+
+  raise notice '===== bundle tests passed =====';
+end $$;
+
 -- Nothing is persisted: this is a dry run.
 rollback;
 
