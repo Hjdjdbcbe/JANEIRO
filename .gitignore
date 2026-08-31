@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.deploy.example
 
 # supabase CLI local state
 .supabase/
@@ -29,6 +30,9 @@ frontend/config.js
 # Built demo bundles: ~2.6MB each of inlined data URIs, regenerated in
 # seconds by tools/build-demo.js. The builder is the source, not these.
 demo/*.html
+
+# الموقع المبني: يُنتَج بأمر واحد من tools/build-site.sh
+dist/
 
 # stray output when a capture script is run without its output dir set
 undefined/
