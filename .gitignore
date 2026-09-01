@@ -33,6 +33,7 @@ demo/*.html
 
 # الموقع المبني: يُنتَج بأمر واحد من tools/build-site.sh
 dist/
+dist-functions/
 
 # stray output when a capture script is run without its output dir set
 undefined/
