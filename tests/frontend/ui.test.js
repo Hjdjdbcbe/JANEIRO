@@ -426,20 +426,34 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   await lp.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
   await lp.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
 
-  const fr = await lp.evaluate(() => {
-    window.cycleLang(); // ar -> fr
-    return {
-      dir: document.documentElement.getAttribute("dir"),
-      lang: document.documentElement.getAttribute("lang"),
-      nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
-      langBtn: document.querySelector("#langBtn").textContent.trim(),
-      cardBtn: document.querySelector("#shopGrid .pcard .btn")?.textContent.trim(),
-    };
-  });
+  // the dropdown itself: closed by default, opens on the button, picking
+  // an option both switches and closes it, clicking away closes it too
+  check(await lp.locator("#langMenu").isHidden(), "the language dropdown starts closed");
+  await lp.click("#langBtn");
+  check(await lp.locator("#langMenu").isVisible(), "opens on the button");
+  check(await lp.locator("#langBtn").getAttribute("aria-expanded") === "true", "and says so to assistive tech");
+  await lp.click('#langMenu button[data-lang="fr"]');
+  check(await lp.locator("#langMenu").isHidden(), "picking an option closes it again");
+
+  const fr = await lp.evaluate(() => ({
+    dir: document.documentElement.getAttribute("dir"),
+    lang: document.documentElement.getAttribute("lang"),
+    nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
+    langBtn: document.querySelector("#langBtn").textContent.trim(),
+    current: document.querySelector('#langMenu button[data-lang="fr"]').getAttribute("aria-current"),
+    cardBtn: document.querySelector("#shopGrid .pcard .btn")?.textContent.trim(),
+  }));
   check(fr.dir === "ltr" && fr.lang === "fr", `switches to French: dir=${fr.dir} lang=${fr.lang}`);
   check(fr.nav === "Accueil Produits Offres Suivre ma commande Nous contacter", `French nav reads: ${fr.nav}`);
   check(fr.langBtn === "FR", `the language button shows the active code: ${fr.langBtn}`);
+  check(fr.current === "true", "the picked option is marked current in the dropdown");
   check(/Voir les détails|Indisponible/.test(fr.cardBtn || ""), `product card buttons translate too: "${fr.cardBtn}"`);
+
+  // clicking anywhere else closes an open dropdown without changing anything
+  await lp.click("#langBtn");
+  check(await lp.locator("#langMenu").isVisible(), "reopens for the next check");
+  await lp.click("body", { position: { x: 20, y: 400 } });
+  check(await lp.locator("#langMenu").isHidden(), "clicking away closes it");
 
   // localStorage, not just in-memory state -- a returning French visitor
   // should not see a flash of Arabic before it catches up
@@ -457,7 +471,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         `LTR layout has no horizontal scroll (doc ${ltrOverflow.doc} vs win ${ltrOverflow.win})`);
 
   const en = await lp.evaluate(() => {
-    window.cycleLang(); // fr -> en
+    window.setLang("en");
     return {
       dir: document.documentElement.getAttribute("dir"),
       lang: document.documentElement.getAttribute("lang"),
@@ -468,7 +482,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(en.nav === "Home Products Deals Track Order Contact Us", `English nav reads: ${en.nav}`);
 
   const backToAr = await lp.evaluate(() => {
-    window.cycleLang(); // en -> ar
+    window.setLang("ar");
     return {
       dir: document.documentElement.getAttribute("dir"),
       lang: document.documentElement.getAttribute("lang"),
@@ -479,6 +493,37 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         `cycles back to Arabic: dir=${backToAr.dir} lang=${backToAr.lang}`);
   check(backToAr.nav === "الرئيسية المنتجات العروض تتبع الطلب تواصل معنا", `back to Arabic nav: ${backToAr.nav}`);
   await lp.close();
+
+  // ---------- language switch on a phone ----------
+  // The header is position:fixed, so a button spilling past the
+  // viewport edge does NOT grow document.documentElement.scrollWidth --
+  // the usual overflow check above would miss it. A 5th icon-sized
+  // button in the always-visible row once pushed the hamburger half
+  // off-screen this way; check the hamburger's own bounding box
+  // directly, and confirm the header's copy of the switch is the one
+  // that gives way, not the burger it would break.
+  const lm = await newPage({ viewport: { width: 390, height: 844 } });
+  await lm.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+  await lm.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  const burger = await lm.evaluate(() => {
+    const r = document.querySelector(".menu-btn").getBoundingClientRect();
+    return { left: r.left, right: r.right, win: window.innerWidth };
+  });
+  check(burger.left >= -0.5 && burger.right <= burger.win + 0.5,
+        `the hamburger stays fully on screen (left ${burger.left.toFixed(1)}, right ${burger.right.toFixed(1)} of ${burger.win}px)`);
+  check(await lm.locator(".langwrap").isHidden(), "the header's own language button steps aside on a phone");
+
+  await lm.evaluate(() => window.openPanel("menu"));
+  await lm.waitForTimeout(350);
+  check(await lm.locator("#menuLangRow").isVisible(), "the language row lives in the panel instead");
+  await lm.click('#menuLangRow button[data-lang="fr"]');
+  const mobileLang = await lm.evaluate(() => ({
+    dir: document.documentElement.getAttribute("dir"),
+    current: document.querySelector('#menuLangRow button[data-lang="fr"]').getAttribute("aria-current"),
+  }));
+  check(mobileLang.dir === "ltr" && mobileLang.current === "true",
+        `picking French from the panel switches it: dir=${mobileLang.dir} current=${mobileLang.current}`);
+  await lm.close();
 
   /* Every var() in the stylesheet must resolve to something defined.
      A typo like var(--s5) on a scale that has no --s5 is not an error

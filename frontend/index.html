@@ -441,7 +441,28 @@ header.stuck .hbar{height:54px}
   color:var(--ink);position:relative;transition:background .15s,color .15s}
 .ibtn svg{width:21px;height:21px}
 .ibtn:hover{background:var(--surface);color:var(--accent-ink)}
+/* A 5th icon-sized button in the header's action row does not fit
+   next to search+cart+theme+menu on a narrow phone -- the row is a
+   plain nowrap flex, and unlike normal document flow, a position:fixed
+   header can spill past the viewport edge without ever growing
+   document.documentElement.scrollWidth, so it clips silently instead
+   of scrolling. The mobile menu panel already carries the same choice
+   (#menuLangRow), so the header's copy only needs to exist once
+   there is room for it. */
+.langwrap{position:relative;display:none}
+@media(min-width:900px){.langwrap{display:block}}
 .langbtn{font-family:var(--f-mono);font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.langmenu{position:absolute;top:calc(100% + 6px);inset-inline-end:0;min-width:140px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);
+  box-shadow:0 10px 30px rgba(8,9,20,.16);padding:6px;display:grid;gap:2px;z-index:70}
+.langmenu button{text-align:start;padding:9px 12px;border-radius:9px;font-size:14px;
+  font-weight:500;color:var(--ink);transition:background .15s}
+.langmenu button:hover{background:var(--surface)}
+.langmenu button[aria-current="true"]{color:var(--accent-ink);font-weight:700}
+.mlang{display:flex;gap:var(--s2);margin:0 var(--s2) var(--s3)}
+.mlang button{flex:1;padding:9px;border-radius:11px;border:1px solid var(--line);
+  font-family:var(--f-mono);font-size:12.5px;font-weight:700;transition:background .15s,border-color .15s}
+.mlang button[aria-current="true"]{border-color:var(--accent-ink);color:var(--accent-ink);background:var(--surface)}
 .cbadge{position:absolute;top:1px;inset-inline-end:1px;background:var(--purple);color:#fff;
   font-family:var(--f-mono);font-size:9.5px;font-weight:600;min-width:18px;height:18px;
   border-radius:50%;display:grid;place-items:center;padding:0 4px;
@@ -1157,7 +1178,14 @@ footer ul button:hover{color:var(--text-on-dark)}
       <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z"/></svg>
     </button>
 
-    <button class="ibtn langbtn" onclick="cycleLang()" id="langBtn" data-i18n-aria="aria_lang" aria-label="تغيير اللغة" title="AR / FR / EN">AR</button>
+    <div class="langwrap">
+      <button class="ibtn langbtn" onclick="toggleLangMenu()" id="langBtn" aria-haspopup="true" aria-expanded="false" data-i18n-aria="aria_lang" aria-label="تغيير اللغة" title="AR / FR / EN">AR</button>
+      <div class="langmenu hidden" id="langMenu" role="menu">
+        <button role="menuitem" data-lang="ar" onclick="setLang('ar')">العربية</button>
+        <button role="menuitem" data-lang="fr" onclick="setLang('fr')">Français</button>
+        <button role="menuitem" data-lang="en" onclick="setLang('en')">English</button>
+      </div>
+    </div>
 
     <button class="ibtn menu-btn" onclick="openPanel('menu')" data-i18n-aria="aria_menu" aria-label="القائمة">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -1186,8 +1214,13 @@ footer ul button:hover{color:var(--text-on-dark)}
       <button data-i18n="nav_track" onclick="go('track');closePanels()">تتبع الطلب</button>
       <button data-i18n="nav_contact" onclick="contactWhatsApp();closePanels()">تواصل معنا</button>
       <button onclick="toggleTheme()" id="menuTheme" data-i18n="aria_theme">تبديل المظهر</button>
-      <button onclick="cycleLang()" id="menuLangBtn">تغيير اللغة (AR)</button>
       <button data-i18n="nav_policies" onclick="go('policies');closePanels()">السياسات والشروط</button>
+    </div>
+    <div class="mlabel" data-i18n="aria_lang">تغيير اللغة</div>
+    <div class="mlang" id="menuLangRow">
+      <button data-lang="ar" onclick="setLang('ar')">AR</button>
+      <button data-lang="fr" onclick="setLang('fr')">FR</button>
+      <button data-lang="en" onclick="setLang('en')">EN</button>
     </div>
     <div class="mlabel" data-i18n="browse_by_cat">تصفح حسب التصنيف</div>
     <div id="menuCats"></div>
@@ -1805,8 +1838,8 @@ function applyLang(){
   $$("[data-i18n-aria]").forEach(el => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
   const langBtn = $("#langBtn");
   if(langBtn) langBtn.textContent = LANG.toUpperCase();
-  const menuLangBtn = $("#menuLangBtn");
-  if(menuLangBtn) menuLangBtn.textContent = `${t("aria_lang")} (${LANG.toUpperCase()})`;
+  $$("#langMenu button, #menuLangRow button").forEach(b =>
+    b.setAttribute("aria-current", String(b.dataset.lang === LANG)));
   /* the theme button's own label depends on the CURRENT theme, not just
      the language -- applyTheme() already knows how to phrase it right */
   const themeMode = document.documentElement.getAttribute("data-theme");
@@ -1816,11 +1849,25 @@ function applyLang(){
   if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); renderDeals(); }
   renderCart();
 }
-function cycleLang(){
-  LANG = LANGS[(LANGS.indexOf(LANG)+1) % LANGS.length];
+function setLang(lang){
+  if(!LANGS.includes(lang)) return;
+  LANG = lang;
   try{ localStorage.setItem(LANG_KEY, LANG); }catch(e){}
   applyLang();
+  closeLangMenu();
 }
+function toggleLangMenu(force){
+  const menu = $("#langMenu"), btn = $("#langBtn");
+  const open = force ?? menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !open);
+  btn.setAttribute("aria-expanded", String(open));
+}
+function closeLangMenu(){ toggleLangMenu(false); }
+document.addEventListener("click", e => {
+  const wrap = $(".langwrap");
+  if(wrap && !wrap.contains(e.target)) closeLangMenu();
+});
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeLangMenu(); });
 
 function hex2rgba(hex,a){
   const h = hex.replace("#","");
@@ -3099,7 +3146,7 @@ Object.assign(window, {
   openBundle, addBundle, addBundleToCart,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
   nextFromDetails, validateName, validatePhone, validateChannel, validateDetails, clearErr,
-  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch, cycleLang,
+  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch, setLang, toggleLangMenu,
 });
 
 /* The page opens on home without go() ever running, so the flag it sets
