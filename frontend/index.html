@@ -38,6 +38,17 @@
   var m=document.querySelector('meta[name="theme-color"]');
   if(m) m.setAttribute("content", t==="dark"?"#0F0F1A":"#FFFFFF");
 })();
+/* Same reasoning as the theme block above: resolving the language and
+   direction here, before first paint, avoids a flash of the wrong
+   direction (a layout jump, not just a color flash) for a returning
+   French/English visitor. */
+(function(){
+  var l=null;
+  try{ l=localStorage.getItem("janeiro-lang"); }catch(e){}
+  if(l!=="ar"&&l!=="fr"&&l!=="en") l="ar";
+  document.documentElement.setAttribute("lang", l);
+  document.documentElement.setAttribute("dir", l==="ar"?"rtl":"ltr");
+})();
 </script>
 <style>
 /* ============================================================
@@ -259,6 +270,16 @@ h1,h2,h3{font-family:var(--f-display);font-weight:400;line-height:1.42;letter-sp
 h4{font-family:var(--f-body);font-weight:700;line-height:1.4}
 h1,h2,h3,.jmark,.brand b{font-synthesis-weight:none;-webkit-font-synthesis:none}
 .mono{font-family:var(--f-mono);direction:ltr;unicode-bidi:isolate}
+/* French/English swap the chrome's own text (nav, buttons, labels) to a
+   left-to-right page, but product names, descriptions and long-form
+   copy (hero lede, policies, FAQ) stay exactly as the store owner typed
+   them -- in Arabic. Left-aligning an Arabic paragraph just because its
+   LTR-page ancestor says so reads as broken, so text-bearing elements
+   resolve their OWN direction from their own first strong character
+   instead of inheriting the page's. A French/English string in the
+   same tag still resolves left-to-right -- plaintext bidi is a no-op
+   for text that is already one direction throughout. */
+[dir="ltr"] :is(h1,h2,h3,h4,p,span,b,dd,dt,li,button,a,label,summary){unicode-bidi:plaintext}
 button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
 input,textarea{font-family:inherit;font-size:15px}
 a{color:inherit;text-decoration:none}
@@ -420,6 +441,7 @@ header.stuck .hbar{height:54px}
   color:var(--ink);position:relative;transition:background .15s,color .15s}
 .ibtn svg{width:21px;height:21px}
 .ibtn:hover{background:var(--surface);color:var(--accent-ink)}
+.langbtn{font-family:var(--f-mono);font-size:11.5px;font-weight:700;letter-spacing:.02em}
 .cbadge{position:absolute;top:1px;inset-inline-end:1px;background:var(--purple);color:#fff;
   font-family:var(--f-mono);font-size:9.5px;font-weight:600;min-width:18px;height:18px;
   border-radius:50%;display:grid;place-items:center;padding:0 4px;
@@ -1106,26 +1128,26 @@ footer ul button:hover{color:var(--text-on-dark)}
 
     <!-- centre: desktop only -->
     <nav class="nav" id="mainNav" aria-label="التنقل الرئيسي">
-      <button data-nav="home" onclick="go('home')">الرئيسية</button>
-      <button data-nav="shop" onclick="go('shop','all')">المنتجات</button>
-      <button data-nav="offers" onclick="go('shop','__offers')">العروض</button>
-      <button data-nav="track" onclick="go('track')">تتبع الطلب</button>
-      <button onclick="contactWhatsApp()">تواصل معنا</button>
+      <button data-nav="home" data-i18n="nav_home" onclick="go('home')">الرئيسية</button>
+      <button data-nav="shop" data-i18n="nav_shop" onclick="go('shop','all')">المنتجات</button>
+      <button data-nav="offers" data-i18n="nav_offers" onclick="go('shop','__offers')">العروض</button>
+      <button data-nav="track" data-i18n="nav_track" onclick="go('track')">تتبع الطلب</button>
+      <button data-i18n="nav_contact" onclick="contactWhatsApp()">تواصل معنا</button>
     </nav>
 
     <div class="hspace"></div>
 
     <!-- left in RTL: the actions -->
     <div class="hsearch" id="hsearch">
-      <button class="ibtn hsbtn" onclick="toggleHeaderSearch()" aria-label="بحث" aria-expanded="false" id="hsToggle">
+      <button class="ibtn hsbtn" onclick="toggleHeaderSearch()" data-i18n-aria="aria_search" aria-label="بحث" aria-expanded="false" id="hsToggle">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6" stroke-linecap="round"/></svg>
       </button>
-      <label class="sr" for="deskSearch">ابحث عن منتج</label>
-      <input id="deskSearch" type="search" placeholder="ابحث عن ChatGPT، Canva…"
+      <label class="sr" for="deskSearch" data-i18n="search_label">ابحث عن منتج</label>
+      <input id="deskSearch" type="search" data-i18n-ph="search_ph" placeholder="ابحث عن ChatGPT، Canva…"
              oninput="doSearch(this.value)" tabindex="-1">
     </div>
 
-    <button class="ibtn" onclick="openPanel('cart')" aria-label="سلة المشتريات">
+    <button class="ibtn" onclick="openPanel('cart')" data-i18n-aria="aria_cart" aria-label="سلة المشتريات">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.3 10.8a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
       <span class="cbadge hidden" id="cartBadge">0</span>
     </button>
@@ -1135,7 +1157,9 @@ footer ul button:hover{color:var(--text-on-dark)}
       <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z"/></svg>
     </button>
 
-    <button class="ibtn menu-btn" onclick="openPanel('menu')" aria-label="القائمة">
+    <button class="ibtn langbtn" onclick="cycleLang()" id="langBtn" data-i18n-aria="aria_lang" aria-label="تغيير اللغة" title="AR / FR / EN">AR</button>
+
+    <button class="ibtn menu-btn" onclick="openPanel('menu')" data-i18n-aria="aria_menu" aria-label="القائمة">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
   </div>
@@ -1148,42 +1172,43 @@ footer ul button:hover{color:var(--text-on-dark)}
 <aside class="panel r" id="menu" aria-label="القائمة">
   <div class="phead">
     <div class="brand"><div class="jmark"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div><b>Janeiro Store</b></div>
-    <button class="ibtn" onclick="closePanels()" aria-label="إغلاق">
+    <button class="ibtn" onclick="closePanels()" data-i18n-aria="aria_close" aria-label="إغلاق">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   </div>
   <div class="pscroll">
     <div class="mnav">
-      <button onclick="go('home');closePanels()">الرئيسية</button>
-      <button onclick="go('shop','all');closePanels()">كل المنتجات</button>
-      <button onclick="go('shop','__best');closePanels()">الأكثر طلباً</button>
-      <button onclick="go('shop','__offers');closePanels()">العروض</button>
-      <button onclick="go('about');closePanels()">من نحن</button>
-      <button onclick="go('track');closePanels()">تتبع الطلب</button>
-      <button onclick="contactWhatsApp();closePanels()">تواصل معنا</button>
-      <button onclick="toggleTheme()" id="menuTheme">تبديل المظهر</button>
-      <button onclick="go('policies');closePanels()">السياسات والشروط</button>
+      <button data-i18n="nav_home" onclick="go('home');closePanels()">الرئيسية</button>
+      <button data-i18n="footer_all" onclick="go('shop','all');closePanels()">كل المنتجات</button>
+      <button data-i18n="footer_best" onclick="go('shop','__best');closePanels()">الأكثر طلباً</button>
+      <button data-i18n="nav_offers" onclick="go('shop','__offers');closePanels()">العروض</button>
+      <button data-i18n="nav_about" onclick="go('about');closePanels()">من نحن</button>
+      <button data-i18n="nav_track" onclick="go('track');closePanels()">تتبع الطلب</button>
+      <button data-i18n="nav_contact" onclick="contactWhatsApp();closePanels()">تواصل معنا</button>
+      <button onclick="toggleTheme()" id="menuTheme" data-i18n="aria_theme">تبديل المظهر</button>
+      <button onclick="cycleLang()" id="menuLangBtn">تغيير اللغة (AR)</button>
+      <button data-i18n="nav_policies" onclick="go('policies');closePanels()">السياسات والشروط</button>
     </div>
-    <div class="mlabel">تصفح حسب التصنيف</div>
+    <div class="mlabel" data-i18n="browse_by_cat">تصفح حسب التصنيف</div>
     <div id="menuCats"></div>
   </div>
   <div class="pfoot">
-    <button class="btn btn-primary btn-block" onclick="go('shop','all');closePanels()">تصفح المنتجات</button>
+    <button class="btn btn-primary btn-block" data-i18n="hero_browse" onclick="go('shop','all');closePanels()">تصفح المنتجات</button>
   </div>
 </aside>
 
 <!-- ===== cart ===== -->
 <aside class="panel l" id="cart" aria-label="سلة المشتريات">
   <div class="phead">
-    <h3>سلة المشتريات</h3>
-    <button class="ibtn" onclick="closePanels()" aria-label="إغلاق">
+    <h3 data-i18n="aria_cart">سلة المشتريات</h3>
+    <button class="ibtn" onclick="closePanels()" data-i18n-aria="aria_close" aria-label="إغلاق">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   </div>
   <div class="pscroll" id="cartList"></div>
   <div class="pfoot hidden" id="cartFoot">
-    <div class="ctot"><span>الإجمالي</span><b id="cartTotal">0 دج</b></div>
-    <button class="btn btn-primary btn-block" onclick="closePanels();go('order')">إتمام الطلب</button>
+    <div class="ctot"><span data-i18n="cart_total">الإجمالي</span><b id="cartTotal">0 دج</b></div>
+    <button class="btn btn-primary btn-block" data-i18n="cart_checkout" onclick="closePanels();go('order')">إتمام الطلب</button>
   </div>
 </aside>
 
@@ -1195,8 +1220,8 @@ footer ul button:hover{color:var(--text-on-dark)}
       <h1>كل أدواتك الرقمية،<br><span class="g">في مكان واحد.</span></h1>
       <p class="lede">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
       <div class="hero-cta">
-        <button class="btn hbtn-1" onclick="go('shop','all')">تصفح المنتجات</button>
-        <button class="btn hbtn-2" onclick="go('shop','__offers')">اكتشف العروض</button>
+        <button class="btn hbtn-1" data-i18n="hero_browse" onclick="go('shop','all')">تصفح المنتجات</button>
+        <button class="btn hbtn-2" data-i18n="hero_offers" onclick="go('shop','__offers')">اكتشف العروض</button>
       </div>
     </div>
   </section>
@@ -1273,7 +1298,7 @@ footer ul button:hover{color:var(--text-on-dark)}
           <span class="eyebrow">عروض Janeiro</span>
           <h2>وفّر أكثر مع باقات Janeiro</h2>
           <p>خصومات على مجموعة من أشهر الخدمات الرقمية، بنفس التفعيل السريع والدعم المباشر.</p>
-          <button class="btn btn-primary" onclick="go('bundles')">اكتشف الباقات</button>
+          <button class="btn btn-primary" data-i18n="bundles_cta" onclick="go('bundles')">اكتشف الباقات</button>
         </div>
         <div class="pboxes" id="promoBoxes"></div>
       </div>
@@ -1333,7 +1358,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= SHOP ================= -->
 <section id="shop" class="hidden page">
   <div class="wrap">
-    <button class="crumb" onclick="go('home')">→ الرئيسية</button>
+    <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
     <div class="sechead">
       <div><h2 id="shopTitle">كل المنتجات</h2><p id="shopCount"></p></div>
     </div>
@@ -1352,7 +1377,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= PRODUCT DETAIL ================= -->
 <section id="detail" class="hidden page">
   <div class="wrap">
-    <button class="crumb" onclick="go('shop')">→ كل المنتجات</button>
+    <button class="crumb" data-i18n="crumb_all_prod" onclick="go('shop')">→ كل المنتجات</button>
     <div class="dhead">
       <div class="dposter" id="dPoster"></div>
       <div>
@@ -1388,8 +1413,8 @@ footer ul button:hover{color:var(--text-on-dark)}
   <div class="stickybar">
     <div class="wrap">
       <div class="amt"><small>الإجمالي</small><b id="dTotal">—</b></div>
-      <button class="btn btn-ghost" onclick="addCurrent()">+ السلة</button>
-      <button class="btn btn-primary" onclick="addCurrent(true)">اشترِ الآن</button>
+      <button class="btn btn-ghost" data-i18n="add_to_cart" onclick="addCurrent()">+ السلة</button>
+      <button class="btn btn-primary" data-i18n="buy_now" onclick="addCurrent(true)">اشترِ الآن</button>
     </div>
   </div>
 </section>
@@ -1397,7 +1422,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= BUNDLES ================= -->
 <section id="bundles" class="hidden page">
   <div class="wrap">
-    <button class="crumb" onclick="go('home')">→ الرئيسية</button>
+    <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
     <h1 style="font-size:24px">الباقات</h1>
     <p style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)">
       عدة منتجات مجمّعة بسعر واحد أقل من مجموعها منفردة.</p>
@@ -1408,7 +1433,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= BUNDLE DETAIL ================= -->
 <section id="bundle" class="hidden page">
   <div class="wrap" style="max-width:720px">
-    <button class="crumb" onclick="go('bundles')">→ كل الباقات</button>
+    <button class="crumb" data-i18n="crumb_all_bund" onclick="go('bundles')">→ كل الباقات</button>
     <h1 style="font-size:24px" id="bName"></h1>
     <p id="bDesc" style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)"></p>
 
@@ -1424,7 +1449,7 @@ footer ul button:hover{color:var(--text-on-dark)}
         <div><span>توفيرك</span><b class="mono" id="bSave"></b></div>
       </div>
     </div>
-    <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="addBundleToCart()">
+    <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" data-i18n="add_bundle" onclick="addBundleToCart()">
       أضف الباقة للسلة
     </button>
   </div>
@@ -1433,7 +1458,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= ORDER ================= -->
 <section id="order" class="hidden page">
   <div class="wrap" style="max-width:640px">
-    <button class="crumb" onclick="go('shop')">→ متابعة التسوق</button>
+    <button class="crumb" data-i18n="crumb_continue" onclick="go('shop')">→ متابعة التسوق</button>
     <h1 style="font-size:24px">إتمام الطلب</h1>
     <div class="steps" id="steps">
       <span class="n on">1</span><span class="bar"></span><span class="n">2</span><span class="bar"></span><span class="n">3</span><span class="bar"></span><span class="n">4</span>
@@ -1464,7 +1489,7 @@ footer ul button:hover{color:var(--text-on-dark)}
         <div class="field"><label for="fWilaya">الولاية <span class="sub">— اختياري</span></label><input id="fWilaya" placeholder="مثال: الجزائر"></div>
         <div class="field" style="margin:0"><label for="fNote">رسالة إضافية <span class="sub">— اختياري</span></label><textarea id="fNote" rows="2" maxlength="500" placeholder="أي ملاحظة تحب تضيفها لطلبك…"></textarea></div>
       </div>
-      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="nextFromDetails()">التالي — طريقة الدفع</button>
+      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="nextFromDetails()" data-i18n="step_next_pay">التالي — طريقة الدفع</button>
     </div>
 
     <div id="o2" class="hidden">
@@ -1481,8 +1506,8 @@ footer ul button:hover{color:var(--text-on-dark)}
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round"/></svg>
         <span>احتفظ برقم العملية من إيصال الدفع — يسرّع التأكيد. رقم الطلب يصلك بعد تأكيد الطلب.</span>
       </div>
-      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(3)">دفعتُ — رفع الوصل</button>
-      <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(1)">رجوع</button>
+      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(3)" data-i18n="step_paid">دفعتُ — رفع الوصل</button>
+      <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(1)" data-i18n="step_back">رجوع</button>
     </div>
 
     <div id="o3" class="hidden">
@@ -1498,8 +1523,8 @@ footer ul button:hover{color:var(--text-on-dark)}
           <input id="fRef" class="mono" placeholder="مثال: 4821990">
         </div>
       </div>
-      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(4)">التالي — بيانات التفعيل</button>
-      <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(2)">رجوع</button>
+      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(4)" data-i18n="step_next_act">التالي — بيانات التفعيل</button>
+      <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(2)" data-i18n="step_back">رجوع</button>
     </div>
 
     <div id="o4" class="hidden">
@@ -1512,9 +1537,9 @@ footer ul button:hover{color:var(--text-on-dark)}
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="sendOrder()">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2Zm0 1.8a8.2 8.2 0 1 1-4.3 15.2l-.4-.2-3.3.9.9-3.2-.3-.4A8.2 8.2 0 0 1 12 3.8Z"/></svg>
-        إرسال الطلب عبر واتساب
+        <span data-i18n="send_whatsapp">إرسال الطلب عبر واتساب</span>
       </button>
-      <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(3)">رجوع للتعديل</button>
+      <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(3)" data-i18n="step_back_edit">رجوع للتعديل</button>
     </div>
   </div>
 </section>
@@ -1534,20 +1559,20 @@ footer ul button:hover{color:var(--text-on-dark)}
         <div><span>طريقة الدفع</span><b id="sentPay"></b></div>
       </div>
     </div>
-    <button class="btn btn-ghost btn-block" style="margin-top:var(--s4)" onclick="resetOrder()">العودة للمتجر</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:var(--s4)" onclick="resetOrder()" data-i18n="back_to_store">العودة للمتجر</button>
   </div>
 </section>
 
 <!-- ================= TRACK ================= -->
 <section id="track" class="hidden page">
   <div class="wrap" style="max-width:560px">
-    <button class="crumb" onclick="go('home')">→ الرئيسية</button>
-    <h1 style="font-size:24px">تتبع الطلب</h1>
+    <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
+    <h1 style="font-size:24px" data-i18n="nav_track">تتبع الطلب</h1>
     <p style="color:var(--muted-on-dark);font-size:14px;margin-top:var(--s2)">أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.</p>
     <div class="card">
       <div class="field"><label for="tNum">رقم الطلب</label><input id="tNum" class="mono" inputmode="numeric" maxlength="6" placeholder="482913"></div>
       <div class="field" style="margin:0"><label for="tPhone">رقم هاتفك</label><input id="tPhone" class="mono" inputmode="numeric" maxlength="10" placeholder="0550123456"></div>
-      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="runTrack()">الاستعلام</button>
+      <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="runTrack()" data-i18n="track_submit">الاستعلام</button>
     </div>
     <div id="tResult"></div>
     <div class="hint">
@@ -1560,7 +1585,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= ABOUT ================= -->
 <section id="about" class="hidden page">
   <div class="wrap" style="max-width:720px">
-    <button class="crumb" onclick="go('home')">→ الرئيسية</button>
+    <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
     <h1 style="font-size:clamp(24px,5vw,34px)">من نحن</h1>
     <p style="color:var(--muted-on-dark);font-size:15px;margin-top:var(--s3);line-height:1.9">Janeiro Store متجر جزائري متخصص في الاشتراكات والمنتجات الرقمية. فكرتنا بسيطة: طلب واضح، دفع محلي بلا تعقيد، ومتابعة إنسانية مباشرة حتى يكتمل تفعيل ما طلبته.</p>
     <div class="card">
@@ -1585,7 +1610,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= POLICIES ================= -->
 <section id="policies" class="hidden page">
   <div class="wrap" style="max-width:720px">
-    <button class="crumb" onclick="go('home')">→ الرئيسية</button>
+    <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
     <h1 style="font-size:clamp(24px,5vw,34px)">السياسات والشروط</h1>
     <div style="margin-top:var(--s6)">
       <details class="faq" open><summary>سياسة الاسترجاع</summary><p>إذا تعذّر تفعيل المنتج بعد تأكيد الدفع، يُسترجع كامل المبلغ عبر نفس طريقة الدفع أو بطريقة أخرى بالاتفاق. يُرجى التبليغ عن أي مشكلة خلال 48 ساعة من إشعار اكتمال الطلب. لا يشمل الاسترجاع تغيير بيانات التفعيل من طرف العميل بعد التفعيل الناجح.</p></details>
@@ -1606,16 +1631,16 @@ footer ul button:hover{color:var(--text-on-dark)}
         <a href="#" onclick="return false" aria-label="تيليغرام"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3 18.8 19c-.2 1-.9 1.3-1.7.8l-4.7-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.4-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.8 12.7l-4.7-1.5c-1-.3-1-1 .2-1.5l18.4-7.1c.9-.3 1.6.2 1.2 1.7Z"/></svg></a>
       </div>
     </div>
-    <div><h4>المتجر</h4><ul>
-      <li><button onclick="go('home')">الرئيسية</button></li>
-      <li><button onclick="go('shop','all')">كل المنتجات</button></li>
-      <li><button onclick="go('shop','__best')">الأكثر طلباً</button></li>
-      <li><button onclick="go('shop','__offers')">العروض</button></li>
+    <div><h4 data-i18n="footer_shop_h">المتجر</h4><ul>
+      <li><button data-i18n="nav_home" onclick="go('home')">الرئيسية</button></li>
+      <li><button data-i18n="footer_all" onclick="go('shop','all')">كل المنتجات</button></li>
+      <li><button data-i18n="footer_best" onclick="go('shop','__best')">الأكثر طلباً</button></li>
+      <li><button data-i18n="nav_offers" onclick="go('shop','__offers')">العروض</button></li>
     </ul></div>
-    <div><h4>الدعم</h4><ul>
-      <li><button onclick="go('track')">تتبع الطلب</button></li>
-      <li><button onclick="go('about')">من نحن</button></li>
-      <li><button onclick="go('policies')">السياسات والشروط</button></li>
+    <div><h4 data-i18n="footer_support_h">الدعم</h4><ul>
+      <li><button data-i18n="nav_track" onclick="go('track')">تتبع الطلب</button></li>
+      <li><button data-i18n="nav_about" onclick="go('about')">من نحن</button></li>
+      <li><button data-i18n="nav_policies" onclick="go('policies')">السياسات والشروط</button></li>
     </ul></div>
     <div>
       <h4>طرق الدفع</h4>
@@ -1699,6 +1724,103 @@ const PS = slug => PRODUCTS.find(p=>p.slug===slug);
 const money = n => n.toLocaleString("en-US") + " " + CONFIG.currency;
 const minPrice = p => p.plans.length ? Math.min(...p.plans.map(x=>x.p)) : 0;
 const BADGES = { hot:["الأكثر طلباً","hot"], new:["جديد","new"], off:["عرض","off"] };
+
+/* ================================================================
+   LANGUAGE
+   Scope is deliberately narrow: navigation, icons, and the primary
+   action buttons a customer clicks through checkout. Product names,
+   descriptions, badges, and long-form copy (hero lede, policies, FAQ)
+   stay exactly as the store owner typed them in the dashboard --
+   translating those would mean either machine-translating a merchant's
+   own words or asking them to type every product three times, and
+   nobody asked for that. */
+const LANG_KEY = "janeiro-lang";
+const LANGS = ["ar","fr","en"];
+const I18N = {
+  nav_home:      { ar:"الرئيسية",            fr:"Accueil",                  en:"Home" },
+  nav_shop:      { ar:"المنتجات",             fr:"Produits",                 en:"Products" },
+  nav_offers:    { ar:"العروض",               fr:"Offres",                   en:"Deals" },
+  nav_track:     { ar:"تتبع الطلب",           fr:"Suivre ma commande",       en:"Track Order" },
+  nav_contact:   { ar:"تواصل معنا",           fr:"Nous contacter",           en:"Contact Us" },
+  nav_about:     { ar:"من نحن",               fr:"À propos",                 en:"About Us" },
+  nav_policies:  { ar:"السياسات والشروط",     fr:"Politiques et conditions", en:"Policies & Terms" },
+  browse_by_cat: { ar:"تصفح حسب التصنيف",     fr:"Parcourir par catégorie",  en:"Browse by Category" },
+
+  aria_search:   { ar:"بحث",                  fr:"Recherche",                en:"Search" },
+  search_label:  { ar:"ابحث عن منتج",         fr:"Rechercher un produit",    en:"Search for a product" },
+  search_ph:     { ar:"ابحث عن ChatGPT، Canva…", fr:"Rechercher ChatGPT, Canva…", en:"Search ChatGPT, Canva…" },
+  aria_cart:     { ar:"سلة المشتريات",        fr:"Panier",                   en:"Shopping Cart" },
+  aria_theme:    { ar:"تبديل المظهر",         fr:"Changer l'apparence",      en:"Toggle Appearance" },
+  aria_menu:     { ar:"القائمة",              fr:"Menu",                     en:"Menu" },
+  aria_lang:     { ar:"تغيير اللغة",          fr:"Changer la langue",        en:"Change Language" },
+  aria_close:    { ar:"إغلاق",                fr:"Fermer",                   en:"Close" },
+  theme_to_light:{ ar:"التبديل إلى المظهر الفاتح", fr:"Passer au mode clair", en:"Switch to Light Mode" },
+  theme_to_dark: { ar:"التبديل إلى المظهر الغامق", fr:"Passer au mode sombre",en:"Switch to Dark Mode" },
+
+  footer_shop_h:    { ar:"المتجر",            fr:"Boutique",                 en:"Shop" },
+  footer_support_h: { ar:"الدعم",             fr:"Assistance",               en:"Support" },
+  footer_all:       { ar:"كل المنتجات",       fr:"Tous les produits",        en:"All Products" },
+  footer_best:      { ar:"الأكثر طلباً",      fr:"Les plus demandés",        en:"Best Sellers" },
+
+  cart_total:    { ar:"الإجمالي",             fr:"Total",                    en:"Total" },
+  cart_checkout: { ar:"إتمام الطلب",          fr:"Passer la commande",       en:"Checkout" },
+  cart_empty:    { ar:"سلتك فارغة",           fr:"Votre panier est vide",    en:"Your cart is empty" },
+  cart_empty_sub:{ ar:"تصفّح المنتجات وأضف ما يعجبك", fr:"Parcourez les produits et ajoutez ce qui vous plaît", en:"Browse products and add what you like" },
+
+  hero_browse:   { ar:"تصفح المنتجات",        fr:"Parcourir les produits",   en:"Browse Products" },
+  hero_offers:   { ar:"اكتشف العروض",         fr:"Découvrir les offres",     en:"Discover Deals" },
+  bundles_cta:   { ar:"اكتشف الباقات",        fr:"Découvrir les packs",      en:"Discover Bundles" },
+
+  view_details:  { ar:"عرض التفاصيل",         fr:"Voir les détails",         en:"View Details" },
+  unavailable:   { ar:"غير متوفر",            fr:"Indisponible",             en:"Unavailable" },
+  add_to_cart:   { ar:"+ السلة",              fr:"+ Panier",                 en:"+ Cart" },
+  buy_now:       { ar:"اشترِ الآن",           fr:"Acheter maintenant",       en:"Buy Now" },
+  add_bundle:    { ar:"أضف الباقة للسلة",     fr:"Ajouter le pack au panier",en:"Add Bundle to Cart" },
+
+  crumb_home:      { ar:"→ الرئيسية",         fr:"← Accueil",                en:"← Home" },
+  crumb_all_prod:  { ar:"→ كل المنتجات",      fr:"← Tous les produits",      en:"← All Products" },
+  crumb_all_bund:  { ar:"→ كل الباقات",       fr:"← Tous les packs",         en:"← All Bundles" },
+  crumb_continue:  { ar:"→ متابعة التسوق",    fr:"← Continuer mes achats",   en:"← Continue Shopping" },
+
+  step_next_pay:   { ar:"التالي — طريقة الدفع",     fr:"Suivant — Mode de paiement",   en:"Next — Payment Method" },
+  step_paid:       { ar:"دفعتُ — رفع الوصل",        fr:"Payé — Envoyer le reçu",       en:"Paid — Upload Receipt" },
+  step_next_act:   { ar:"التالي — بيانات التفعيل",  fr:"Suivant — Infos d'activation", en:"Next — Activation Info" },
+  step_back:       { ar:"رجوع",                     fr:"Retour",                       en:"Back" },
+  step_back_edit:  { ar:"رجوع للتعديل",             fr:"Retour pour modifier",         en:"Back to Edit" },
+  send_whatsapp:   { ar:"إرسال الطلب عبر واتساب",   fr:"Envoyer via WhatsApp",         en:"Send via WhatsApp" },
+  back_to_store:   { ar:"العودة للمتجر",            fr:"Retour à la boutique",         en:"Back to Store" },
+  track_submit:    { ar:"الاستعلام",                fr:"Vérifier",                     en:"Check Status" },
+};
+let LANG = "ar";
+function t(key){ return (I18N[key] && I18N[key][LANG]) || (I18N[key] && I18N[key].ar) || key; }
+
+/* Refreshes every static [data-i18n*] node and the dynamic sections
+   that build their own button text in JS, so a language switch is
+   never half-applied on whatever page is open. */
+function applyLang(){
+  document.documentElement.setAttribute("lang", LANG);
+  document.documentElement.setAttribute("dir", LANG==="ar" ? "rtl" : "ltr");
+  $$("[data-i18n]").forEach(el => el.textContent = t(el.dataset.i18n));
+  $$("[data-i18n-ph]").forEach(el => el.setAttribute("placeholder", t(el.dataset.i18nPh)));
+  $$("[data-i18n-aria]").forEach(el => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
+  const langBtn = $("#langBtn");
+  if(langBtn) langBtn.textContent = LANG.toUpperCase();
+  const menuLangBtn = $("#menuLangBtn");
+  if(menuLangBtn) menuLangBtn.textContent = `${t("aria_lang")} (${LANG.toUpperCase()})`;
+  /* the theme button's own label depends on the CURRENT theme, not just
+     the language -- applyTheme() already knows how to phrase it right */
+  const themeMode = document.documentElement.getAttribute("data-theme");
+  if(themeMode) applyTheme(themeMode);
+  /* re-render whatever already built its own buttons in JS, from the
+     data already in memory -- no network round trip */
+  if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); renderDeals(); }
+  renderCart();
+}
+function cycleLang(){
+  LANG = LANGS[(LANGS.indexOf(LANG)+1) % LANGS.length];
+  try{ localStorage.setItem(LANG_KEY, LANG); }catch(e){}
+  applyLang();
+}
 
 function hex2rgba(hex,a){
   const h = hex.replace("#","");
@@ -1806,7 +1928,7 @@ function cardHTML(p){
         ${p.oldFrom?`<span class="old">${money(p.oldFrom)}</span>`:""}
       </div>
       <button class="btn ${p.available?"btn-primary":"btn-soft"}" onclick="openDetail('${p.id}')" ${p.available?"":"disabled"}>
-        ${p.available?"عرض التفاصيل":"غير متوفر"}
+        ${p.available?t("view_details"):t("unavailable")}
       </button>
     </div>
   </article>`;
@@ -1905,7 +2027,7 @@ function dealCardHTML(d){
         <span class="old">${money(d.originalPrice)}</span>
         <span class="disc" dir="ltr">−${d.percentOff}%</span>
       </div>
-      <button class="btn btn-primary" onclick="openDetail('${p.id}','${d.planId}')">عرض التفاصيل</button>
+      <button class="btn btn-primary" onclick="openDetail('${p.id}','${d.planId}')">${t("view_details")}</button>
     </div>
   </article>`;
 }
@@ -2246,7 +2368,7 @@ function renderBundles(){
         <s>${money(b.listTotal)}</s>
         <span class="bsave">وفّر ${b.savingPct}%</span>
       </div>
-      <button class="btn btn-soft" onclick="event.stopPropagation();openBundle('${b.id}')">عرض التفاصيل</button>
+      <button class="btn btn-soft" onclick="event.stopPropagation();openBundle('${b.id}')">${t("view_details")}</button>
     </div>`).join("");
   revealOnScroll();
 }
@@ -2384,7 +2506,7 @@ function renderCart(){
   if(!CART.length){
     $("#cartList").innerHTML=`<div class="blank">
       <i><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.3 10.8a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg></i>
-      سلتك فارغة<br><span style="font-size:12.5px">تصفّح المنتجات وأضف ما يعجبك</span></div>`;
+      ${t("cart_empty")}<br><span style="font-size:12.5px">${t("cart_empty_sub")}</span></div>`;
     $("#cartFoot").classList.add("hidden"); return;
   }
   /* One line of markup per cart line, then the lines of a whole bundle
@@ -2907,7 +3029,8 @@ async function boot(){
       return p && p.plans.some(pl => pl.id === i.planId);
     }));
 
-    renderCats(); renderDeals(); renderHome(); renderCart(); renderShop(); renderBundles();
+    renderCats();
+    applyLang(); /* renders deals/home/cart/shop/bundles, in the current language */
     revealOnScroll();
   }catch(err){
     console.error("boot failed", err);
@@ -2936,14 +3059,14 @@ window.addEventListener("scroll",()=>{
    janeiro-theme exists. */
 const THEME_KEY = "janeiro-theme";
 
-function applyTheme(t){
-  document.documentElement.setAttribute("data-theme", t);
+function applyTheme(mode){
+  document.documentElement.setAttribute("data-theme", mode);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if(meta) meta.setAttribute("content", t === "dark" ? "#0F0F1A" : "#FFFFFF");
+  if(meta) meta.setAttribute("content", mode === "dark" ? "#0F0F1A" : "#FFFFFF");
   const btn = $("#themeBtn");
   if(btn){
-    btn.setAttribute("aria-pressed", String(t === "dark"));
-    btn.setAttribute("aria-label", t === "dark" ? "التبديل إلى المظهر الفاتح" : "التبديل إلى المظهر الغامق");
+    btn.setAttribute("aria-pressed", String(mode === "dark"));
+    btn.setAttribute("aria-label", mode === "dark" ? t("theme_to_light") : t("theme_to_dark"));
     btn.setAttribute("title", btn.getAttribute("aria-label"));
   }
 }
@@ -2976,7 +3099,7 @@ Object.assign(window, {
   openBundle, addBundle, addBundleToCart,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
   nextFromDetails, validateName, validatePhone, validateChannel, validateDetails, clearErr,
-  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch,
+  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch, cycleLang,
 });
 
 /* The page opens on home without go() ever running, so the flag it sets
@@ -2984,8 +3107,15 @@ Object.assign(window, {
    in its light glass over the dark hero, at 2.5:1. */
 document.documentElement.dataset.page = "home";
 
-/* label the toggle for whatever <head> resolved before first paint */
-applyTheme(document.documentElement.getAttribute("data-theme") || "light");
+/* <head> already resolved theme and language/direction on <html>
+   before first paint (avoiding a flash of the wrong one); this just
+   has to agree and label the toggles. applyLang() also relabels the
+   theme button for the theme <head> resolved, so a separate
+   applyTheme() call here is not needed. The product/bundle cards
+   applyLang() refreshes are simply empty until boot() loads them,
+   and boot() calls applyLang() again once they exist. */
+try{ const l = localStorage.getItem(LANG_KEY); if(LANGS.includes(l)) LANG = l; }catch(e){}
+applyLang();
 boot();
 </script>
 </body>

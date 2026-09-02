@@ -419,6 +419,67 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     await pm.close();
   }
 
+  // ---------- language switch (AR / FR / EN) ----------
+  // its own page: re-rendering the grid here must not disturb whatever
+  // filter/state the shared `page` above was left in for later checks.
+  const lp = await newPage({ viewport: { width: 1280, height: 1000 } });
+  await lp.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+  await lp.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+
+  const fr = await lp.evaluate(() => {
+    window.cycleLang(); // ar -> fr
+    return {
+      dir: document.documentElement.getAttribute("dir"),
+      lang: document.documentElement.getAttribute("lang"),
+      nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
+      langBtn: document.querySelector("#langBtn").textContent.trim(),
+      cardBtn: document.querySelector("#shopGrid .pcard .btn")?.textContent.trim(),
+    };
+  });
+  check(fr.dir === "ltr" && fr.lang === "fr", `switches to French: dir=${fr.dir} lang=${fr.lang}`);
+  check(fr.nav === "Accueil Produits Offres Suivre ma commande Nous contacter", `French nav reads: ${fr.nav}`);
+  check(fr.langBtn === "FR", `the language button shows the active code: ${fr.langBtn}`);
+  check(/Voir les détails|Indisponible/.test(fr.cardBtn || ""), `product card buttons translate too: "${fr.cardBtn}"`);
+
+  // localStorage, not just in-memory state -- a returning French visitor
+  // should not see a flash of Arabic before it catches up
+  await lp.reload({ waitUntil: "networkidle" });
+  await lp.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  const persisted = await lp.evaluate(() => ({
+    dir: document.documentElement.getAttribute("dir"), lang: document.documentElement.getAttribute("lang"),
+  }));
+  check(persisted.dir === "ltr" && persisted.lang === "fr",
+        `the language choice survives a reload: dir=${persisted.dir} lang=${persisted.lang}`);
+
+  const ltrOverflow = await lp.evaluate(() => (
+    { doc: document.documentElement.scrollWidth, win: window.innerWidth }));
+  check(ltrOverflow.doc <= ltrOverflow.win + 1,
+        `LTR layout has no horizontal scroll (doc ${ltrOverflow.doc} vs win ${ltrOverflow.win})`);
+
+  const en = await lp.evaluate(() => {
+    window.cycleLang(); // fr -> en
+    return {
+      dir: document.documentElement.getAttribute("dir"),
+      lang: document.documentElement.getAttribute("lang"),
+      nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
+    };
+  });
+  check(en.dir === "ltr" && en.lang === "en", `switches to English: dir=${en.dir} lang=${en.lang}`);
+  check(en.nav === "Home Products Deals Track Order Contact Us", `English nav reads: ${en.nav}`);
+
+  const backToAr = await lp.evaluate(() => {
+    window.cycleLang(); // en -> ar
+    return {
+      dir: document.documentElement.getAttribute("dir"),
+      lang: document.documentElement.getAttribute("lang"),
+      nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
+    };
+  });
+  check(backToAr.dir === "rtl" && backToAr.lang === "ar",
+        `cycles back to Arabic: dir=${backToAr.dir} lang=${backToAr.lang}`);
+  check(backToAr.nav === "الرئيسية المنتجات العروض تتبع الطلب تواصل معنا", `back to Arabic nav: ${backToAr.nav}`);
+  await lp.close();
+
   /* Every var() in the stylesheet must resolve to something defined.
      A typo like var(--s5) on a scale that has no --s5 is not an error
      anywhere -- the element silently loses that property -- and it is
