@@ -60,22 +60,6 @@ const uidFrom = (req) => {
   return /^[0-9a-f-]{36}$/i.test(t) ? t : null;
 };
 
-const PRODUCT_EMBED = `
-  select p.*,
-    (select jsonb_build_object('slug',c.slug,'name',c.name)
-       from categories c where c.id = p.category_id) as categories,
-    coalesce((select jsonb_agg(jsonb_build_object(
-        'id',pl.id,'name',pl.name,'price',pl.price,'old_price',pl.old_price,
-        'is_active',pl.is_active,'sort_order',pl.sort_order) order by pl.sort_order)
-      from product_plans pl where pl.product_id = p.id and pl.is_active), '[]'::jsonb) as product_plans,
-    coalesce((select jsonb_agg(jsonb_build_object('label',f.label,'sort_order',f.sort_order) order by f.sort_order)
-      from product_features f where f.product_id = p.id), '[]'::jsonb) as product_features,
-    coalesce((select jsonb_agg(jsonb_build_object(
-        'id',r.id,'label',r.label,'field_type',r.field_type,'placeholder',r.placeholder,
-        'is_required',r.is_required,'sort_order',r.sort_order) order by r.sort_order)
-      from product_requirements r where r.product_id = p.id), '[]'::jsonb) as product_requirements
-  from products p`;
-
 async function rest(url, res) {
   const table = url.pathname.replace("/rest/v1/", "");
   const q = url.searchParams;
@@ -101,9 +85,36 @@ async function rest(url, res) {
            from payment_methods where is_active order by sort_order`));
     if (table === "products") {
       const slug = (q.get("slug") || "").replace("eq.", "");
-      if (slug) return send(res, 200, await asAnon(`${PRODUCT_EMBED} where p.slug = $1 limit 1`, [slug]));
+      /* Faithful to the real PostgREST endpoint: an embed is in the
+         response ONLY if the caller's own select= string asked for it.
+         A single PRODUCT_EMBED that always returned every embed once
+         hid a real bug for months -- js/janeiro-api.js's bulk
+         loadProducts() never requested product_requirements, so the
+         cart could never see a product's required field, and the
+         server correctly rejected the order the client had no way to
+         warn about. Caught live, not by this harness. */
+      const select = q.get("select") || "";
+      const embed = `select p.*,
+        (select jsonb_build_object('slug',c.slug,'name',c.name)
+           from categories c where c.id = p.category_id) as categories` +
+        (select.includes("product_plans") ? `,
+        coalesce((select jsonb_agg(jsonb_build_object(
+            'id',pl.id,'name',pl.name,'price',pl.price,'old_price',pl.old_price,
+            'is_active',pl.is_active,'sort_order',pl.sort_order) order by pl.sort_order)
+          from product_plans pl where pl.product_id = p.id and pl.is_active), '[]'::jsonb) as product_plans` : "") +
+        (select.includes("product_features") ? `,
+        coalesce((select jsonb_agg(jsonb_build_object('label',f.label,'sort_order',f.sort_order) order by f.sort_order)
+          from product_features f where f.product_id = p.id), '[]'::jsonb) as product_features` : "") +
+        (select.includes("product_requirements") ? `,
+        coalesce((select jsonb_agg(jsonb_build_object(
+            'id',r.id,'label',r.label,'field_type',r.field_type,'placeholder',r.placeholder,
+            'is_required',r.is_required,'sort_order',r.sort_order) order by r.sort_order)
+          from product_requirements r where r.product_id = p.id), '[]'::jsonb) as product_requirements` : "") +
+        `
+        from products p`;
+      if (slug) return send(res, 200, await asAnon(`${embed} where p.slug = $1 limit 1`, [slug]));
       return send(res, 200, await asAnon(
-        `${PRODUCT_EMBED} where p.status in ('published','temporarily_unavailable','coming_soon')
+        `${embed} where p.status in ('published','temporarily_unavailable','coming_soon')
            and p.archived_at is null order by p.sort_order`));
     }
     /* ---------- admin console reads ---------- */

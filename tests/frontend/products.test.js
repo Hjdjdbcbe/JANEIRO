@@ -137,7 +137,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
 
   // ---------- and a customer can actually buy it ----------
   const bought = await p.evaluate(async ([b, s, price]) => {
-    const [prod] = await (await fetch(`${b}/rest/v1/products?select=*&slug=eq.${s}`)).json();
+    const [prod] = await (await fetch(
+      `${b}/rest/v1/products?select=*,product_plans(*),product_requirements(*)&slug=eq.${s}`)).json();
     if (!prod) return { err: "not visible to the public" };
     const [pm] = await (await fetch(`${b}/rest/v1/payment_methods?select=id&is_active=eq.true`)).json();
     const plan = prod.product_plans[0];

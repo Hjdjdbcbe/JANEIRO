@@ -124,7 +124,16 @@ export async function loadProducts() {
   const rows = await rest(
     "products?select=id,name,slug,short_description,accent_color,poster_path,thumbnail_path,icon_path," +
     "badge_type,badge_label,status,sort_order,warranty_type,warranty_days,warranty_label,activation_type," +
-    "categories(slug,name),product_plans(id,name,price,old_price,is_active,sort_order)" +
+    "categories(slug,name),product_plans(id,name,price,old_price,is_active,sort_order)," +
+    /* Missing here meant the cart and checkout, which build their
+       activation form from this SAME array (via P(id)), could never
+       see a product's required fields -- "لا حقول إضافية مطلوبة" showed
+       for every product regardless of the truth, and create_order (which
+       reads product_requirements itself, correctly) then rejected the
+       order the client had no way to warn about. Caught live: a phone
+       number and email requirement existed, the cart never asked for
+       it, and MISSING_ACTIVATION_FIELD came back from the server. */
+    "product_requirements(id,label,field_type,placeholder,is_required,sort_order)" +
     "&status=in.(published,temporarily_unavailable,coming_soon)" +
     "&archived_at=is.null&order=sort_order",
   );

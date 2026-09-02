@@ -28,7 +28,10 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     return page.evaluate(async (b) => {
       const get = async (q) => (await fetch(`${b}/rest/v1/${q}`)).json();
       const [pm] = await get("payment_methods?select=id&is_active=eq.true");
-      const [prod] = await get("products?select=*&slug=eq.gemini-pro");
+      /* the real bulk/detail queries always ask for product_plans by
+         name -- select=* alone gets none of it, on the real endpoint
+         or this harness now that it mirrors PostgREST honestly */
+      const [prod] = await get("products?select=*,product_plans(*)&slug=eq.gemini-pro");
       const plan = prod.product_plans[0];
       const phone = "0562" + String(Math.floor(100000 + Math.random() * 899999));
 

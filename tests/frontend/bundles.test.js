@@ -188,7 +188,8 @@ const num = s => Number((String(s).match(/[\d,]+(?:\.\d+)?/) || ["0"])[0].replac
            activation fields; fill them the way step 4 of the checkout
            does, or the order is refused for the wrong reason */
         items: await Promise.all(bundle.items.map(async (i) => {
-          const [prod] = await (await fetch(`${b}/rest/v1/products?select=*&slug=eq.${i.slug}`)).json();
+          const [prod] = await (await fetch(
+            `${b}/rest/v1/products?select=*,product_requirements(*)&slug=eq.${i.slug}`)).json();
           return {
             product_id: i.product_id, plan_id: i.plan_id, quantity: 1, bundle_id: bid,
             activation: (prod.product_requirements || []).map(r => ({
