@@ -494,6 +494,38 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(backToAr.nav === "الرئيسية المنتجات العروض تتبع الطلب تواصل معنا", `back to Arabic nav: ${backToAr.nav}`);
   await lp.close();
 
+  // ---------- catalogue text (owner-authored, machine-translated) ----------
+  // Product names/descriptions and category names come from the
+  // dashboard, not the frontend's own dictionary, so switching
+  // language has to fetch them from translate-content -- checked
+  // against the mock's deterministic "[FR] <text>" stand-in for a
+  // real DeepL call, on its own page so this async round trip cannot
+  // race the synchronous dictionary checks above.
+  const lt = await newPage({ viewport: { width: 1280, height: 1000 } });
+  await lt.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+  await lt.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  const beforeName = await lt.locator("#shopGrid .pcard h3").first().textContent();
+  await lt.evaluate(() => window.setLang("fr"));
+  await lt.waitForFunction(() => {
+    const h3 = document.querySelector("#shopGrid .pcard h3");
+    return h3 && h3.textContent.startsWith("[FR]");
+  }, { timeout: 8000 });
+  const afterName = await lt.locator("#shopGrid .pcard h3").first().textContent();
+  check(afterName === `[FR] ${beforeName}`, `product name is machine-translated: "${beforeName}" -> "${afterName}"`);
+  // each chip carries two <span>s -- the icon tile (.cticon) and the
+  // name -- so the name has to be picked out explicitly
+  const catChip = await lt.locator("#catGrid .category-chip span:not(.cticon)").nth(1).textContent();
+  check(catChip.startsWith("[FR] "), `category name is translated too: "${catChip}"`);
+  const allChip = await lt.locator("#catGrid .category-chip span:not(.cticon)").first().textContent();
+  check(allChip === "Tout", `the "all" chip is dictionary-translated, not sent for machine translation: "${allChip}"`);
+
+  // switching back to Arabic restores the kept original -- no new request
+  await lt.evaluate(() => window.setLang("ar"));
+  await lt.waitForTimeout(150);
+  const restoredName = await lt.locator("#shopGrid .pcard h3").first().textContent();
+  check(restoredName === beforeName, `switching back to Arabic restores the original text: "${restoredName}"`);
+  await lt.close();
+
   // ---------- language switch on a phone ----------
   // The header is position:fixed, so a button spilling past the
   // viewport edge does NOT grow document.documentElement.scrollWidth --

@@ -353,6 +353,22 @@ export async function trackOrder(orderNumber, phone) {
   return res.order;
 }
 
+/* ---------------- catalogue translation ---------------- */
+
+/**
+ * Machine-translates owner-authored catalogue text (product names/
+ * descriptions, category names, bundle names/descriptions) for a
+ * French or English visitor. Best-effort: a failure here is caught by
+ * the caller, which simply keeps showing the original Arabic text.
+ *
+ * items: [{ type: "product_name"|"product_description"|"category_name"
+ *            |"bundle_name"|"bundle_description", id, text }]
+ */
+export async function translateContent(items, lang) {
+  const res = await callFn("translate-content", { lang, items });
+  return res.translations;
+}
+
 /* ---------------- cart price revalidation ---------------- */
 
 /**

@@ -306,6 +306,38 @@ async function fn(name, req, res) {
         return send(res, 400, { ok: false, ...m });
       }
     }
+    if (name === "translate-content") {
+      const b = JSON.parse(raw.toString());
+      const lang = b.lang === "fr" || b.lang === "en" ? b.lang : null;
+      if (!lang) return send(res, 400, { ok: false, code: "INVALID_REQUEST", message: "لغة غير صالحة." });
+      const items = (Array.isArray(b.items) ? b.items : []).slice(0, 80);
+      const translations = {};
+      /* No real DeepL call here -- a deterministic fake translation
+         (tagged with the target language) is enough to prove the
+         request/cache/response wiring end to end without a network
+         dependency. Cached exactly like the real function, in the
+         same table, so a repeat call for the same text is a cache hit. */
+      for (const it of items) {
+        if (!it || !it.type || !it.id || !it.text) continue;
+        const key = `${it.type}:${it.id}`;
+        const [cached] = await asService(
+          "select source_text, translated_text from content_translations where entity_type=$1 and entity_id=$2 and lang=$3",
+          [it.type, it.id, lang]);
+        if (cached && cached.source_text === it.text) {
+          translations[key] = cached.translated_text;
+          continue;
+        }
+        const fake = `[${lang.toUpperCase()}] ${it.text}`;
+        await asService(
+          `insert into content_translations (entity_type, entity_id, lang, source_text, translated_text)
+           values ($1,$2,$3,$4,$5)
+           on conflict (entity_type, entity_id, lang)
+           do update set source_text=excluded.source_text, translated_text=excluded.translated_text, updated_at=now()`,
+          [it.type, it.id, lang, it.text, fake]);
+        translations[key] = fake;
+      }
+      return send(res, 200, { ok: true, translations });
+    }
     return send(res, 404, { ok: false, message: "no such function" });
   } catch (e) {
     const m = mapErr(e);

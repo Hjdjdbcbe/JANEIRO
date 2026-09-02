@@ -2015,6 +2015,7 @@ const I18N = {
   badge_off: { ar:"عرض", fr:"Offre", en:"Deal" },
   view_product_aria: { ar:"عرض", fr:"Voir", en:"View" },
   save_word: { ar:"وفّر", fr:"Économisez", en:"Save" },
+  all_categories: { ar:"الكل", fr:"Tout", en:"All" },
 };
 let LANG = "ar";
 function t(key){ return (I18N[key] && I18N[key][LANG]) || (I18N[key] && I18N[key].ar) || key; }
@@ -2052,6 +2053,13 @@ function applyLang(){
        preview relabel too, without touching what the customer typed */
     if(orderStep===4) buildReview();
   }
+  /* Product/category/bundle text the owner typed in the dashboard --
+     not the frontend's own dictionary -- so it needs its own,
+     separate (and asynchronous) trip. Fired after the synchronous
+     part above so the chrome and any already-cached catalogue text
+     switch instantly; whatever is not yet cached simply arrives a
+     moment later and re-renders again. */
+  translateCatalog();
 }
 function setLang(lang){
   if(!LANGS.includes(lang)) return;
@@ -2059,6 +2067,67 @@ function setLang(lang){
   try{ localStorage.setItem(LANG_KEY, LANG); }catch(e){}
   applyLang();
   closeLangMenu();
+}
+
+/* Keeps each product/category/bundle's own original Arabic on the
+   object (._nameAr etc.) the first time it is seen, so switching back
+   to Arabic is a free, instant restore rather than another round trip
+   -- and so a second switch to French does not re-send text that is
+   already itself a translation. */
+async function translateCatalog(){
+  if(LANG==="ar"){
+    for(const p of PRODUCTS){ if(p._nameAr!==undefined){ p.name=p._nameAr; p.desc=p._descAr; } }
+    for(const c of CATEGORIES){ if(c._nameAr!==undefined) c.name=c._nameAr; }
+    for(const b of BUNDLES){ if(b._nameAr!==undefined){ b.name=b._nameAr; b.desc=b._descAr; } }
+    renderCats();
+    if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); renderDeals(); }
+    renderCart();
+    return;
+  }
+
+  const items=[];
+  for(const p of PRODUCTS){
+    if(p._nameAr===undefined) p._nameAr=p.name;
+    if(p._descAr===undefined) p._descAr=p.desc;
+    items.push({type:"product_name", id:p.id, text:p._nameAr});
+    if(p._descAr) items.push({type:"product_description", id:p.id, text:p._descAr});
+  }
+  for(const c of CATEGORIES){
+    if(c._nameAr===undefined) c._nameAr=c.name;
+    items.push({type:"category_name", id:c.id, text:c._nameAr});
+  }
+  for(const b of BUNDLES){
+    if(b._nameAr===undefined) b._nameAr=b.name;
+    if(b._descAr===undefined) b._descAr=b.desc;
+    items.push({type:"bundle_name", id:b.id, text:b._nameAr});
+    if(b._descAr) items.push({type:"bundle_description", id:b.id, text:b._descAr});
+  }
+  if(!items.length) return;
+
+  const langAtRequest = LANG;
+  try{
+    const translations = await API.translateContent(items, LANG);
+    /* the visitor may have switched language again while this was in
+       flight -- a stale response must not overwrite a newer choice */
+    if(LANG!==langAtRequest) return;
+    for(const p of PRODUCTS){
+      const n=translations[`product_name:${p.id}`]; if(n) p.name=n;
+      const d=translations[`product_description:${p.id}`]; if(d) p.desc=d;
+    }
+    for(const c of CATEGORIES){
+      const n=translations[`category_name:${c.id}`]; if(n) c.name=n;
+    }
+    for(const b of BUNDLES){
+      const n=translations[`bundle_name:${b.id}`]; if(n) b.name=n;
+      const d=translations[`bundle_description:${b.id}`]; if(d) b.desc=d;
+    }
+  }catch(err){
+    console.error("translateCatalog failed", err);
+    return; // best-effort: the original Arabic text is still showing
+  }
+  renderCats();
+  if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); renderDeals(); }
+  renderCart();
 }
 function toggleLangMenu(force){
   const menu = $("#langMenu"), btn = $("#langBtn");
@@ -2374,7 +2443,7 @@ function renderCats(){
       ${icon}<span>${name}</span></button>`;
   const allIcon='<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>';
   const allTile = `<span class="cticon" style="--cat:var(--purple)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">${allIcon}</svg></span>`;
-  const html = chip("all","الكل",allTile) + CATEGORIES.map(c=>chip(c.slug,c.name,catIcon(c))).join("");
+  const html = chip("all",t("all_categories"),allTile) + CATEGORIES.map(c=>chip(c.slug,c.name,catIcon(c))).join("");
   $("#catGrid").innerHTML = html;
   if($("#shopCatGrid")) $("#shopCatGrid").innerHTML = html;
   updateArrows();
