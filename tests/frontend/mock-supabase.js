@@ -267,9 +267,9 @@ async function fn(name, req, res) {
         activation: Array.isArray(i.activation) ? i.activation : [],
       }));
       const rows = await asService(
-        "select create_order($1,$2,$3,$4::uuid,$5::jsonb,$6,$7) as r",
+        "select create_order($1,$2,$3,$4::uuid,$5::jsonb,$6,$7,$8) as r",
         [b.name ?? "", b.phone ?? "", b.wilaya ?? null, b.payment_method_id,
-         JSON.stringify(items), b.idempotency_key, "203.0.113.5"]);
+         JSON.stringify(items), b.idempotency_key, "203.0.113.5", b.note ?? null]);
       return send(res, 200, { ok: true, order: rows[0].r });
     }
     if (name === "upload-receipt") {
@@ -297,7 +297,7 @@ async function fn(name, req, res) {
     if (name === "track-order") {
       const b = JSON.parse(raw.toString());
       try {
-        const rows = await asService("select track_order($1,$2) as r", [b.order_number ?? "", b.phone_last4 ?? ""]);
+        const rows = await asService("select track_order($1,$2) as r", [b.order_number ?? "", b.phone ?? ""]);
         return send(res, 200, { ok: true, order: rows[0].r });
       } catch (e) {
         const m = mapErr(e);

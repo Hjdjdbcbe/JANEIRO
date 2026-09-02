@@ -195,7 +195,7 @@ janeiro-backend/
 | `generate_order_number()` | داخلي (مسحوبة من `anon`) |
 | `create_order(...)` | **service role فقط** |
 | `submit_order(...)` | **service role فقط** |
-| `track_order(number, last4)` | عام |
+| `track_order(number, phone)` | عام |
 | `count_active_orders(phone)` | داخلي |
 | `check_rate_limit(...)` | داخلي |
 | `is_admin()` | متاحة للجميع **عمداً** — كل سياسة RLS تستدعيها بدور صاحب الطلب، وسحبها يكسر وصول الأدمن كلياً |
@@ -453,7 +453,7 @@ curl -X POST "$SUPABASE_URL/functions/v1/submit-order" \
 # 4) التتبع
 curl -X POST "$SUPABASE_URL/functions/v1/track-order" \
   -H "apikey: $ANON" -H "Content-Type: application/json" \
-  -d '{"order_number":"JNR-260826-A7K3","phone_last4":"3456"}'
+  -d '{"order_number":"482913","phone":"0550123456"}'
 ```
 
 ---

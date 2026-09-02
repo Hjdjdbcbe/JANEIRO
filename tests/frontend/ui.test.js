@@ -242,7 +242,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     };
   });
   check(!head.handle, "the @handle is gone from the header");
-  check(head.nav.join(" ") === "الرئيسية المنتجات العروض تواصل معنا", `nav reads: ${head.nav.join(" / ")}`);
+  check(head.nav.join(" ") === "الرئيسية المنتجات العروض تتبع الطلب تواصل معنا", `nav reads: ${head.nav.join(" / ")}`);
   check(head.navShown && !head.burgerShown, "a desktop column shows the links, not the burger");
   check(head.glass, `the bar is frosted: ${head.glass}`);
   check(head.translucent, "and translucent, so the artwork shows through");

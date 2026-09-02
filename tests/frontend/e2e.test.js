@@ -222,7 +222,7 @@ const check = (c, m) => c ? ok(m) : bad(m);
   await page.waitForSelector("#sent:not(.hidden)", { timeout: 20000 });
 
   const oid = await page.locator("#sentOid").innerText();
-  check(/^JNR-\d{6}-[0-9A-Z]{4}$/.test(oid), `server-issued order number shown: ${oid}`);
+  check(/^\d{6}$/.test(oid), `server-issued order number shown: ${oid}`);
   const total = await page.locator("#sentTotal").innerText();
   check(total.includes("1,900"), `total came from the server: "${total}"`);
 
@@ -237,13 +237,13 @@ const check = (c, m) => c ? ok(m) : bad(m);
   // ---------- tracking ----------
   await page.evaluate(() => window.go("track"));
   await page.fill("#tNum", oid);
-  await page.fill("#tLast4", "3456");
+  await page.fill("#tPhone", "0550123456");
   await page.click("#track .btn-primary");
   await page.waitForTimeout(1200);
   const tr = await page.locator("#tResult").innerText();
   check(tr.includes(oid) && tr.includes("مراجعة الدفع"), `tracking returned the order: ${tr.split("\n").join(" | ").slice(0,80)}`);
 
-  await page.fill("#tLast4", "9999");
+  await page.fill("#tPhone", "0559999999");
   await page.click("#track .btn-primary");
   await page.waitForTimeout(1200);
   const tr2 = await page.locator("#tResult").innerText();

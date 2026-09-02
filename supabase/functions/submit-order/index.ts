@@ -25,7 +25,7 @@ async function buildMessage(db: SupabaseClient, orderId: string): Promise<string
   const { data: o } = await db
     .from("orders")
     .select(`order_number, customer_name, customer_phone, customer_wilaya,
-             total, currency, payment_reference, status, submitted_at,
+             total, currency, payment_reference, status, submitted_at, customer_note,
              payment_methods ( label )`)
     .eq("id", orderId).single();
 
@@ -59,6 +59,7 @@ async function buildMessage(db: SupabaseClient, orderId: string): Promise<string
   const pm = (o as { payment_methods?: { label?: string } } | null)?.payment_methods;
   lines.push(`الدفع: ${pm?.label ?? "—"}`);
   if (o?.payment_reference) lines.push(`رقم العملية: ${o.payment_reference}`);
+  if (o?.customer_note) lines.push("", `رسالة العميل: ${o.customer_note}`);
   lines.push(`وقت الطلب: ${o?.submitted_at}`);
   lines.push(`الحالة: ${STATUS_AR[o?.status as string] ?? o?.status}`);
 

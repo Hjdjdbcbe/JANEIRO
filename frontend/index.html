@@ -900,9 +900,9 @@ header.stuck .hbar{height:54px}
 .field{margin-bottom:var(--s4)}
 .field label{display:block;font-size:13.5px;font-weight:600;margin-bottom:6px}
 .field .sub{font-weight:400;color:var(--ink-2);font-size:12px}
-.field input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
-  background:var(--card);outline:0;transition:border-color .15s,box-shadow .15s}
-.field input:focus{border-color:var(--accent-ink);box-shadow:var(--ring)}
+.field input,.field textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  background:var(--card);outline:0;transition:border-color .15s,box-shadow .15s;font:inherit;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--accent-ink);box-shadow:var(--ring)}
 /* The one <select> on the storefront. Same box as an input, with the
    chevron drawn in so the native arrow does not sit on the wrong side
    in RTL. currentColor keeps it right in both themes. */
@@ -1109,6 +1109,7 @@ footer ul button:hover{color:var(--text-on-dark)}
       <button data-nav="home" onclick="go('home')">الرئيسية</button>
       <button data-nav="shop" onclick="go('shop','all')">المنتجات</button>
       <button data-nav="offers" onclick="go('shop','__offers')">العروض</button>
+      <button data-nav="track" onclick="go('track')">تتبع الطلب</button>
       <button onclick="contactWhatsApp()">تواصل معنا</button>
     </nav>
 
@@ -1460,7 +1461,8 @@ footer ul button:hover{color:var(--text-on-dark)}
           <input id="fPhone" class="mono" inputmode="numeric" placeholder="0550123456" required aria-required="true" aria-describedby="errPhone" onblur="validatePhone()" oninput="clearErr('fldPhone')">
           <p class="err" id="errPhone" role="alert">رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07</p>
         </div>
-        <div class="field" style="margin:0"><label for="fWilaya">الولاية <span class="sub">— اختياري</span></label><input id="fWilaya" placeholder="مثال: الجزائر"></div>
+        <div class="field"><label for="fWilaya">الولاية <span class="sub">— اختياري</span></label><input id="fWilaya" placeholder="مثال: الجزائر"></div>
+        <div class="field" style="margin:0"><label for="fNote">رسالة إضافية <span class="sub">— اختياري</span></label><textarea id="fNote" rows="2" maxlength="500" placeholder="أي ملاحظة تحب تضيفها لطلبك…"></textarea></div>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="nextFromDetails()">التالي — طريقة الدفع</button>
     </div>
@@ -1543,8 +1545,8 @@ footer ul button:hover{color:var(--text-on-dark)}
     <h1 style="font-size:24px">تتبع الطلب</h1>
     <p style="color:var(--muted-on-dark);font-size:14px;margin-top:var(--s2)">أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.</p>
     <div class="card">
-      <div class="field"><label for="tNum">رقم الطلب</label><input id="tNum" class="mono" placeholder="JNR-XXXXXX-XXXX"></div>
-      <div class="field" style="margin:0"><label for="tLast4">آخر 4 أرقام من هاتفك</label><input id="tLast4" class="mono" inputmode="numeric" maxlength="4" placeholder="XXXX"></div>
+      <div class="field"><label for="tNum">رقم الطلب</label><input id="tNum" class="mono" inputmode="numeric" maxlength="6" placeholder="482913"></div>
+      <div class="field" style="margin:0"><label for="tPhone">رقم هاتفك</label><input id="tPhone" class="mono" inputmode="numeric" maxlength="10" placeholder="0550123456"></div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="runTrack()">الاستعلام</button>
     </div>
     <div id="tResult"></div>
@@ -2744,6 +2746,7 @@ async function sendOrder(){
         paymentMethodId: payMethod,
         items: cartForApi(),
         idempotencyKey: idemKey,
+        note: $("#fNote").value.trim() || null,
       });
     }
 
@@ -2803,15 +2806,15 @@ function resetOrder(){
    ORDER TRACKING
    ================================================================ */
 async function runTrack(){
-  const num=$("#tNum").value.trim(), last4=$("#tLast4").value.trim();
+  const num=$("#tNum").value.trim(), phone=$("#tPhone").value.trim();
   const out=$("#tResult");
-  if(!num || !/^[0-9]{4}$/.test(last4)){
-    out.innerHTML=`<div class="hint"><span>أدخل رقم الطلب وآخر 4 أرقام من هاتفك.</span></div>`;
+  if(!num || !/^0[567][0-9]{8}$/.test(phone)){
+    out.innerHTML=`<div class="hint"><span>أدخل رقم الطلب ورقم هاتفك كاملاً (10 أرقام يبدأ بـ 05 أو 06 أو 07).</span></div>`;
     return;
   }
   out.innerHTML=`<div class="hint"><span>جارٍ الاستعلام…</span></div>`;
   try{
-    const o=await API.trackOrder(num,last4);
+    const o=await API.trackOrder(num,phone);
     out.innerHTML=`<div class="card" style="text-align:start">
       <div class="dl">
         <div><span>رقم الطلب</span><b class="mono">${o.order_number}</b></div>

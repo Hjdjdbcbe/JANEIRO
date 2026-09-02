@@ -377,7 +377,14 @@ end $$;
 -- TRACK ORDER: order_number + last 4 digits of the phone.
 -- Returns the bare minimum. Never phone, receipt, activation data
 -- or payment account details.
+--
+-- Dropped first: a later migration renames this function's second
+-- parameter, and postgres refuses to rename a parameter through
+-- create or replace. The guard keeps a full replay of every
+-- migration in order idempotent no matter what a later file does
+-- to this signature.
 -- ------------------------------------------------------------
+drop function if exists track_order(text, text);
 create or replace function track_order(p_order_number text, p_phone_last4 text)
 returns jsonb
 language plpgsql security definer set search_path = public as $$

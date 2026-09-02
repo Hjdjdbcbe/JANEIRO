@@ -1,6 +1,6 @@
 // ============================================================
 // POST /functions/v1/track-order
-// body: { order_number, phone_last4 }
+// body: { order_number, phone }
 // Returns status + item names only. Never phone, receipt,
 // activation data or payment account details.
 // ============================================================
@@ -20,11 +20,11 @@ Deno.serve(async (req) => {
         message: "عدد المحاولات كبير. انتظر قليلاً ثم أعد المحاولة." }, 429);
     }
 
-    const { order_number, phone_last4 } = await req.json();
+    const { order_number, phone } = await req.json();
 
     const { data, error } = await db.rpc("track_order", {
       p_order_number: String(order_number ?? "").slice(0, 30),
-      p_phone_last4: String(phone_last4 ?? "").slice(0, 4),
+      p_phone: String(phone ?? "").slice(0, 20),
     });
 
     if (error) {
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
       // "wrong phone" so the endpoint can't be used to enumerate orders.
       if (m.code === "ORDER_NOT_FOUND" || m.code === "INVALID_TRACKING_INPUT") {
         return json({ ok: false, code: "ORDER_NOT_FOUND",
-          message: "لم نعثر على طلب بهذه البيانات. تحقق من رقم الطلب وآخر 4 أرقام من هاتفك." }, 404);
+          message: "لم نعثر على طلب بهذه البيانات. تحقق من رقم الطلب ورقم الهاتف." }, 404);
       }
       return json({ ok: false, ...m }, m.code === "RATE_LIMITED" ? 429 : 400);
     }

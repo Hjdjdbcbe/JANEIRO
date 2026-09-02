@@ -29,10 +29,11 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const {
       name, phone, wilaya, payment_method_id,
-      items, idempotency_key,
+      items, idempotency_key, note,
     } = body as {
       name: string; phone: string; wilaya?: string;
       payment_method_id: string; items: ItemIn[]; idempotency_key: string;
+      note?: string;
     };
 
     if (!idempotency_key || String(idempotency_key).length < 8) {
@@ -71,6 +72,7 @@ Deno.serve(async (req) => {
       p_items: safeItems,
       p_idempotency_key: String(idempotency_key).slice(0, 100),
       p_client_ip: ip || null,
+      p_customer_note: note ? String(note).slice(0, 500) : null,
     });
 
     if (error) {

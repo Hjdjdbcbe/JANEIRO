@@ -129,7 +129,8 @@ const dataUri = (file) => {
   if (name === "track-order") {
     const o = Object.values(S).find(x =>
       x.order_number === String(body.order_number || "").trim().toUpperCase() &&
-      String(x.phone || "").slice(-4) === String(body.phone_last4 || ""));
+      String(x.phone || "").replace(/[^0-9]/g, "").slice(-9) ===
+        String(body.phone || "").replace(/[^0-9]/g, "").slice(-9));
     if (!o) { const e = new Error("لم نعثر على الطلب."); e.code = "ORDER_NOT_FOUND"; throw e; }
     return { order: { order_number: o.order_number, status: o.status,
                       created_at: o.created_at, total: o.total, items: [] } };

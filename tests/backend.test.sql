@@ -37,7 +37,7 @@ begin
   raise notice 'PASS  phone normalization';
 
   -- ========== order number format ==========
-  assert generate_order_number() ~ '^JNR-[0-9]{6}-[0-9A-Z]{4}$', 'order number format';
+  assert generate_order_number() ~ '^[0-9]{6}$', 'order number format';
   raise notice 'PASS  order number format';
 
   -- ========== valid order ==========
@@ -315,8 +315,8 @@ begin
   select order_number into v_num from orders
    where normalized_phone='213551000001' and status <> 'awaiting_receipt' limit 1;
 
-  -- correct order + correct last4
-  v_res := track_order(v_num, '0001');
+  -- correct order + correct phone
+  v_res := track_order(v_num, '0551000001');
   assert v_res->>'order_number' = v_num, 'tracking returns the order';
   assert v_res ? 'status_label', 'tracking returns an Arabic status label';
   assert not (v_res ? 'customer_phone'), 'tracking must not leak the phone';
@@ -324,9 +324,9 @@ begin
   assert not (v_res ? 'activation'),     'tracking must not leak activation data';
   raise notice 'PASS  tracking with correct phone';
 
-  -- wrong last4 -> rejected
+  -- wrong phone -> rejected
   begin
-    perform track_order(v_num, '9999');
+    perform track_order(v_num, '0559999999');
     raise exception 'FAILED: tracking accepted the wrong phone';
   exception when others then
     assert sqlerrm like '%ORDER_NOT_FOUND%' or sqlerrm like '%RATE_LIMITED%',
@@ -618,7 +618,7 @@ begin
 
   -- ---------- the customer sees the new status ----------
   perform set_config('request.jwt.claims', '', true);
-  v_res := track_order((select order_number from orders where id=v_id), '0001');
+  v_res := track_order((select order_number from orders where id=v_id), '0557000001');
   assert v_res->>'status' = 'refunded', 'tracking must reflect the admin move';
   assert v_res->>'status_label' = 'تم الاسترجاع', 'the Arabic label must follow';
   raise notice 'PASS  the customer''s tracking page reflects the change';

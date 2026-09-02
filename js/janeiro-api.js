@@ -269,7 +269,7 @@ export function newIdempotencyKey() {
  * Step 1 — create the awaiting_receipt order.
  * Note we send NO prices: the server computes them from the database.
  */
-export async function createOrder({ name, phone, wilaya, paymentMethodId, items, idempotencyKey }) {
+export async function createOrder({ name, phone, wilaya, paymentMethodId, items, idempotencyKey, note }) {
   const res = await callFn("create-order", {
     name, phone, wilaya,
     payment_method_id: paymentMethodId,
@@ -283,6 +283,7 @@ export async function createOrder({ name, phone, wilaya, paymentMethodId, items,
       activation: i.activation ?? [],
     })),
     idempotency_key: idempotencyKey,
+    note: note || null,
   });
   return res.order;
 }
@@ -345,9 +346,9 @@ export function buildWhatsAppUrl(number, order, items, currency = "دج") {
 
 /* ---------------- tracking ---------------- */
 
-export async function trackOrder(orderNumber, phoneLast4) {
+export async function trackOrder(orderNumber, phone) {
   const res = await callFn("track-order", {
-    order_number: orderNumber, phone_last4: phoneLast4,
+    order_number: orderNumber, phone,
   });
   return res.order;
 }

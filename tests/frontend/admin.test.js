@@ -43,6 +43,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
           items: [{ product_id: prod.id, plan_id: plan.id, quantity: 1, activation: [
             { label: "بريد Gmail للتفعيل", value: "console@gmail.com" },
             { label: "رقم الهاتف المرتبط", value: phone }] }],
+          note: "الرجاء التفعيل بعد الساعة 8 مساءً",
         }),
       })).json();
       if (!created.ok) throw new Error("seed create failed: " + JSON.stringify(created));
@@ -61,7 +62,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
       if (!done.ok) throw new Error("seed submit failed: " + JSON.stringify(done));
       /* the store's own value for this product -- the console must show
          the same string, not something the seeding code chose */
-      return { number: done.order.order_number, phone, last4: phone.slice(-4),
+      return { number: done.order.order_number, phone,
                actType: prod.activation_type };
     }, BASE);
   }
@@ -174,6 +175,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         `the product's نوع التفعيل is on the order the owner works from: ${seeded.actType}`);
   check(body.includes(seeded.phone), "the customer's phone is shown");
   check(body.includes("4821990"), "the payment reference is shown");
+  check(body.includes("الرجاء التفعيل بعد الساعة 8 مساءً"), "the customer's note is shown");
   check(await p.locator("#receiptBtn").count() === 1, "there is a way to open the payment receipt");
 
   // the receipt bucket is private: the link must be minted, not public
@@ -215,12 +217,12 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         "once completed, the only move left is a refund");
 
   // the customer's tracking page must now agree
-  const track = await p.evaluate(async ([b, n, l4]) => {
+  const track = await p.evaluate(async ([b, n, ph]) => {
     const r = await fetch(`${b}/functions/v1/track-order`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order_number: n, phone_last4: l4 }) });
+      body: JSON.stringify({ order_number: n, phone: ph }) });
     return await r.json();
-  }, [BASE, seeded.number, seeded.last4]);
+  }, [BASE, seeded.number, seeded.phone]);
   check(track?.order?.status === "completed",
         `the customer's tracking page shows the new status (${track?.order?.status_label || "—"})`);
 

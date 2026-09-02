@@ -1362,6 +1362,7 @@ async function openOrder(id) {
         ${o.payment_reference ? `<dt>رقم العملية</dt><dd><span class="mono">${esc(o.payment_reference)}</span></dd>` : ""}
         <dt>الإجمالي</dt><dd><b class="mono">${money(o.total, o.currency)}</b></dd>
         <dt>وقت الطلب</dt><dd><span class="mono">${when(o.submitted_at || o.created_at)}</span></dd>
+        ${o.customer_note ? `<dt>رسالة العميل</dt><dd>${esc(o.customer_note)}</dd>` : ""}
       </dl>
       ${o.receipt_path
         ? `<button class="btn" id="receiptBtn">عرض وصل الدفع</button>`
