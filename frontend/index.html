@@ -1263,8 +1263,8 @@ footer ul button:hover{color:var(--text-on-dark)}
   <section class="sec" id="bestSec">
     <div class="wrap">
       <div class="sechead rv">
-        <div><h2>الأكثر طلباً</h2><p>المنتجات التي يطلبها عملاؤنا أكثر</p></div>
-        <button class="arclink" onclick="go('shop','__best')">عرض الكل ←</button>
+        <div><h2 data-i18n="footer_best">الأكثر طلباً</h2><p data-i18n="best_sub">المنتجات التي يطلبها عملاؤنا أكثر</p></div>
+        <button class="arclink" data-i18n="view_all" onclick="go('shop','__best')">عرض الكل ←</button>
       </div>
       <div class="rail rv" id="bestRail"></div>
     </div>
@@ -1277,20 +1277,20 @@ footer ul button:hover{color:var(--text-on-dark)}
            buries the fastest route to a product. This one is always here. -->
       <label class="homesearch" for="homeSearch">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4" stroke-linecap="round"/></svg>
-        <span class="sr">ابحث عن منتج</span>
-        <input id="homeSearch" type="search" placeholder="ابحث عن ChatGPT، Canva، Discord…"
+        <span class="sr" data-i18n="search_label">ابحث عن منتج</span>
+        <input id="homeSearch" type="search" data-i18n-ph="home_search_ph" placeholder="ابحث عن ChatGPT، Canva، Discord…"
                oninput="doSearch(this.value)">
       </label>
       <div style="margin-bottom:18px">
-        <h2 style="font-size:19px">تصفح حسب التصنيف</h2>
-        <p style="color:var(--muted-on-dark);font-size:13px;margin-top:4px">وصل للخدمة التي تحتاجها بسرعة.</p>
+        <h2 style="font-size:19px" data-i18n="browse_by_cat">تصفح حسب التصنيف</h2>
+        <p style="color:var(--muted-on-dark);font-size:13px;margin-top:4px" data-i18n="browse_cat_sub">وصل للخدمة التي تحتاجها بسرعة.</p>
       </div>
       <div class="catwrap">
-        <button class="carr prev hidden" onclick="scrollCats(-1)" aria-label="السابق">
+        <button class="carr prev hidden" onclick="scrollCats(-1)" data-i18n-aria="cat_prev" aria-label="السابق">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>
         </button>
         <div class="category-carousel" id="catGrid" role="tablist" aria-label="التصنيفات"></div>
-        <button class="carr next hidden" onclick="scrollCats(1)" aria-label="التالي">
+        <button class="carr next hidden" onclick="scrollCats(1)" data-i18n-aria="cat_next" aria-label="التالي">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
@@ -1304,7 +1304,7 @@ footer ul button:hover{color:var(--text-on-dark)}
     <div class="wrap">
       <div class="sechead rv">
         <div>
-          <h2>عروض اليوم</h2>
+          <h2 data-i18n="deals_h">عروض اليوم</h2>
           <p class="dealtime">
             <span class="dot" aria-hidden="true"></span>
             <span id="dealsTimer"></span>
@@ -1319,8 +1319,8 @@ footer ul button:hover{color:var(--text-on-dark)}
     <div class="wrap">
       <div class="helpbar rv">
         <span class="hi"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/><path d="M9.5 10.5h.01M12 10.5h.01M14.5 10.5h.01"/></svg></span>
-        <div class="ht"><b>تحتاج مساعدة تختار؟</b><span>راسلنا مباشرة، فريقنا يرد خلال وقت قصير.</span></div>
-        <button class="btn btn-soft" onclick="contactWhatsApp()" style="background:var(--tint-2);color:var(--ink)">تواصل معنا</button>
+        <div class="ht"><b data-i18n="help_h">تحتاج مساعدة تختار؟</b><span data-i18n="help_p">راسلنا مباشرة، فريقنا يرد خلال وقت قصير.</span></div>
+        <button class="btn btn-soft" data-i18n="nav_contact" onclick="contactWhatsApp()" style="background:var(--tint-2);color:var(--ink)">تواصل معنا</button>
       </div>
     </div>
   </section>
@@ -1329,9 +1329,9 @@ footer ul button:hover{color:var(--text-on-dark)}
     <div class="wrap">
       <div class="promo rv">
         <div>
-          <span class="eyebrow">عروض Janeiro</span>
-          <h2>وفّر أكثر مع باقات Janeiro</h2>
-          <p>خصومات على مجموعة من أشهر الخدمات الرقمية، بنفس التفعيل السريع والدعم المباشر.</p>
+          <span class="eyebrow" data-i18n="promo_eyebrow">عروض Janeiro</span>
+          <h2 data-i18n="promo_h">وفّر أكثر مع باقات Janeiro</h2>
+          <p data-i18n="promo_p">خصومات على مجموعة من أشهر الخدمات الرقمية، بنفس التفعيل السريع والدعم المباشر.</p>
           <button class="btn btn-primary" data-i18n="bundles_cta" onclick="go('bundles')">اكتشف الباقات</button>
         </div>
         <div class="pboxes" id="promoBoxes"></div>
@@ -1341,49 +1341,49 @@ footer ul button:hover{color:var(--text-on-dark)}
 
   <section class="sec">
     <div class="wrap">
-      <div class="sechead rv"><div><h2>كيف يعمل الطلب؟</h2><p>أربع خطوات فقط، بدون إنشاء حساب</p></div></div>
+      <div class="sechead rv"><div><h2 data-i18n="hiw_h">كيف يعمل الطلب؟</h2><p data-i18n="hiw_sub">أربع خطوات فقط، بدون إنشاء حساب</p></div></div>
       <div class="hiwgrid rv">
-        <div class="hiwcard"><div class="hiwnum">01</div><b>اختر واطلب</b><p>حدد المنتج والخطة، ورقم طلبك يظهر فوراً.</p></div>
-        <div class="hiwcard"><div class="hiwnum">02</div><b>ادفع وارفع الوصل</b><p>CCP أو BaridiMob أو Flexy، ثم صورة الوصل.</p></div>
-        <div class="hiwcard"><div class="hiwnum">03</div><b>نراجع يدوياً</b><p>نتأكد من الدفع خلال وقت قصير.</p></div>
-        <div class="hiwcard"><div class="hiwnum">04</div><b>تفعيل ومتابعة</b><p>نتابعك حتى يكتمل تفعيل طلبك.</p></div>
+        <div class="hiwcard"><div class="hiwnum">01</div><b data-i18n="hiw1_t">اختر واطلب</b><p data-i18n="hiw1_p">حدد المنتج والخطة، ورقم طلبك يظهر فوراً.</p></div>
+        <div class="hiwcard"><div class="hiwnum">02</div><b data-i18n="hiw2_t">ادفع وارفع الوصل</b><p data-i18n="hiw2_p">CCP أو BaridiMob أو Flexy، ثم صورة الوصل.</p></div>
+        <div class="hiwcard"><div class="hiwnum">03</div><b data-i18n="hiw3_t">نراجع يدوياً</b><p data-i18n="hiw3_p">نتأكد من الدفع خلال وقت قصير.</p></div>
+        <div class="hiwcard"><div class="hiwnum">04</div><b data-i18n="hiw4_t">تفعيل ومتابعة</b><p data-i18n="hiw4_p">نتابعك حتى يكتمل تفعيل طلبك.</p></div>
       </div>
     </div>
   </section>
 
   <section class="sec trust">
     <div class="wrap">
-      <div class="sechead rv"><div><h2>الأمان يهمنا بقدر ما يهمك</h2><p>لا نطلب أكثر مما تحتاجه الخدمة فعلاً</p></div></div>
+      <div class="sechead rv"><div><h2 data-i18n="trust_h">الأمان يهمنا بقدر ما يهمك</h2><p data-i18n="trust_sub">لا نطلب أكثر مما تحتاجه الخدمة فعلاً</p></div></div>
       <div class="trustgrid rv">
-        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></i><b>كلمة مرور عند الحاجة فقط</b><p>لا نطلبها إلا إذا كان المنتج نفسه يتطلب ذلك فعلاً، ونوضح هذا بصراحة قبل الطلب.</p></div>
-        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6" stroke-linecap="round"/></svg></i><b>ضمان محدد لكل منتج</b><p>مدة الضمان موضحة في صفحة كل منتج قبل الشراء.</p></div>
-        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></i><b>مراجعة يدوية للدفع</b><p>كل عملية دفع تُراجع يدوياً قبل بدء التفعيل.</p></div>
-        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5" stroke-linejoin="round"/></svg></i><b>متابعة حتى الاكتمال</b><p>نبقى معك حتى يكتمل تفعيل طلبك بالكامل.</p></div>
+        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></i><b data-i18n="trust1_t">كلمة مرور عند الحاجة فقط</b><p data-i18n="trust1_p">لا نطلبها إلا إذا كان المنتج نفسه يتطلب ذلك فعلاً، ونوضح هذا بصراحة قبل الطلب.</p></div>
+        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6" stroke-linecap="round"/></svg></i><b data-i18n="trust2_t">ضمان محدد لكل منتج</b><p data-i18n="trust2_p">مدة الضمان موضحة في صفحة كل منتج قبل الشراء.</p></div>
+        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></i><b data-i18n="trust3_t">مراجعة يدوية للدفع</b><p data-i18n="trust3_p">كل عملية دفع تُراجع يدوياً قبل بدء التفعيل.</p></div>
+        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5" stroke-linejoin="round"/></svg></i><b data-i18n="trust4_t">متابعة حتى الاكتمال</b><p data-i18n="trust4_p">نبقى معك حتى يكتمل تفعيل طلبك بالكامل.</p></div>
       </div>
     </div>
   </section>
 
   <section class="sec tint">
     <div class="wrap">
-      <div class="sechead rv"><div><h2>لماذا Janeiro؟</h2><p>أربعة أسباب تجعل طلبك أسهل وأأمن</p></div></div>
+      <div class="sechead rv"><div><h2 data-i18n="why_h">لماذا Janeiro؟</h2><p data-i18n="why_sub">أربعة أسباب تجعل طلبك أسهل وأأمن</p></div></div>
       <div class="whygrid rv">
-        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/></svg></i><h3>تفعيل سريع</h3><p>نبدأ التنفيذ فور تأكيد الدفع، والمتابعة معك خطوة بخطوة.</p></div>
-        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v18M8 7h6.5a2.75 2.75 0 0 1 0 5.5h-5a2.75 2.75 0 0 0 0 5.5H16"/></svg></i><h3>أسعار مناسبة</h3><p>أسعار بالدينار الجزائري مدروسة للسوق المحلي.</p></div>
-        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/></svg></i><h3>دعم مباشر</h3><p>تواصل حقيقي على واتساب أو إنستغرام، بدون أنظمة تذاكر.</p></div>
-        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 2.5 4.5 6v6c0 4.5 3.2 8.3 7.5 9.5 4.3-1.2 7.5-5 7.5-9.5V6L12 2.5Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg></i><h3>منتجات موثوقة</h3><p>لا نطلب كلمات مرور، وإذا تعذّر التفعيل يُسترجع المبلغ كاملاً.</p></div>
+        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"/></svg></i><h3 data-i18n="why1_t">تفعيل سريع</h3><p data-i18n="why1_p">نبدأ التنفيذ فور تأكيد الدفع، والمتابعة معك خطوة بخطوة.</p></div>
+        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v18M8 7h6.5a2.75 2.75 0 0 1 0 5.5h-5a2.75 2.75 0 0 0 0 5.5H16"/></svg></i><h3 data-i18n="why2_t">أسعار مناسبة</h3><p data-i18n="why2_p">أسعار بالدينار الجزائري مدروسة للسوق المحلي.</p></div>
+        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/></svg></i><h3 data-i18n="why3_t">دعم مباشر</h3><p data-i18n="why3_p">تواصل حقيقي على واتساب أو إنستغرام، بدون أنظمة تذاكر.</p></div>
+        <div class="why"><i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 2.5 4.5 6v6c0 4.5 3.2 8.3 7.5 9.5 4.3-1.2 7.5-5 7.5-9.5V6L12 2.5Z"/><path d="m9 12 2 2 4-4" stroke-linecap="round"/></svg></i><h3 data-i18n="why4_t">منتجات موثوقة</h3><p data-i18n="why4_p">لا نطلب كلمات مرور، وإذا تعذّر التفعيل يُسترجع المبلغ كاملاً.</p></div>
       </div>
     </div>
   </section>
 
   <section class="sec">
     <div class="wrap" style="max-width:820px">
-      <div class="sechead rv"><div><h2>أسئلة شائعة</h2></div></div>
+      <div class="sechead rv"><div><h2 data-i18n="faq_h">أسئلة شائعة</h2></div></div>
       <div class="rv">
-        <details class="faq" open><summary>كم يستغرق التفعيل بعد الدفع؟</summary><p>يبدأ التنفيذ فور تأكيد وصول المبلغ، ونخبرك بالمدة المتوقعة لكل منتج عند الطلب.</p></details>
-        <details class="faq"><summary>كيف أدفع؟</summary><p>الدفع محلي عبر CCP أو BaridiMob أو Flexy. ترسل صورة الوصل ونتحقق منها يدوياً قبل التنفيذ.</p></details>
-        <details class="faq"><summary>هل تطلبون كلمة مرور حسابي؟</summary><p>لا. نعتمد على الدعوات وأكواد التفعيل كلما كان ذلك متاحاً في الخدمة.</p></details>
-        <details class="faq"><summary>ماذا لو تعذّر التفعيل؟</summary><p>يُسترجع المبلغ كاملاً، ونوضح لك السبب عبر القناة التي اخترتها.</p></details>
-        <details class="faq"><summary>هل يمكنني طلب أكثر من منتج؟</summary><p>نعم، أضف ما تريد إلى السلة وأتمم الطلب دفعة واحدة برقم طلب واحد.</p></details>
+        <details class="faq" open><summary data-i18n="faq1_q">كم يستغرق التفعيل بعد الدفع؟</summary><p data-i18n="faq1_a">يبدأ التنفيذ فور تأكيد وصول المبلغ، ونخبرك بالمدة المتوقعة لكل منتج عند الطلب.</p></details>
+        <details class="faq"><summary data-i18n="faq2_q">كيف أدفع؟</summary><p data-i18n="faq2_a">الدفع محلي عبر CCP أو BaridiMob أو Flexy. ترسل صورة الوصل ونتحقق منها يدوياً قبل التنفيذ.</p></details>
+        <details class="faq"><summary data-i18n="faq3_q">هل تطلبون كلمة مرور حسابي؟</summary><p data-i18n="faq3_a">لا. نعتمد على الدعوات وأكواد التفعيل كلما كان ذلك متاحاً في الخدمة.</p></details>
+        <details class="faq"><summary data-i18n="faq4_q">ماذا لو تعذّر التفعيل؟</summary><p data-i18n="faq4_a">يُسترجع المبلغ كاملاً، ونوضح لك السبب عبر القناة التي اخترتها.</p></details>
+        <details class="faq"><summary data-i18n="faq5_q">هل يمكنني طلب أكثر من منتج؟</summary><p data-i18n="faq5_a">نعم، أضف ما تريد إلى السلة وأتمم الطلب دفعة واحدة برقم طلب واحد.</p></details>
       </div>
     </div>
   </section>
@@ -1397,12 +1397,12 @@ footer ul button:hover{color:var(--text-on-dark)}
       <div><h2 id="shopTitle">كل المنتجات</h2><p id="shopCount"></p></div>
     </div>
     <div class="catwrap" style="margin-bottom:var(--s4)">
-      <div class="category-carousel" id="shopCatGrid" role="tablist" aria-label="التصنيفات"></div>
+      <div class="category-carousel" id="shopCatGrid" role="tablist" data-i18n-aria="categories_aria" aria-label="التصنيفات"></div>
     </div>
     <div class="dsearch" style="width:100%;max-width:420px;margin-bottom:var(--s6)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4" stroke-linecap="round"/></svg>
-      <label class="sr" for="shopSearch">بحث عن منتج</label>
-      <input id="shopSearch" placeholder="ابحث عن ChatGPT، Canva، Discord…" oninput="doSearch(this.value)">
+      <label class="sr" for="shopSearch" data-i18n="search_label">بحث عن منتج</label>
+      <input id="shopSearch" data-i18n-ph="home_search_ph" placeholder="ابحث عن ChatGPT، Canva، Discord…" oninput="doSearch(this.value)">
     </div>
     <div class="pgrid" id="shopGrid"></div>
   </div>
@@ -1419,34 +1419,34 @@ footer ul button:hover{color:var(--text-on-dark)}
         <h1 style="font-size:clamp(22px,5vw,32px)" id="dName"></h1>
         <p style="color:var(--muted-on-dark);margin-top:var(--s2);font-size:14.5px" id="dDesc"></p>
 
-        <div class="card"><h3>اختر الخطة</h3><div id="dPlans" role="radiogroup" aria-label="الخطط"></div></div>
+        <div class="card"><h3 data-i18n="choose_plan_h">اختر الخطة</h3><div id="dPlans" role="radiogroup" data-i18n-aria="plans_aria" aria-label="الخطط"></div></div>
 
         <div class="card">
-          <h3>ما ستحصل عليه</h3>
+          <h3 data-i18n="what_you_get_h">ما ستحصل عليه</h3>
           <ul class="feat" id="dFeat"></ul>
         </div>
 
         <div class="card">
-          <h3>معلومات التسليم</h3>
+          <h3 data-i18n="delivery_info_h">معلومات التسليم</h3>
           <div class="dl">
-            <div><span>مدة التسليم</span><b id="dDeliv"></b></div>
+            <div><span data-i18n="delivery_time_label">مدة التسليم</span><b id="dDeliv"></b></div>
             <!-- hidden until the owner sets one on the product -->
-            <div id="dActRow" class="hidden"><span>نوع التفعيل</span><b id="dActType"></b></div>
-            <div><span>الضمان</span><b id="dWar"></b></div>
-            <div><span>الاسترجاع</span><b>يُسترجع المبلغ كاملاً إذا تعذّر التفعيل</b></div>
+            <div id="dActRow" class="hidden"><span data-i18n="activation_type_label">نوع التفعيل</span><b id="dActType"></b></div>
+            <div><span data-i18n="warranty_label">الضمان</span><b id="dWar"></b></div>
+            <div><span data-i18n="refund_label">الاسترجاع</span><b data-i18n="refund_value">يُسترجع المبلغ كاملاً إذا تعذّر التفعيل</b></div>
           </div>
         </div>
 
         <div class="hint">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round"/></svg>
-          <span>لا نطلب كلمة مرور حسابك. الدعم متاح على واتساب وإنستغرام قبل الطلب وبعده.</span>
+          <span data-i18n="no_password_hint">لا نطلب كلمة مرور حسابك. الدعم متاح على واتساب وإنستغرام قبل الطلب وبعده.</span>
         </div>
       </div>
     </div>
   </div>
   <div class="stickybar">
     <div class="wrap">
-      <div class="amt"><small>الإجمالي</small><b id="dTotal">—</b></div>
+      <div class="amt"><small data-i18n="total_label">الإجمالي</small><b id="dTotal">—</b></div>
       <button class="btn btn-ghost" data-i18n="add_to_cart" onclick="addCurrent()">+ السلة</button>
       <button class="btn btn-primary" data-i18n="buy_now" onclick="addCurrent(true)">اشترِ الآن</button>
     </div>
@@ -1457,8 +1457,8 @@ footer ul button:hover{color:var(--text-on-dark)}
 <section id="bundles" class="hidden page">
   <div class="wrap">
     <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
-    <h1 style="font-size:24px">الباقات</h1>
-    <p style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)">
+    <h1 style="font-size:24px" data-i18n="bundles_h">الباقات</h1>
+    <p style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)" data-i18n="bundles_sub">
       عدة منتجات مجمّعة بسعر واحد أقل من مجموعها منفردة.</p>
     <div id="bundleGrid" class="bgrid"></div>
   </div>
@@ -1472,15 +1472,15 @@ footer ul button:hover{color:var(--text-on-dark)}
     <p id="bDesc" style="color:var(--ink-2);font-size:14px;margin-top:var(--s2)"></p>
 
     <div class="card">
-      <h3>ما بداخل الباقة</h3>
+      <h3 data-i18n="bundle_contents_h">ما بداخل الباقة</h3>
       <div id="bItems"></div>
     </div>
 
     <div class="card">
       <div class="dl">
-        <div><span>مجموع الأسعار منفردة</span><b class="mono"><s id="bList"></s></b></div>
-        <div><span>سعر الباقة</span><b class="mono" id="bPrice"></b></div>
-        <div><span>توفيرك</span><b class="mono" id="bSave"></b></div>
+        <div><span data-i18n="bundle_list_total_label">مجموع الأسعار منفردة</span><b class="mono"><s id="bList"></s></b></div>
+        <div><span data-i18n="bundle_price_label">سعر الباقة</span><b class="mono" id="bPrice"></b></div>
+        <div><span data-i18n="bundle_your_saving_label">توفيرك</span><b class="mono" id="bSave"></b></div>
       </div>
     </div>
     <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" data-i18n="add_bundle" onclick="addBundleToCart()">
@@ -1493,7 +1493,7 @@ footer ul button:hover{color:var(--text-on-dark)}
 <section id="order" class="hidden page">
   <div class="wrap" style="max-width:640px">
     <button class="crumb" data-i18n="crumb_continue" onclick="go('shop')">→ متابعة التسوق</button>
-    <h1 style="font-size:24px">إتمام الطلب</h1>
+    <h1 style="font-size:24px" data-i18n="order_h">إتمام الطلب</h1>
     <div class="steps" id="steps">
       <span class="n on">1</span><span class="bar"></span><span class="n">2</span><span class="bar"></span><span class="n">3</span><span class="bar"></span><span class="n">4</span>
     </div>
@@ -1501,34 +1501,34 @@ footer ul button:hover{color:var(--text-on-dark)}
 
     <div id="o1">
       <div class="card" style="margin-top:0">
-        <h3>قناة المتابعة <span class="req" aria-hidden="true">*</span></h3>
+        <h3><span data-i18n="channel_h">قناة المتابعة</span> <span class="req" aria-hidden="true">*</span></h3>
         <div class="pay2" id="chanBox" style="grid-template-columns:repeat(2,1fr)" role="radiogroup" aria-label="قناة المتابعة" aria-required="true">
           <button class="paybtn" role="radio" aria-checked="false" onclick="setChannel(this,'واتساب')">واتساب</button>
           <button class="paybtn" role="radio" aria-checked="false" onclick="setChannel(this,'إنستغرام')">إنستغرام</button>
         </div>
-        <p class="cherr" id="chanErr" role="alert">الرجاء اختيار قناة المتابعة</p>
+        <p class="cherr" id="chanErr" role="alert" data-i18n="channel_err">الرجاء اختيار قناة المتابعة</p>
       </div>
       <div class="card">
-        <h3>بياناتك</h3>
+        <h3 data-i18n="details_h">بياناتك</h3>
         <div class="field" id="fldName">
-          <label for="fName">الاسم الكامل <span class="req" aria-hidden="true">*</span></label>
-          <input id="fName" placeholder="مثال: أمين ب." required aria-required="true" aria-describedby="errName" onblur="validateName()" oninput="clearErr('fldName')">
-          <p class="err" id="errName" role="alert">الاسم مطلوب</p>
+          <label for="fName"><span data-i18n="name_label">الاسم الكامل</span> <span class="req" aria-hidden="true">*</span></label>
+          <input id="fName" data-i18n-ph="name_ph" placeholder="مثال: أمين ب." required aria-required="true" aria-describedby="errName" onblur="validateName()" oninput="clearErr('fldName')">
+          <p class="err" id="errName" role="alert" data-i18n="name_err">الاسم مطلوب</p>
         </div>
         <div class="field" id="fldPhone">
-          <label for="fPhone">رقم الهاتف <span class="req" aria-hidden="true">*</span> <span class="sub">— للتواصل فقط</span></label>
+          <label for="fPhone"><span data-i18n="phone_label">رقم الهاتف</span> <span class="req" aria-hidden="true">*</span> <span class="sub" data-i18n="phone_sub">— للتواصل فقط</span></label>
           <input id="fPhone" class="mono" inputmode="numeric" placeholder="0550123456" required aria-required="true" aria-describedby="errPhone" onblur="validatePhone()" oninput="clearErr('fldPhone')">
-          <p class="err" id="errPhone" role="alert">رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07</p>
+          <p class="err" id="errPhone" role="alert" data-i18n="phone_err">رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07</p>
         </div>
-        <div class="field"><label for="fWilaya">الولاية <span class="sub">— اختياري</span></label><input id="fWilaya" placeholder="مثال: الجزائر"></div>
-        <div class="field" style="margin:0"><label for="fNote">رسالة إضافية <span class="sub">— اختياري</span></label><textarea id="fNote" rows="2" maxlength="500" placeholder="أي ملاحظة تحب تضيفها لطلبك…"></textarea></div>
+        <div class="field"><label for="fWilaya"><span data-i18n="wilaya_label">الولاية</span> <span class="sub" data-i18n="optional">— اختياري</span></label><input id="fWilaya" data-i18n-ph="wilaya_ph" placeholder="مثال: الجزائر"></div>
+        <div class="field" style="margin:0"><label for="fNote"><span data-i18n="note_label">رسالة إضافية</span> <span class="sub" data-i18n="optional">— اختياري</span></label><textarea id="fNote" rows="2" maxlength="500" data-i18n-ph="note_ph" placeholder="أي ملاحظة تحب تضيفها لطلبك…"></textarea></div>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="nextFromDetails()" data-i18n="step_next_pay">التالي — طريقة الدفع</button>
     </div>
 
     <div id="o2" class="hidden">
       <div class="card" style="margin-top:0">
-        <h3>اختر طريقة الدفع</h3>
+        <h3 data-i18n="pay_h">اختر طريقة الدفع</h3>
         <div class="pay2" role="radiogroup" aria-label="طريقة الدفع">
           <button class="paybtn" role="radio" aria-checked="true" onclick="setPay(this,'CCP')">CCP</button>
           <button class="paybtn" role="radio" aria-checked="false" onclick="setPay(this,'BaridiMob')">BaridiMob</button>
@@ -1538,7 +1538,7 @@ footer ul button:hover{color:var(--text-on-dark)}
       </div>
       <div class="hint">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round"/></svg>
-        <span>احتفظ برقم العملية من إيصال الدفع — يسرّع التأكيد. رقم الطلب يصلك بعد تأكيد الطلب.</span>
+        <span data-i18n="pay_hint">احتفظ برقم العملية من إيصال الدفع — يسرّع التأكيد. رقم الطلب يصلك بعد تأكيد الطلب.</span>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="step(3)" data-i18n="step_paid">دفعتُ — رفع الوصل</button>
       <button class="btn btn-soft btn-block" style="margin-top:var(--s2)" onclick="step(1)" data-i18n="step_back">رجوع</button>
@@ -1546,14 +1546,14 @@ footer ul button:hover{color:var(--text-on-dark)}
 
     <div id="o3" class="hidden">
       <div class="card" style="margin-top:0">
-        <h3>صورة وصل الدفع</h3>
+        <h3 data-i18n="receipt_h">صورة وصل الدفع</h3>
         <label class="drop" id="dropLabel">
-          <b id="dropText">اضغط لاختيار صورة الوصل</b>
-          <span>JPG أو PNG · حتى 5 ميغابايت</span>
+          <b id="dropText" data-i18n="receipt_drop">اضغط لاختيار صورة الوصل</b>
+          <span data-i18n="receipt_hint2">JPG أو PNG · حتى 5 ميغابايت</span>
           <input type="file" accept="image/*" hidden id="receiptFile" onchange="onReceipt(this)">
         </label>
         <div class="field" style="margin-top:var(--s4);margin-bottom:0">
-          <label for="fRef">رقم العملية / المرجع <span class="sub">— يسرّع التأكيد</span></label>
+          <label for="fRef"><span data-i18n="ref_label">رقم العملية / المرجع</span> <span class="sub" data-i18n="ref_sub">— يسرّع التأكيد</span></label>
           <input id="fRef" class="mono" placeholder="مثال: 4821990">
         </div>
       </div>
@@ -1562,11 +1562,11 @@ footer ul button:hover{color:var(--text-on-dark)}
     </div>
 
     <div id="o4" class="hidden">
-      <div class="card" style="margin-top:0"><h3>بيانات التفعيل</h3><div id="actFields"></div></div>
+      <div class="card" style="margin-top:0"><h3 data-i18n="act_h">بيانات التفعيل</h3><div id="actFields"></div></div>
       <div class="summary" style="margin-top:var(--s4)" id="orderSummary"></div>
       <div class="card">
-        <h3>الرسالة التي سترسل</h3>
-        <p style="font-size:12.5px;color:var(--ink-2)">راجع التفاصيل قبل الإرسال — يمكنك الرجوع وتعديلها.</p>
+        <h3 data-i18n="msg_preview_h">الرسالة التي سترسل</h3>
+        <p style="font-size:12.5px;color:var(--ink-2)" data-i18n="msg_preview_sub">راجع التفاصيل قبل الإرسال — يمكنك الرجوع وتعديلها.</p>
         <div class="msgprev mono" id="waPreview"></div>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="sendOrder()">
@@ -1584,13 +1584,13 @@ footer ul button:hover{color:var(--text-on-dark)}
     <div style="width:64px;height:64px;border-radius:22px;background:var(--brand-grad);color:#fff;display:grid;place-items:center;margin:var(--s8) auto var(--s4)">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4.5 4.5L19 7"/></svg>
     </div>
-    <h1 style="font-size:24px">تم استلام طلبك</h1>
-    <p style="color:var(--muted-on-dark);margin-top:var(--s2)">سجّلنا طلبك ووصل الدفع. احتفظ برقم الطلب لمتابعته:</p>
+    <h1 style="font-size:24px" data-i18n="sent_h">تم استلام طلبك</h1>
+    <p style="color:var(--muted-on-dark);margin-top:var(--s2)" data-i18n="sent_sub">سجّلنا طلبك ووصل الدفع. احتفظ برقم الطلب لمتابعته:</p>
     <div class="card" style="text-align:start">
       <div class="dl">
-        <div><span>رقم الطلب</span><b class="mono" id="sentOid"></b></div>
-        <div><span>المبلغ</span><b class="mono" id="sentTotal"></b></div>
-        <div><span>طريقة الدفع</span><b id="sentPay"></b></div>
+        <div><span data-i18n="order_number_label">رقم الطلب</span><b class="mono" id="sentOid"></b></div>
+        <div><span data-i18n="amount_label">المبلغ</span><b class="mono" id="sentTotal"></b></div>
+        <div><span data-i18n="pay_method_label">طريقة الدفع</span><b id="sentPay"></b></div>
       </div>
     </div>
     <button class="btn btn-ghost btn-block" style="margin-top:var(--s4)" onclick="resetOrder()" data-i18n="back_to_store">العودة للمتجر</button>
@@ -1602,16 +1602,16 @@ footer ul button:hover{color:var(--text-on-dark)}
   <div class="wrap" style="max-width:560px">
     <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
     <h1 style="font-size:24px" data-i18n="nav_track">تتبع الطلب</h1>
-    <p style="color:var(--muted-on-dark);font-size:14px;margin-top:var(--s2)">أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.</p>
+    <p style="color:var(--muted-on-dark);font-size:14px;margin-top:var(--s2)" data-i18n="track_sub">أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.</p>
     <div class="card">
-      <div class="field"><label for="tNum">رقم الطلب</label><input id="tNum" class="mono" inputmode="numeric" maxlength="6" placeholder="482913"></div>
-      <div class="field" style="margin:0"><label for="tPhone">رقم هاتفك</label><input id="tPhone" class="mono" inputmode="numeric" maxlength="10" placeholder="0550123456"></div>
+      <div class="field"><label for="tNum" data-i18n="order_number_label">رقم الطلب</label><input id="tNum" class="mono" inputmode="numeric" maxlength="6" placeholder="482913"></div>
+      <div class="field" style="margin:0"><label for="tPhone" data-i18n="phone_label">رقم هاتفك</label><input id="tPhone" class="mono" inputmode="numeric" maxlength="10" placeholder="0550123456"></div>
       <button class="btn btn-primary btn-block" style="margin-top:var(--s4)" onclick="runTrack()" data-i18n="track_submit">الاستعلام</button>
     </div>
     <div id="tResult"></div>
     <div class="hint">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round"/></svg>
-      <span>يمكنك أيضاً الاستعلام مباشرة على واتساب برقم طلبك.</span>
+      <span data-i18n="track_hint">يمكنك أيضاً الاستعلام مباشرة على واتساب برقم طلبك.</span>
     </div>
   </div>
 </section>
@@ -1620,22 +1620,22 @@ footer ul button:hover{color:var(--text-on-dark)}
 <section id="about" class="hidden page">
   <div class="wrap" style="max-width:720px">
     <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
-    <h1 style="font-size:clamp(24px,5vw,34px)">من نحن</h1>
-    <p style="color:var(--muted-on-dark);font-size:15px;margin-top:var(--s3);line-height:1.9">Janeiro Store متجر جزائري متخصص في الاشتراكات والمنتجات الرقمية. فكرتنا بسيطة: طلب واضح، دفع محلي بلا تعقيد، ومتابعة إنسانية مباشرة حتى يكتمل تفعيل ما طلبته.</p>
+    <h1 style="font-size:clamp(24px,5vw,34px)" data-i18n="nav_about">من نحن</h1>
+    <p style="color:var(--muted-on-dark);font-size:15px;margin-top:var(--s3);line-height:1.9" data-i18n="about_lede">Janeiro Store متجر جزائري متخصص في الاشتراكات والمنتجات الرقمية. فكرتنا بسيطة: طلب واضح، دفع محلي بلا تعقيد، ومتابعة إنسانية مباشرة حتى يكتمل تفعيل ما طلبته.</p>
     <div class="card">
-      <h3>كيف نعمل</h3>
+      <h3 data-i18n="about_how_h">كيف نعمل</h3>
       <div class="dl">
-        <div><span>الدفع</span><b>محلي عبر CCP، BaridiMob أو Flexy</b></div>
-        <div><span>مراجعة الطلبات</span><b>تحقق يدوي لكل طلب</b></div>
-        <div><span>المتابعة</span><b>واتساب أو إنستغرام</b></div>
-        <div><span>التسجيل</span><b>شراء كضيف، بدون حساب</b></div>
+        <div><span data-i18n="about_pay_label">الدفع</span><b data-i18n="about_pay_value">محلي عبر CCP، BaridiMob أو Flexy</b></div>
+        <div><span data-i18n="about_review_label">مراجعة الطلبات</span><b data-i18n="about_review_value">تحقق يدوي لكل طلب</b></div>
+        <div><span data-i18n="about_followup_label">المتابعة</span><b data-i18n="about_followup_value">واتساب أو إنستغرام</b></div>
+        <div><span data-i18n="about_signup_label">التسجيل</span><b data-i18n="about_signup_value">شراء كضيف، بدون حساب</b></div>
       </div>
     </div>
     <div class="card">
-      <h3>تواصل معنا</h3>
+      <h3 data-i18n="nav_contact">تواصل معنا</h3>
       <div class="dl">
-        <div><span>المعرّف</span><b class="mono">@janeiro_service</b></div>
-        <div><span>وقت الرد</span><b>يومياً من 9ص إلى 11م</b></div>
+        <div><span data-i18n="about_handle_label">المعرّف</span><b class="mono">@janeiro_service</b></div>
+        <div><span data-i18n="about_hours_label">وقت الرد</span><b data-i18n="about_hours_value">يومياً من 9ص إلى 11م</b></div>
       </div>
     </div>
   </div>
@@ -1645,11 +1645,11 @@ footer ul button:hover{color:var(--text-on-dark)}
 <section id="policies" class="hidden page">
   <div class="wrap" style="max-width:720px">
     <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
-    <h1 style="font-size:clamp(24px,5vw,34px)">السياسات والشروط</h1>
+    <h1 style="font-size:clamp(24px,5vw,34px)" data-i18n="nav_policies">السياسات والشروط</h1>
     <div style="margin-top:var(--s6)">
-      <details class="faq" open><summary>سياسة الاسترجاع</summary><p>إذا تعذّر تفعيل المنتج بعد تأكيد الدفع، يُسترجع كامل المبلغ عبر نفس طريقة الدفع أو بطريقة أخرى بالاتفاق. يُرجى التبليغ عن أي مشكلة خلال 48 ساعة من إشعار اكتمال الطلب. لا يشمل الاسترجاع تغيير بيانات التفعيل من طرف العميل بعد التفعيل الناجح.</p></details>
-      <details class="faq"><summary>شروط الاستخدام</summary><p>الشراء يتم كضيف دون إنشاء حساب. الأسعار المعروضة بالدينار الجزائري وقد تتغيّر دون إشعار مسبق. يتحمّل العميل مسؤولية دقة بيانات التفعيل التي يقدمها؛ أي خطأ فيها قد يؤخر التنفيذ.</p></details>
-      <details class="faq"><summary>سياسة الخصوصية</summary><p>نجمع فقط ما يلزم لإتمام طلبك: الاسم، وسيلة التواصل، وبيانات التفعيل الخاصة بالمنتج. لا نحتفظ بكلمات مرور حساباتك الشخصية ولا نطلبها.</p></details>
+      <details class="faq" open><summary data-i18n="policy1_q">سياسة الاسترجاع</summary><p data-i18n="policy1_a">إذا تعذّر تفعيل المنتج بعد تأكيد الدفع، يُسترجع كامل المبلغ عبر نفس طريقة الدفع أو بطريقة أخرى بالاتفاق. يُرجى التبليغ عن أي مشكلة خلال 48 ساعة من إشعار اكتمال الطلب. لا يشمل الاسترجاع تغيير بيانات التفعيل من طرف العميل بعد التفعيل الناجح.</p></details>
+      <details class="faq"><summary data-i18n="policy2_q">شروط الاستخدام</summary><p data-i18n="policy2_a">الشراء يتم كضيف دون إنشاء حساب. الأسعار المعروضة بالدينار الجزائري وقد تتغيّر دون إشعار مسبق. يتحمّل العميل مسؤولية دقة بيانات التفعيل التي يقدمها؛ أي خطأ فيها قد يؤخر التنفيذ.</p></details>
+      <details class="faq"><summary data-i18n="policy3_q">سياسة الخصوصية</summary><p data-i18n="policy3_a">نجمع فقط ما يلزم لإتمام طلبك: الاسم، وسيلة التواصل، وبيانات التفعيل الخاصة بالمنتج. لا نحتفظ بكلمات مرور حساباتك الشخصية ولا نطلبها.</p></details>
     </div>
   </div>
 </section>
@@ -1658,7 +1658,7 @@ footer ul button:hover{color:var(--text-on-dark)}
   <div class="wrap fgrid">
     <div>
       <div class="brand"><div class="jmark"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div><b>Janeiro Store</b></div>
-      <p class="fdesc">متجر جزائري للاشتراكات والمنتجات الرقمية، بتفعيل سريع ودعم مباشر.</p>
+      <p class="fdesc" data-i18n="footer_desc">متجر جزائري للاشتراكات والمنتجات الرقمية، بتفعيل سريع ودعم مباشر.</p>
       <div class="socials">
         <a href="#" onclick="return false" aria-label="واتساب"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2Zm0 1.8a8.2 8.2 0 1 1-4.3 15.2l-.4-.2-3.3.9.9-3.2-.3-.4A8.2 8.2 0 0 1 12 3.8Zm4.6 9.9c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-1.4-.6-2.5-1.6-3.1-2.8-.1-.2 0-.4.1-.5l.5-.6c.1-.2.1-.3 0-.5l-.8-1.9c-.2-.4-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.7.7-1 1.6-.9 2.5.2 2.4 3 5.9 6.2 6.9 1.4.5 2.5.4 3.2-.2.4-.3.7-.8.8-1.3.1-.2 0-.4-.2-.5Z"/></svg></a>
         <a href="#" onclick="return false" aria-label="إنستغرام"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
@@ -1677,10 +1677,10 @@ footer ul button:hover{color:var(--text-on-dark)}
       <li><button data-i18n="nav_policies" onclick="go('policies')">السياسات والشروط</button></li>
     </ul></div>
     <div>
-      <h4>طرق الدفع</h4>
+      <h4 data-i18n="footer_payment_h">طرق الدفع</h4>
       <div class="paylist"><span>CCP</span><span>BaridiMob</span><span>Flexy</span></div>
-      <h4 style="margin-top:var(--s6)">وقت الرد</h4>
-      <ul><li>يومياً 9ص — 11م</li></ul>
+      <h4 style="margin-top:var(--s6)" data-i18n="footer_hours_h">وقت الرد</h4>
+      <ul><li data-i18n="footer_hours_value">يومياً 9ص — 11م</li></ul>
     </div>
   </div>
   <div class="wrap fbot"><span>© 2026 Janeiro Store</span><span class="mono">@janeiro_service</span></div>
@@ -1757,7 +1757,7 @@ const C  = key => CATEGORIES.find(c=>c.slug===key||c.id===key) || {name:"",accen
 const PS = slug => PRODUCTS.find(p=>p.slug===slug);
 const money = n => n.toLocaleString("en-US") + " " + CONFIG.currency;
 const minPrice = p => p.plans.length ? Math.min(...p.plans.map(x=>x.p)) : 0;
-const BADGES = { hot:["الأكثر طلباً","hot"], new:["جديد","new"], off:["عرض","off"] };
+const BADGES = () => ({ hot:[t("badge_hot"),"hot"], new:[t("badge_new"),"new"], off:[t("badge_off"),"off"] });
 
 /* ================================================================
    LANGUAGE
@@ -1824,6 +1824,197 @@ const I18N = {
   send_whatsapp:   { ar:"إرسال الطلب عبر واتساب",   fr:"Envoyer via WhatsApp",         en:"Send via WhatsApp" },
   back_to_store:   { ar:"العودة للمتجر",            fr:"Retour à la boutique",         en:"Back to Store" },
   track_submit:    { ar:"الاستعلام",                fr:"Vérifier",                     en:"Check Status" },
+
+  view_all:      { ar:"عرض الكل ←", fr:"Tout voir ←", en:"View All ←" },
+  optional:      { ar:"— اختياري", fr:"— facultatif", en:"— optional" },
+
+  best_sub:      { ar:"المنتجات التي يطلبها عملاؤنا أكثر", fr:"Les produits les plus demandés par nos clients", en:"The products our customers order most" },
+  home_search_ph:{ ar:"ابحث عن ChatGPT، Canva، Discord…", fr:"Rechercher ChatGPT, Canva, Discord…", en:"Search ChatGPT, Canva, Discord…" },
+  browse_cat_sub:{ ar:"وصل للخدمة التي تحتاجها بسرعة.", fr:"Trouvez rapidement le service qu'il vous faut.", en:"Find the service you need, fast." },
+  cat_prev:      { ar:"السابق", fr:"Précédent", en:"Previous" },
+  cat_next:      { ar:"التالي", fr:"Suivant", en:"Next" },
+
+  promo_eyebrow: { ar:"عروض Janeiro", fr:"Offres Janeiro", en:"Janeiro Deals" },
+  promo_h:       { ar:"وفّر أكثر مع باقات Janeiro", fr:"Économisez plus avec les packs Janeiro", en:"Save more with Janeiro bundles" },
+  promo_p:       { ar:"خصومات على مجموعة من أشهر الخدمات الرقمية، بنفس التفعيل السريع والدعم المباشر.", fr:"Des remises sur un ensemble des services numériques les plus populaires, avec la même activation rapide et le même support direct.", en:"Discounts on a set of the most popular digital services, with the same fast activation and direct support." },
+
+  hiw_h:   { ar:"كيف يعمل الطلب؟", fr:"Comment fonctionne la commande ?", en:"How does ordering work?" },
+  hiw_sub: { ar:"أربع خطوات فقط، بدون إنشاء حساب", fr:"Seulement quatre étapes, sans créer de compte", en:"Just four steps, no account needed" },
+  hiw1_t: { ar:"اختر واطلب", fr:"Choisissez et commandez", en:"Choose & order" },
+  hiw1_p: { ar:"حدد المنتج والخطة، ورقم طلبك يظهر فوراً.", fr:"Sélectionnez le produit et le forfait, votre numéro de commande apparaît aussitôt.", en:"Pick the product and plan — your order number appears right away." },
+  hiw2_t: { ar:"ادفع وارفع الوصل", fr:"Payez et envoyez le reçu", en:"Pay & upload the receipt" },
+  hiw2_p: { ar:"CCP أو BaridiMob أو Flexy، ثم صورة الوصل.", fr:"CCP, BaridiMob ou Flexy, puis une photo du reçu.", en:"CCP, BaridiMob or Flexy, then a photo of the receipt." },
+  hiw3_t: { ar:"نراجع يدوياً", fr:"Nous vérifions manuellement", en:"We review it manually" },
+  hiw3_p: { ar:"نتأكد من الدفع خلال وقت قصير.", fr:"Nous confirmons le paiement rapidement.", en:"We confirm the payment shortly after." },
+  hiw4_t: { ar:"تفعيل ومتابعة", fr:"Activation et suivi", en:"Activation & follow-up" },
+  hiw4_p: { ar:"نتابعك حتى يكتمل تفعيل طلبك.", fr:"Nous vous accompagnons jusqu'à l'activation complète.", en:"We stay with you until your order is fully activated." },
+
+  trust_h:   { ar:"الأمان يهمنا بقدر ما يهمك", fr:"La sécurité nous importe autant qu'à vous", en:"Security matters to us as much as it does to you" },
+  trust_sub: { ar:"لا نطلب أكثر مما تحتاجه الخدمة فعلاً", fr:"Nous ne demandons que ce que le service exige réellement", en:"We never ask for more than the service actually needs" },
+  trust1_t: { ar:"كلمة مرور عند الحاجة فقط", fr:"Mot de passe seulement si nécessaire", en:"Password only when needed" },
+  trust1_p: { ar:"لا نطلبها إلا إذا كان المنتج نفسه يتطلب ذلك فعلاً، ونوضح هذا بصراحة قبل الطلب.", fr:"Nous ne le demandons que si le produit lui-même l'exige réellement, et nous le précisons clairement avant la commande.", en:"We only ask for it if the product itself genuinely requires it, and we say so plainly before you order." },
+  trust2_t: { ar:"ضمان محدد لكل منتج", fr:"Une garantie précise pour chaque produit", en:"A clear warranty for every product" },
+  trust2_p: { ar:"مدة الضمان موضحة في صفحة كل منتج قبل الشراء.", fr:"La durée de la garantie est indiquée sur la page de chaque produit avant l'achat.", en:"The warranty period is shown on every product's page before you buy." },
+  trust3_t: { ar:"مراجعة يدوية للدفع", fr:"Vérification manuelle du paiement", en:"Manual payment review" },
+  trust3_p: { ar:"كل عملية دفع تُراجع يدوياً قبل بدء التفعيل.", fr:"Chaque paiement est vérifié manuellement avant le début de l'activation.", en:"Every payment is manually reviewed before activation begins." },
+  trust4_t: { ar:"متابعة حتى الاكتمال", fr:"Suivi jusqu'à l'achèvement", en:"Follow-up until it's done" },
+  trust4_p: { ar:"نبقى معك حتى يكتمل تفعيل طلبك بالكامل.", fr:"Nous restons avec vous jusqu'à l'activation complète de votre commande.", en:"We stay with you until your order is fully and completely activated." },
+
+  why_h:   { ar:"لماذا Janeiro؟", fr:"Pourquoi Janeiro ?", en:"Why Janeiro?" },
+  why_sub: { ar:"أربعة أسباب تجعل طلبك أسهل وأأمن", fr:"Quatre raisons qui rendent votre commande plus simple et plus sûre", en:"Four reasons that make ordering easier and safer" },
+  why1_t: { ar:"تفعيل سريع", fr:"Activation rapide", en:"Fast activation" },
+  why1_p: { ar:"نبدأ التنفيذ فور تأكيد الدفع، والمتابعة معك خطوة بخطوة.", fr:"Nous commençons dès la confirmation du paiement, et vous accompagnons étape par étape.", en:"We start as soon as payment is confirmed, and follow up with you step by step." },
+  why2_t: { ar:"أسعار مناسبة", fr:"Des prix adaptés", en:"Fair prices" },
+  why2_p: { ar:"أسعار بالدينار الجزائري مدروسة للسوق المحلي.", fr:"Des prix en dinars algériens pensés pour le marché local.", en:"Prices in Algerian dinar, set for the local market." },
+  why3_t: { ar:"دعم مباشر", fr:"Support direct", en:"Direct support" },
+  why3_p: { ar:"تواصل حقيقي على واتساب أو إنستغرام، بدون أنظمة تذاكر.", fr:"Un vrai contact sur WhatsApp ou Instagram, sans système de tickets.", en:"Real contact on WhatsApp or Instagram — no ticket systems." },
+  why4_t: { ar:"منتجات موثوقة", fr:"Des produits fiables", en:"Trusted products" },
+  why4_p: { ar:"لا نطلب كلمات مرور، وإذا تعذّر التفعيل يُسترجع المبلغ كاملاً.", fr:"Nous ne demandons pas de mots de passe, et si l'activation échoue, vous êtes intégralement remboursé.", en:"We don't ask for passwords, and if activation fails, you get a full refund." },
+
+  faq_h: { ar:"أسئلة شائعة", fr:"Questions fréquentes", en:"Frequently Asked Questions" },
+  faq1_q: { ar:"كم يستغرق التفعيل بعد الدفع؟", fr:"Combien de temps prend l'activation après le paiement ?", en:"How long does activation take after payment?" },
+  faq1_a: { ar:"يبدأ التنفيذ فور تأكيد وصول المبلغ، ونخبرك بالمدة المتوقعة لكل منتج عند الطلب.", fr:"Le traitement commence dès la confirmation du paiement, et nous vous indiquons la durée prévue pour chaque produit au moment de la commande.", en:"Processing starts as soon as the payment is confirmed, and we tell you the expected time for each product when you order." },
+  faq2_q: { ar:"كيف أدفع؟", fr:"Comment puis-je payer ?", en:"How do I pay?" },
+  faq2_a: { ar:"الدفع محلي عبر CCP أو BaridiMob أو Flexy. ترسل صورة الوصل ونتحقق منها يدوياً قبل التنفيذ.", fr:"Le paiement se fait localement via CCP, BaridiMob ou Flexy. Vous envoyez une photo du reçu et nous la vérifions manuellement avant le traitement.", en:"Payment is local via CCP, BaridiMob or Flexy. You send a photo of the receipt and we verify it manually before processing." },
+  faq3_q: { ar:"هل تطلبون كلمة مرور حسابي؟", fr:"Demandez-vous le mot de passe de mon compte ?", en:"Do you ask for my account password?" },
+  faq3_a: { ar:"لا. نعتمد على الدعوات وأكواد التفعيل كلما كان ذلك متاحاً في الخدمة.", fr:"Non. Nous utilisons les invitations et les codes d'activation chaque fois que le service le permet.", en:"No. We use invites and activation codes whenever the service supports them." },
+  faq4_q: { ar:"ماذا لو تعذّر التفعيل؟", fr:"Que se passe-t-il si l'activation échoue ?", en:"What if activation isn't possible?" },
+  faq4_a: { ar:"يُسترجع المبلغ كاملاً، ونوضح لك السبب عبر القناة التي اخترتها.", fr:"Vous êtes intégralement remboursé, et nous vous expliquons la raison via le canal que vous avez choisi.", en:"You get a full refund, and we explain why through the channel you chose." },
+  faq5_q: { ar:"هل يمكنني طلب أكثر من منتج؟", fr:"Puis-je commander plusieurs produits ?", en:"Can I order more than one product?" },
+  faq5_a: { ar:"نعم، أضف ما تريد إلى السلة وأتمم الطلب دفعة واحدة برقم طلب واحد.", fr:"Oui, ajoutez ce que vous voulez au panier et validez tout en une seule commande, avec un seul numéro.", en:"Yes — add what you want to the cart and check out all at once, with a single order number." },
+
+  about_lede: { ar:"Janeiro Store متجر جزائري متخصص في الاشتراكات والمنتجات الرقمية. فكرتنا بسيطة: طلب واضح، دفع محلي بلا تعقيد، ومتابعة إنسانية مباشرة حتى يكتمل تفعيل ما طلبته.",
+                fr:"Janeiro Store est une boutique algérienne spécialisée dans les abonnements et produits numériques. Notre idée est simple : une commande claire, un paiement local sans complication, et un suivi humain direct jusqu'à l'activation complète de votre achat.",
+                en:"Janeiro Store is an Algerian shop specialized in subscriptions and digital products. Our idea is simple: a clear order, uncomplicated local payment, and direct human follow-up until what you ordered is fully activated." },
+  about_how_h: { ar:"كيف نعمل", fr:"Comment nous travaillons", en:"How we work" },
+  about_pay_label: { ar:"الدفع", fr:"Paiement", en:"Payment" },
+  about_pay_value: { ar:"محلي عبر CCP، BaridiMob أو Flexy", fr:"Local via CCP, BaridiMob ou Flexy", en:"Local via CCP, BaridiMob or Flexy" },
+  about_review_label: { ar:"مراجعة الطلبات", fr:"Vérification des commandes", en:"Order review" },
+  about_review_value: { ar:"تحقق يدوي لكل طلب", fr:"Vérification manuelle de chaque commande", en:"Manual check on every order" },
+  about_followup_label: { ar:"المتابعة", fr:"Suivi", en:"Follow-up" },
+  about_followup_value: { ar:"واتساب أو إنستغرام", fr:"WhatsApp ou Instagram", en:"WhatsApp or Instagram" },
+  about_signup_label: { ar:"التسجيل", fr:"Inscription", en:"Sign-up" },
+  about_signup_value: { ar:"شراء كضيف، بدون حساب", fr:"Achat en tant qu'invité, sans compte", en:"Buy as a guest, no account needed" },
+  about_handle_label: { ar:"المعرّف", fr:"Identifiant", en:"Handle" },
+  about_hours_label: { ar:"وقت الرد", fr:"Heures de réponse", en:"Response hours" },
+  about_hours_value: { ar:"يومياً من 9ص إلى 11م", fr:"Tous les jours de 9h à 23h", en:"Daily from 9am to 11pm" },
+
+  policy1_q: { ar:"سياسة الاسترجاع", fr:"Politique de remboursement", en:"Refund Policy" },
+  policy1_a: { ar:"إذا تعذّر تفعيل المنتج بعد تأكيد الدفع، يُسترجع كامل المبلغ عبر نفس طريقة الدفع أو بطريقة أخرى بالاتفاق. يُرجى التبليغ عن أي مشكلة خلال 48 ساعة من إشعار اكتمال الطلب. لا يشمل الاسترجاع تغيير بيانات التفعيل من طرف العميل بعد التفعيل الناجح.",
+              fr:"Si l'activation du produit échoue après confirmation du paiement, le montant intégral est remboursé via le même moyen de paiement ou un autre convenu ensemble. Merci de signaler tout problème dans les 48 heures suivant la notification d'achèvement de la commande. Le remboursement ne couvre pas un changement des informations d'activation par le client après une activation réussie.",
+              en:"If the product cannot be activated after payment is confirmed, the full amount is refunded via the same payment method or another agreed one. Please report any issue within 48 hours of the order-completion notice. Refunds do not cover the customer changing activation details after a successful activation." },
+  policy2_q: { ar:"شروط الاستخدام", fr:"Conditions d'utilisation", en:"Terms of Use" },
+  policy2_a: { ar:"الشراء يتم كضيف دون إنشاء حساب. الأسعار المعروضة بالدينار الجزائري وقد تتغيّر دون إشعار مسبق. يتحمّل العميل مسؤولية دقة بيانات التفعيل التي يقدمها؛ أي خطأ فيها قد يؤخر التنفيذ.",
+              fr:"L'achat se fait en tant qu'invité, sans création de compte. Les prix affichés sont en dinars algériens et peuvent changer sans préavis. Le client est responsable de l'exactitude des informations d'activation fournies ; toute erreur peut retarder le traitement.",
+              en:"Purchases are made as a guest, with no account creation. Prices shown are in Algerian dinar and may change without notice. The customer is responsible for the accuracy of the activation details they provide; any error in them may delay processing." },
+  policy3_q: { ar:"سياسة الخصوصية", fr:"Politique de confidentialité", en:"Privacy Policy" },
+  policy3_a: { ar:"نجمع فقط ما يلزم لإتمام طلبك: الاسم، وسيلة التواصل، وبيانات التفعيل الخاصة بالمنتج. لا نحتفظ بكلمات مرور حساباتك الشخصية ولا نطلبها.",
+              fr:"Nous ne collectons que ce qui est nécessaire pour traiter votre commande : le nom, le moyen de contact, et les informations d'activation propres au produit. Nous ne conservons ni ne demandons les mots de passe de vos comptes personnels.",
+              en:"We only collect what's needed to complete your order: your name, a way to reach you, and the product's activation details. We never store or ask for your personal account passwords." },
+
+  footer_desc: { ar:"متجر جزائري للاشتراكات والمنتجات الرقمية، بتفعيل سريع ودعم مباشر.", fr:"Boutique algérienne d'abonnements et de produits numériques, activation rapide et support direct.", en:"An Algerian shop for subscriptions and digital products, with fast activation and direct support." },
+  footer_payment_h: { ar:"طرق الدفع", fr:"Moyens de paiement", en:"Payment Methods" },
+  footer_hours_h: { ar:"وقت الرد", fr:"Heures de réponse", en:"Response Hours" },
+  footer_hours_value: { ar:"يومياً 9ص — 11م", fr:"Tous les jours 9h — 23h", en:"Daily 9am — 11pm" },
+
+  channel_h: { ar:"قناة المتابعة", fr:"Canal de suivi", en:"Follow-up Channel" },
+  channel_err: { ar:"الرجاء اختيار قناة المتابعة", fr:"Veuillez choisir un canal de suivi", en:"Please choose a follow-up channel" },
+  details_h: { ar:"بياناتك", fr:"Vos informations", en:"Your Details" },
+  name_label: { ar:"الاسم الكامل", fr:"Nom complet", en:"Full Name" },
+  name_ph: { ar:"مثال: أمين ب.", fr:"Exemple : Amine B.", en:"Example: Amine B." },
+  name_err: { ar:"الاسم مطلوب", fr:"Le nom est requis", en:"Name is required" },
+  phone_label: { ar:"رقم الهاتف", fr:"Numéro de téléphone", en:"Phone Number" },
+  phone_sub: { ar:"— للتواصل فقط", fr:"— pour vous contacter uniquement", en:"— for contact only" },
+  phone_err: { ar:"رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07", fr:"Le numéro doit comporter 10 chiffres et commencer par 05, 06 ou 07", en:"The number must be 10 digits and start with 05, 06 or 07" },
+  wilaya_label: { ar:"الولاية", fr:"Wilaya", en:"Wilaya" },
+  wilaya_ph: { ar:"مثال: الجزائر", fr:"Exemple : Alger", en:"Example: Algiers" },
+  note_label: { ar:"رسالة إضافية", fr:"Message supplémentaire", en:"Additional Note" },
+  note_ph: { ar:"أي ملاحظة تحب تضيفها لطلبك…", fr:"Une remarque à ajouter à votre commande…", en:"Any note you'd like to add to your order…" },
+  pay_h: { ar:"اختر طريقة الدفع", fr:"Choisissez le mode de paiement", en:"Choose a Payment Method" },
+  pay_hint: { ar:"احتفظ برقم العملية من إيصال الدفع — يسرّع التأكيد. رقم الطلب يصلك بعد تأكيد الطلب.", fr:"Gardez le numéro de transaction du reçu — cela accélère la confirmation. Le numéro de commande vous parvient après confirmation.", en:"Keep the transaction number from your receipt — it speeds up confirmation. The order number arrives once your order is confirmed." },
+  receipt_h: { ar:"صورة وصل الدفع", fr:"Photo du reçu de paiement", en:"Payment Receipt Photo" },
+  receipt_drop: { ar:"اضغط لاختيار صورة الوصل", fr:"Appuyez pour choisir la photo du reçu", en:"Tap to choose the receipt photo" },
+  receipt_hint2: { ar:"JPG أو PNG · حتى 5 ميغابايت", fr:"JPG ou PNG · jusqu'à 5 Mo", en:"JPG or PNG · up to 5MB" },
+  ref_label: { ar:"رقم العملية / المرجع", fr:"Numéro de transaction / référence", en:"Transaction / Reference Number" },
+  ref_sub: { ar:"— يسرّع التأكيد", fr:"— accélère la confirmation", en:"— speeds up confirmation" },
+  act_h: { ar:"بيانات التفعيل", fr:"Informations d'activation", en:"Activation Details" },
+  msg_preview_h: { ar:"الرسالة التي سترسل", fr:"Le message qui sera envoyé", en:"The Message You'll Send" },
+  msg_preview_sub: { ar:"راجع التفاصيل قبل الإرسال — يمكنك الرجوع وتعديلها.", fr:"Vérifiez les détails avant l'envoi — vous pouvez revenir en arrière et les modifier.", en:"Review the details before sending — you can go back and edit them." },
+  toast_pay_required: { ar:"اختر طريقة الدفع", fr:"Choisissez un mode de paiement", en:"Choose a payment method" },
+  toast_receipt_required: { ar:"ارفع صورة وصل الدفع", fr:"Envoyez la photo du reçu de paiement", en:"Upload the payment receipt photo" },
+
+  sent_h: { ar:"تم استلام طلبك", fr:"Votre commande a été reçue", en:"Your Order Was Received" },
+  sent_sub: { ar:"سجّلنا طلبك ووصل الدفع. احتفظ برقم الطلب لمتابعته:", fr:"Nous avons enregistré votre commande et le reçu. Gardez le numéro de commande pour le suivre :", en:"We've recorded your order and receipt. Keep the order number to track it:" },
+  order_number_label: { ar:"رقم الطلب", fr:"Numéro de commande", en:"Order Number" },
+  amount_label: { ar:"المبلغ", fr:"Montant", en:"Amount" },
+  pay_method_label: { ar:"طريقة الدفع", fr:"Mode de paiement", en:"Payment Method" },
+
+  track_sub: { ar:"أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.", fr:"Entrez votre numéro de commande pour vérifier son statut — aucun compte requis.", en:"Enter your order number to check its status — no account needed." },
+  track_hint: { ar:"يمكنك أيضاً الاستعلام مباشرة على واتساب برقم طلبك.", fr:"Vous pouvez aussi vous renseigner directement sur WhatsApp avec votre numéro de commande.", en:"You can also ask directly on WhatsApp with your order number." },
+
+  step_word: { ar:"الخطوة", fr:"Étape", en:"Step" },
+  of_4: { ar:"من 4", fr:"sur 4", en:"of 4" },
+  step1_lbl: { ar:"قناة المتابعة وبياناتك", fr:"Canal de suivi et vos informations", en:"Follow-up channel & your details" },
+  step2_lbl: { ar:"طريقة الدفع", fr:"Mode de paiement", en:"Payment method" },
+  step3_lbl: { ar:"رفع الوصل", fr:"Envoi du reçu", en:"Uploading the receipt" },
+  step4_lbl: { ar:"بيانات التفعيل والمراجعة", fr:"Informations d'activation et vérification", en:"Activation details & review" },
+
+  busy_sending: { ar:"جارٍ الإرسال…", fr:"Envoi en cours…", en:"Sending…" },
+  busy_creating_order: { ar:"جارٍ إنشاء الطلب…", fr:"Création de la commande…", en:"Creating the order…" },
+  busy_uploading: { ar:"جارٍ رفع الوصل…", fr:"Envoi du reçu…", en:"Uploading the receipt…" },
+  busy_confirming: { ar:"جارٍ تأكيد الطلب…", fr:"Confirmation de la commande…", en:"Confirming the order…" },
+  complete_field: { ar:"أكمل", fr:"Complétez", en:"Complete" },
+
+  new_order: { ar:"طلب جديد", fr:"Nouvelle commande", en:"New Order" },
+  issued_on_confirm: { ar:"يُصدر عند التأكيد", fr:"attribué à la confirmation", en:"issued upon confirmation" },
+  activation_type_label: { ar:"نوع التفعيل", fr:"Type d'activation", en:"Activation Type" },
+  price_label: { ar:"السعر", fr:"Prix", en:"Price" },
+  total_label: { ar:"الإجمالي", fr:"Total", en:"Total" },
+  receipt_photo_label: { ar:"صورة الوصل", fr:"Photo du reçu", en:"Receipt Photo" },
+  will_attach_in_chat: { ar:"سأرفقها في المحادثة", fr:"je la joindrai à la conversation", en:"I'll attach it in the chat" },
+  not_attached_yet: { ar:"لم تُرفق بعد", fr:"pas encore jointe", en:"not attached yet" },
+  name_only_label: { ar:"الاسم", fr:"Nom", en:"Name" },
+  phone_only_label: { ar:"الهاتف", fr:"Téléphone", en:"Phone" },
+  wilaya_only_label: { ar:"الولاية", fr:"Wilaya", en:"Wilaya" },
+  channel_only_label: { ar:"قناة المتابعة", fr:"Canal de suivi", en:"Follow-up Channel" },
+  receipt_selected: { ar:"✓ مُختار", fr:"✓ sélectionné", en:"✓ selected" },
+  receipt_not_uploaded: { ar:"لم يُرفع", fr:"non envoyé", en:"not uploaded" },
+  bundle_saving_label: { ar:"توفير الباقات", fr:"Économie des packs", en:"Bundle Savings" },
+  price_from: { ar:"من", fr:"À partir de", en:"From" },
+  coming_soon: { ar:"قريباً", fr:"Bientôt", en:"Coming Soon" },
+  no_results: { ar:"لا توجد نتائج", fr:"Aucun résultat", en:"No Results" },
+  no_results_sub: { ar:"جرّب كلمة أخرى أو تصفح كل المنتجات.", fr:"Essayez un autre mot ou parcourez tous les produits.", en:"Try a different word or browse all products." },
+  product_unavailable: { ar:"هذا المنتج غير متوفر حالياً", fr:"Ce produit n'est pas disponible actuellement", en:"This product isn't currently available" },
+
+  categories_aria: { ar:"التصنيفات", fr:"Catégories", en:"Categories" },
+  choose_plan_h: { ar:"اختر الخطة", fr:"Choisissez le forfait", en:"Choose a Plan" },
+  plans_aria: { ar:"الخطط", fr:"Forfaits", en:"Plans" },
+  what_you_get_h: { ar:"ما ستحصل عليه", fr:"Ce que vous obtenez", en:"What You Get" },
+  delivery_info_h: { ar:"معلومات التسليم", fr:"Informations de livraison", en:"Delivery Information" },
+  delivery_time_label: { ar:"مدة التسليم", fr:"Délai de livraison", en:"Delivery Time" },
+  warranty_label: { ar:"الضمان", fr:"Garantie", en:"Warranty" },
+  refund_label: { ar:"الاسترجاع", fr:"Remboursement", en:"Refund" },
+  refund_value: { ar:"يُسترجع المبلغ كاملاً إذا تعذّر التفعيل", fr:"Remboursement intégral si l'activation échoue", en:"Full refund if activation isn't possible" },
+  no_password_hint: { ar:"لا نطلب كلمة مرور حسابك. الدعم متاح على واتساب وإنستغرام قبل الطلب وبعده.", fr:"Nous ne demandons pas le mot de passe de votre compte. Le support est disponible sur WhatsApp et Instagram avant et après la commande.", en:"We don't ask for your account password. Support is available on WhatsApp and Instagram before and after ordering." },
+
+  bundles_h: { ar:"الباقات", fr:"Les Packs", en:"Bundles" },
+  bundles_sub: { ar:"عدة منتجات مجمّعة بسعر واحد أقل من مجموعها منفردة.", fr:"Plusieurs produits regroupés à un prix unique, inférieur à leur somme individuelle.", en:"Several products bundled at one price, lower than their sum bought separately." },
+  bundle_contents_h: { ar:"ما بداخل الباقة", fr:"Ce que contient le pack", en:"What's in the Bundle" },
+  bundle_list_total_label: { ar:"مجموع الأسعار منفردة", fr:"Total des prix séparés", en:"Total at Individual Prices" },
+  bundle_price_label: { ar:"سعر الباقة", fr:"Prix du pack", en:"Bundle Price" },
+  bundle_your_saving_label: { ar:"توفيرك", fr:"Votre économie", en:"Your Savings" },
+  order_h: { ar:"إتمام الطلب", fr:"Finaliser la commande", en:"Complete Your Order" },
+
+  deals_h: { ar:"عروض اليوم", fr:"Offres du jour", en:"Today's Deals" },
+  deal_ended: { ar:"انتهى العرض", fr:"L'offre est terminée", en:"Deal has ended" },
+  deal_ends_in: { ar:"ينتهي أقرب عرض خلال", fr:"La prochaine offre se termine dans", en:"Nearest deal ends in" },
+  help_h: { ar:"تحتاج مساعدة تختار؟", fr:"Besoin d'aide pour choisir ?", en:"Need help choosing?" },
+  help_p: { ar:"راسلنا مباشرة، فريقنا يرد خلال وقت قصير.", fr:"Écrivez-nous directement, notre équipe répond rapidement.", en:"Message us directly — our team replies quickly." },
+  badge_hot: { ar:"الأكثر طلباً", fr:"Le plus demandé", en:"Best Seller" },
+  badge_new: { ar:"جديد", fr:"Nouveau", en:"New" },
+  badge_off: { ar:"عرض", fr:"Offre", en:"Deal" },
+  view_product_aria: { ar:"عرض", fr:"Voir", en:"View" },
+  save_word: { ar:"وفّر", fr:"Économisez", en:"Save" },
 };
 let LANG = "ar";
 function t(key){ return (I18N[key] && I18N[key][LANG]) || (I18N[key] && I18N[key].ar) || key; }
@@ -1849,6 +2040,18 @@ function applyLang(){
      data already in memory -- no network round trip */
   if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); renderDeals(); }
   renderCart();
+  /* the checkout step label: relabel in place rather than re-running
+     step(), which would rebuild the activation fields and could wipe
+     out whatever the customer already typed mid-checkout */
+  const stepLbl = $("#stepLbl");
+  if(stepLbl && typeof orderStep !== "undefined"){
+    stepLbl.textContent = `${t("step_word")} ${orderStep} ${t("of_4")} — ${t(STEP_LBL_KEYS[orderStep-1])}`;
+    /* buildReview() only reads already-entered values, unlike
+       buildActivation() which would rebuild the input fields
+       themselves -- safe to re-run so the summary and the WhatsApp
+       preview relabel too, without touching what the customer typed */
+    if(orderStep===4) buildReview();
+  }
 }
 function setLang(lang){
   if(!LANGS.includes(lang)) return;
@@ -1949,7 +2152,7 @@ function microChips(p){
    ================================================================ */
 function posterHTML(p,big){
   const style = `--pbg:${hex2rgba(p.accent,.09)};--pline:${hex2rgba(p.accent,.22)};--pink:${readableInk(p.accent)}`;
-  const b = p.badge && BADGES[p.badge];
+  const b = p.badge && BADGES()[p.badge];
   const inner = p.image || p.poster
     ? `<img class="pimg" src="${p.poster||p.image}" alt="${p.name}" loading="lazy">`
     : `<div class="pwordmark"><i></i>Janeiro Store</div>
@@ -1965,14 +2168,14 @@ function posterHTML(p,big){
 function cardHTML(p){
   const min=minPrice(p);
   return `<article class="pcard">
-    <button style="all:unset;cursor:pointer;display:block" onclick="openDetail('${p.id}')" aria-label="عرض ${p.name}">
+    <button style="all:unset;cursor:pointer;display:block" onclick="openDetail('${p.id}')" aria-label="${t('view_product_aria')} ${p.name}">
       ${posterHTML(p)}
     </button>
     <div class="pbody">
       <h3>${p.name}</h3>
       <p class="pdesc">${p.desc}</p>
       <div class="pprice">
-        ${p.plans.length?`<span class="from">من</span><b>${money(min)}</b>`:`<b>قريباً</b>`}
+        ${p.plans.length?`<span class="from">${t("price_from")}</span><b>${money(min)}</b>`:`<b>${t("coming_soon")}</b>`}
         ${p.oldFrom?`<span class="old">${money(p.oldFrom)}</span>`:""}
       </div>
       <button class="btn ${p.available?"btn-primary":"btn-soft"}" onclick="openDetail('${p.id}')" ${p.available?"":"disabled"}>
@@ -2050,13 +2253,17 @@ const serverNow = () => Date.now() + clockOffset;
 /* "3 أيام 04:12:33" / "04:12:33". Arabic duals and plurals differ, so
    the day word is picked rather than pluralised. */
 function formatRemaining(ms){
-  const t = Math.max(0, Math.floor(ms/1000));
-  const d = Math.floor(t/86400), h = Math.floor(t%86400/3600),
-        m = Math.floor(t%3600/60), sec = t%60;
+  const tt = Math.max(0, Math.floor(ms/1000));
+  const d = Math.floor(tt/86400), h = Math.floor(tt%86400/3600),
+        m = Math.floor(tt%3600/60), sec = tt%60;
   const pad = n => String(n).padStart(2,"0");
   const clock = `${pad(h)}:${pad(m)}:${pad(sec)}`;
   if(!d) return clock;
-  const word = d===1 ? "يوم" : d===2 ? "يومان" : d<=10 ? `${d} أيام` : `${d} يوماً`;
+  /* Arabic's plural rules are not French/English's -- one/two/few/many
+     each get their own noun form, so this only branches for ar. */
+  const word = LANG==="ar" ? (d===1 ? "يوم" : d===2 ? "يومان" : d<=10 ? `${d} أيام` : `${d} يوماً`)
+             : LANG==="fr" ? `${d} j`
+             : `${d}d`;
   return `${word} ${clock}`;
 }
 
@@ -2064,7 +2271,7 @@ function dealCardHTML(d){
   const p = PRODUCTS.find(x=>x.id===d.productId);
   if(!p) return "";
   return `<article class="pcard">
-    <button style="all:unset;cursor:pointer;display:block" onclick="openDetail('${p.id}','${d.planId}')" aria-label="عرض ${p.name}">
+    <button style="all:unset;cursor:pointer;display:block" onclick="openDetail('${p.id}','${d.planId}')" aria-label="${t('view_product_aria')} ${p.name}">
       ${posterHTML(p)}
     </button>
     <div class="pbody">
@@ -2106,11 +2313,11 @@ function startDealCountdown(){
       /* Never let a finished countdown loop or sit at zero: ask the
          server what is still live and re-render from that. */
       stopDealCountdown();
-      $("#dealsTimer").textContent = "انتهى العرض";
+      $("#dealsTimer").textContent = t("deal_ended");
       await refreshDeals();
       return;
     }
-    $("#dealsTimer").textContent = `ينتهي أقرب عرض خلال ${formatRemaining(left)}`;
+    $("#dealsTimer").textContent = `${t("deal_ends_in")} ${formatRemaining(left)}`;
   };
   tick();
   dealTimer = setInterval(tick, 1000);
@@ -2241,7 +2448,7 @@ function renderShop(){
   $("#shopCount").textContent = list.length ? `${list.length} منتج` : "";
   $("#shopGrid").innerHTML = list.length
     ? list.map(cardHTML).join("")
-    : `<div class="empty"><b>لا توجد نتائج</b>جرّب كلمة أخرى أو تصفح كل المنتجات.</div>`;
+    : `<div class="empty"><b>${t("no_results")}</b>${t("no_results_sub")}</div>`;
   if(list.length) staggerIn("#shopGrid");
 }
 function doSearch(v){
@@ -2366,7 +2573,7 @@ function setPlan(i){
   $("#dTotal").textContent=money(cur.plans[i].p);
 }
 function addCurrent(buyNow){
-  if(!cur.available||!cur.plans.length){ toast("هذا المنتج غير متوفر حالياً"); return; }
+  if(!cur.available||!cur.plans.length){ toast(t("product_unavailable")); return; }
   addToCart(cur.id,curPlan);
   if(buyNow) go("order"); 
 }
@@ -2414,7 +2621,7 @@ function renderBundles(){
       <div class="bprice">
         <b>${money(b.price)}</b>
         <s>${money(b.listTotal)}</s>
-        <span class="bsave">وفّر ${b.savingPct}%</span>
+        <span class="bsave">${t("save_word")} ${b.savingPct}%</span>
       </div>
       <button class="btn btn-soft" onclick="event.stopPropagation();openBundle('${b.id}')">${t("view_details")}</button>
     </div>`).join("");
@@ -2593,7 +2800,7 @@ function renderCart(){
       const first=CART.indexOf(g.lines[0]);
       html+=`<div class="cbundle">
         <div class="bh"><span>${esc(g.bundle.name)}</span>
-          <span class="bsave">وفّر ${money(g.bundle.saving*g.qty)}</span></div>
+          <span class="bsave">${t("save_word")} ${money(g.bundle.saving*g.qty)}</span></div>
         ${g.lines.map(l=>lineHTML(l,CART.indexOf(l),g)).join("")}
         <div class="citem" style="border:0;padding-top:6px">
           <div class="cinfo" style="flex:1">
@@ -2640,15 +2847,15 @@ let submitting=false;
    The old build invented one in the browser; it never matched anything
    the backend knew about. */
 let placedOrder=null;
-const STEP_LBL=["قناة المتابعة وبياناتك","طريقة الدفع","رفع الوصل","بيانات التفعيل والمراجعة"];
+const STEP_LBL_KEYS=["step1_lbl","step2_lbl","step3_lbl","step4_lbl"];
 
 function step(n){
-  if(!CART.length && n>1){ toast("سلتك فارغة"); return; }
+  if(!CART.length && n>1){ toast(t("cart_empty")); return; }
   orderStep=n;
   [1,2,3,4].forEach(i=>$("#o"+i).classList.toggle("hidden",i!==n));
   $$("#steps .n").forEach((el,i)=>el.classList.toggle("on",i<n));
   $$("#steps .bar").forEach((el,i)=>el.classList.toggle("on",i<n-1));
-  $("#stepLbl").textContent=`الخطوة ${n} من 4 — ${STEP_LBL[n-1]}`;
+  $("#stepLbl").textContent=`${t("step_word")} ${n} ${t("of_4")} — ${t(STEP_LBL_KEYS[n-1])}`;
   if(n===2){ renderPayMethods(); renderPayBox(); }
   if(n===4){ buildActivation(); buildReview(); }
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
@@ -2832,39 +3039,39 @@ function firstMissingField(){
   return null;
 }
 function orderMessage(o){
-  let m=`طلب جديد — ${CONFIG.brand}\n`;
-  m+=`رقم الطلب: ${o.id ?? "يُصدر عند التأكيد"}\n`;
+  let m=`${t("new_order")} — ${CONFIG.brand}\n`;
+  m+=`${t("order_number_label")}: ${o.id ?? t("issued_on_confirm")}\n`;
   m+=`———————————\n`;
   o.items.forEach(it=>{
     m+=`• ${it.name} — ${it.plan}${it.qty>1?` ×${it.qty}`:""}\n`;
-    if(it.act) m+=`  نوع التفعيل: ${it.act}\n`;
-    m+=`  السعر: ${money(it.price)}\n`;
+    if(it.act) m+=`  ${t("activation_type_label")}: ${it.act}\n`;
+    m+=`  ${t("price_label")}: ${money(it.price)}\n`;
     it.data.forEach(d=>{ m+=`  ${d.l}: ${d.v}\n`; });
   });
   m+=`———————————\n`;
-  m+=`الإجمالي: ${money(o.total)}\n`;
-  m+=`طريقة الدفع: ${o.pay}\n`;
-  if(o.ref) m+=`رقم العملية: ${o.ref}\n`;
-  m+=`صورة الوصل: ${o.receipt? "سأرفقها في المحادثة" : "لم تُرفق بعد"}\n`;
+  m+=`${t("total_label")}: ${money(o.total)}\n`;
+  m+=`${t("pay_method_label")}: ${o.pay}\n`;
+  if(o.ref) m+=`${t("ref_label")}: ${o.ref}\n`;
+  m+=`${t("receipt_photo_label")}: ${o.receipt? t("will_attach_in_chat") : t("not_attached_yet")}\n`;
   m+=`———————————\n`;
-  m+=`الاسم: ${o.name}\n`;
-  m+=`الهاتف: ${o.phone}\n`;
-  if(o.wilaya) m+=`الولاية: ${o.wilaya}\n`;
-  m+=`قناة المتابعة: ${o.channel}\n`;
+  m+=`${t("name_only_label")}: ${o.name}\n`;
+  m+=`${t("phone_only_label")}: ${o.phone}\n`;
+  if(o.wilaya) m+=`${t("wilaya_only_label")}: ${o.wilaya}\n`;
+  m+=`${t("channel_only_label")}: ${o.channel}\n`;
   return m;
 }
 function buildReview(){
   const o=collectOrder();
   $("#orderSummary").innerHTML =
     o.items.map(it=>`<div class="r"><span>${esc(it.name)} — ${esc(it.plan)}${it.act?` · ${esc(it.act)}`:""}${it.qty>1?` ×${it.qty}`:""}</span><b class="mono">${money(it.price)}</b></div>`).join("")
-    + `<div class="r"><span>طريقة الدفع</span><b>${o.pay}</b></div>`
-    + (o.ref?`<div class="r"><span>رقم العملية</span><b class="mono">${o.ref}</b></div>`:"")
-    + `<div class="r"><span>وصل الدفع</span><b>${o.receipt?"✓ مُختار":"لم يُرفع"}</b></div>`
-    + `<div class="r"><span>قناة المتابعة</span><b>${o.channel}</b></div>`
-    + `<div class="r"><span>الاسم</span><b>${o.name}</b></div>`
-    + `<div class="r"><span>الهاتف</span><b class="mono">${o.phone}</b></div>`
-    + (cartSaving()>0 ? `<div class="r"><span>توفير الباقات</span><b class="mono">− ${money(cartSaving())}</b></div>` : "")
-    + `<div class="r t"><span>الإجمالي</span><b class="mono">${money(o.total)}</b></div>`;
+    + `<div class="r"><span>${t("pay_method_label")}</span><b>${o.pay}</b></div>`
+    + (o.ref?`<div class="r"><span>${t("ref_label")}</span><b class="mono">${o.ref}</b></div>`:"")
+    + `<div class="r"><span>${t("receipt_photo_label")}</span><b>${o.receipt?t("receipt_selected"):t("receipt_not_uploaded")}</b></div>`
+    + `<div class="r"><span>${t("channel_only_label")}</span><b>${o.channel}</b></div>`
+    + `<div class="r"><span>${t("name_only_label")}</span><b>${o.name}</b></div>`
+    + `<div class="r"><span>${t("phone_only_label")}</span><b class="mono">${o.phone}</b></div>`
+    + (cartSaving()>0 ? `<div class="r"><span>${t("bundle_saving_label")}</span><b class="mono">− ${money(cartSaving())}</b></div>` : "")
+    + `<div class="r t"><span>${t("total_label")}</span><b class="mono">${money(o.total)}</b></div>`;
   $("#waPreview").textContent=orderMessage(o);
 }
 /* One key per checkout attempt. Reused across retries of the SAME
@@ -2877,12 +3084,12 @@ function setSendBusy(on,label){
   btn.disabled=on;
   btn.style.opacity=on?".7":"";
   btn.dataset.orig = btn.dataset.orig || btn.innerHTML;
-  btn.innerHTML = on ? (label||"جارٍ الإرسال…") : btn.dataset.orig;
+  btn.innerHTML = on ? (label||t("busy_sending")) : btn.dataset.orig;
 }
 
 async function sendOrder(){
   if(submitting) return;                       // guards the double click
-  if(!CART.length){ toast("سلتك فارغة"); return; }
+  if(!CART.length){ toast(t("cart_empty")); return; }
 
   /* The three required answers are checked again here, not only on the
      way out of step 1: the customer can walk back, empty a field and
@@ -2891,22 +3098,22 @@ async function sendOrder(){
   if(!validateDetails()){
     step(1);
     validateDetails();                 // step() re-renders; paint them again
-    toast(!validateChannel() ? "الرجاء اختيار قناة المتابعة"
-        : !validateName()    ? "الاسم مطلوب"
-        : "رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07");
+    toast(!validateChannel() ? t("channel_err")
+        : !validateName()    ? t("name_err")
+        : t("phone_err"));
     return;
   }
   const name=$("#fName").value.trim(), phone=phoneValue();
-  if(!payMethod){ toast("اختر طريقة الدفع"); step(2); return; }
-  if(!receiptFile){ toast("ارفع صورة وصل الدفع"); step(3); return; }
+  if(!payMethod){ toast(t("toast_pay_required")); step(2); return; }
+  if(!receiptFile){ toast(t("toast_receipt_required")); step(3); return; }
 
   const missing=firstMissingField();
-  if(missing){ toast(`أكمل: ${missing.label}`); missing.el&&missing.el.focus(); return; }
+  if(missing){ toast(`${t("complete_field")}: ${missing.label}`); missing.el&&missing.el.focus(); return; }
 
   if(!idemKey) idemKey=API.newIdempotencyKey();
 
   try{
-    setSendBusy(true,"جارٍ إنشاء الطلب…");
+    setSendBusy(true,t("busy_creating_order"));
 
     /* 1) create — the server prices the cart and issues the number */
     if(!placedOrder){
@@ -2921,12 +3128,12 @@ async function sendOrder(){
     }
 
     /* 2) upload the receipt */
-    setSendBusy(true,"جارٍ رفع الوصل… 0%");
+    setSendBusy(true,`${t("busy_uploading")} 0%`);
     await API.uploadReceipt(placedOrder.order_id, receiptFile,
-      pct => setSendBusy(true,`جارٍ رفع الوصل… ${pct}%`));
+      pct => setSendBusy(true,`${t("busy_uploading")} ${pct}%`));
 
     /* 3) confirm. Only now is the order real. */
-    setSendBusy(true,"جارٍ تأكيد الطلب…");
+    setSendBusy(true,t("busy_confirming"));
     const { order, whatsappNumber } = await API.submitOrder(placedOrder.order_id, $("#fRef").value.trim());
 
     /* 4) and only now do we open WhatsApp */
