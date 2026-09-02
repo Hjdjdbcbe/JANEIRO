@@ -62,7 +62,7 @@ const MESSAGES: Record<string, string> = {
   ORDER_NOT_FOUND: "لم نعثر على الطلب.",
   EMPTY_ORDER: "الطلب فارغ.",
   INVALID_TOTAL: "قيمة الطلب غير صالحة.",
-  INVALID_TRACKING_INPUT: "تحقق من رقم الطلب وآخر 4 أرقام من هاتفك.",
+  INVALID_TRACKING_INPUT: "تحقق من رقم الطلب ورقم هاتفك.",
   INVALID_FILE_TYPE: "الملف يجب أن يكون صورة JPG أو PNG أو WebP.",
   FILE_TOO_LARGE: "حجم الصورة يتجاوز 5 ميغابايت.",
   ORDER_ALREADY_SUBMITTED: "تم إرسال هذا الطلب مسبقاً.",
