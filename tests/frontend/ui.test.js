@@ -497,32 +497,42 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   // ---------- language switch on a phone ----------
   // The header is position:fixed, so a button spilling past the
   // viewport edge does NOT grow document.documentElement.scrollWidth --
-  // the usual overflow check above would miss it. A 5th icon-sized
-  // button in the always-visible row once pushed the hamburger half
-  // off-screen this way; check the hamburger's own bounding box
-  // directly, and confirm the header's copy of the switch is the one
-  // that gives way, not the burger it would break.
+  // the usual overflow check above would miss it. The language switch
+  // has to stay in the always-visible row on every width (the store
+  // owner asked for it there, not tucked in the hamburger panel), so
+  // the wordmark is what gives way on a narrow phone instead: below
+  // 480px the header keeps the mark alone and drops "Janeiro Store",
+  // which frees far more width than the switch needs.
   const lm = await newPage({ viewport: { width: 390, height: 844 } });
   await lm.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
   await lm.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
-  const burger = await lm.evaluate(() => {
-    const r = document.querySelector(".menu-btn").getBoundingClientRect();
-    return { left: r.left, right: r.right, win: window.innerWidth };
+  const header390 = await lm.evaluate(() => {
+    const burger = document.querySelector(".menu-btn").getBoundingClientRect();
+    const lang = document.querySelector(".langwrap").getBoundingClientRect();
+    return {
+      burgerLeft: burger.left, burgerRight: burger.right,
+      langVisible: getComputedStyle(document.querySelector(".langwrap")).display !== "none",
+      langLeft: lang.left, langRight: lang.right,
+      wordmarkShown: getComputedStyle(document.querySelector(".hbar .brand b")).display !== "none",
+      win: window.innerWidth,
+    };
   });
-  check(burger.left >= -0.5 && burger.right <= burger.win + 0.5,
-        `the hamburger stays fully on screen (left ${burger.left.toFixed(1)}, right ${burger.right.toFixed(1)} of ${burger.win}px)`);
-  check(await lm.locator(".langwrap").isHidden(), "the header's own language button steps aside on a phone");
+  check(header390.burgerLeft >= -0.5 && header390.burgerRight <= header390.win + 0.5,
+        `the hamburger stays fully on screen (left ${header390.burgerLeft.toFixed(1)}, right ${header390.burgerRight.toFixed(1)} of ${header390.win}px)`);
+  check(header390.langVisible, "the language switch stays in the top row on a phone too");
+  check(header390.langLeft >= -0.5 && header390.langRight <= header390.win + 0.5,
+        `and it stays fully on screen too (left ${header390.langLeft.toFixed(1)}, right ${header390.langRight.toFixed(1)} of ${header390.win}px)`);
+  check(!header390.wordmarkShown, "the wordmark steps aside instead, to make room");
 
-  await lm.evaluate(() => window.openPanel("menu"));
-  await lm.waitForTimeout(350);
-  check(await lm.locator("#menuLangRow").isVisible(), "the language row lives in the panel instead");
-  await lm.click('#menuLangRow button[data-lang="fr"]');
+  // the dropdown works the same way here as on desktop
+  await lm.click("#langBtn");
+  await lm.click('#langMenu button[data-lang="fr"]');
   const mobileLang = await lm.evaluate(() => ({
     dir: document.documentElement.getAttribute("dir"),
-    current: document.querySelector('#menuLangRow button[data-lang="fr"]').getAttribute("aria-current"),
+    current: document.querySelector('#langMenu button[data-lang="fr"]').getAttribute("aria-current"),
   }));
   check(mobileLang.dir === "ltr" && mobileLang.current === "true",
-        `picking French from the panel switches it: dir=${mobileLang.dir} current=${mobileLang.current}`);
+        `the dropdown switches it on a phone too: dir=${mobileLang.dir} current=${mobileLang.current}`);
   await lm.close();
 
   /* Every var() in the stylesheet must resolve to something defined.

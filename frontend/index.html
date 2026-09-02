@@ -442,15 +442,19 @@ header.stuck .hbar{height:54px}
 .ibtn svg{width:21px;height:21px}
 .ibtn:hover{background:var(--surface);color:var(--accent-ink)}
 /* A 5th icon-sized button in the header's action row does not fit
-   next to search+cart+theme+menu on a narrow phone -- the row is a
+   next to search+cart+theme+menu on a narrow phone -- that row is a
    plain nowrap flex, and unlike normal document flow, a position:fixed
    header can spill past the viewport edge without ever growing
    document.documentElement.scrollWidth, so it clips silently instead
-   of scrolling. The mobile menu panel already carries the same choice
-   (#menuLangRow), so the header's copy only needs to exist once
-   there is room for it. */
-.langwrap{position:relative;display:none}
-@media(min-width:900px){.langwrap{display:block}}
+   of scrolling. The wordmark is the bigger item in that row (93px of
+   145px), and unlike the language switch it is not the thing the
+   store owner asked to keep visible everywhere, so it gives way
+   instead: below 480px the header carries the mark alone, still
+   linked and still recognisable, and the freed width is more than
+   the switch needs (measured a 35px shortfall at 390px; the mark's
+   own text alone is 93px). Above that the row was never tight. */
+@media(max-width:480px){.hbar .brand b{display:none}}
+.langwrap{position:relative}
 .langbtn{font-family:var(--f-mono);font-size:11.5px;font-weight:700;letter-spacing:.02em}
 .langmenu{position:absolute;top:calc(100% + 6px);inset-inline-end:0;min-width:140px;
   background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);
@@ -459,10 +463,6 @@ header.stuck .hbar{height:54px}
   font-weight:500;color:var(--ink);transition:background .15s}
 .langmenu button:hover{background:var(--surface)}
 .langmenu button[aria-current="true"]{color:var(--accent-ink);font-weight:700}
-.mlang{display:flex;gap:var(--s2);margin:0 var(--s2) var(--s3)}
-.mlang button{flex:1;padding:9px;border-radius:11px;border:1px solid var(--line);
-  font-family:var(--f-mono);font-size:12.5px;font-weight:700;transition:background .15s,border-color .15s}
-.mlang button[aria-current="true"]{border-color:var(--accent-ink);color:var(--accent-ink);background:var(--surface)}
 .cbadge{position:absolute;top:1px;inset-inline-end:1px;background:var(--purple);color:#fff;
   font-family:var(--f-mono);font-size:9.5px;font-weight:600;min-width:18px;height:18px;
   border-radius:50%;display:grid;place-items:center;padding:0 4px;
@@ -1216,12 +1216,6 @@ footer ul button:hover{color:var(--text-on-dark)}
       <button onclick="toggleTheme()" id="menuTheme" data-i18n="aria_theme">تبديل المظهر</button>
       <button data-i18n="nav_policies" onclick="go('policies');closePanels()">السياسات والشروط</button>
     </div>
-    <div class="mlabel" data-i18n="aria_lang">تغيير اللغة</div>
-    <div class="mlang" id="menuLangRow">
-      <button data-lang="ar" onclick="setLang('ar')">AR</button>
-      <button data-lang="fr" onclick="setLang('fr')">FR</button>
-      <button data-lang="en" onclick="setLang('en')">EN</button>
-    </div>
     <div class="mlabel" data-i18n="browse_by_cat">تصفح حسب التصنيف</div>
     <div id="menuCats"></div>
   </div>
@@ -1838,7 +1832,7 @@ function applyLang(){
   $$("[data-i18n-aria]").forEach(el => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
   const langBtn = $("#langBtn");
   if(langBtn) langBtn.textContent = LANG.toUpperCase();
-  $$("#langMenu button, #menuLangRow button").forEach(b =>
+  $$("#langMenu button").forEach(b =>
     b.setAttribute("aria-current", String(b.dataset.lang === LANG)));
   /* the theme button's own label depends on the CURRENT theme, not just
      the language -- applyTheme() already knows how to phrase it right */
