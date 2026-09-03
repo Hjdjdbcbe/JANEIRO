@@ -4289,12 +4289,21 @@ grant select on warranty_certificates to authenticated;
 -- returns only what a certificate should show, never the raw row.
 
 -- ---------- 2. a code that never repeats ----------
+-- gen_random_uuid() rather than pgcrypto's gen_random_bytes(): it is
+-- built into Postgres core (no extension needed), which is also why
+-- every id column in this schema already uses it successfully.
+-- gen_random_bytes() needs pgcrypto, and on a hosted Supabase project
+-- that extension lives in the `extensions` schema -- invisible to a
+-- SECURITY DEFINER function pinned to `search_path = public`, so it
+-- failed there with "function gen_random_bytes(integer) does not
+-- exist" even though the same call works in a plain local Postgres
+-- where pgcrypto happened to install into public.
 create or replace function generate_certificate_code()
 returns text language plpgsql volatile as $$
 declare candidate text;
 begin
   for attempt in 1..20 loop
-    candidate := 'JNR-' || upper(encode(gen_random_bytes(7), 'hex'));
+    candidate := 'JNR-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 14));
     if not exists (select 1 from warranty_certificates where certificate_code = candidate) then
       return candidate;
     end if;
