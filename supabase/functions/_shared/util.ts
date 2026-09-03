@@ -66,6 +66,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_FILE_TYPE: "الملف يجب أن يكون صورة JPG أو PNG أو WebP.",
   FILE_TOO_LARGE: "حجم الصورة يتجاوز 5 ميغابايت.",
   ORDER_ALREADY_SUBMITTED: "تم إرسال هذا الطلب مسبقاً.",
+  CERTIFICATE_NOT_FOUND: "لم نعثر على شهادة بهذا الرمز.",
 };
 
 export function mapError(err: unknown): { code: string; message: string } {

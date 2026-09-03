@@ -216,6 +216,15 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(!(await p.locator("[data-to]").allInnerTexts()).includes("مكتمل"),
         "once completed, the only move left is a refund");
 
+  // ---------- completing the order issues a warranty certificate ----------
+  // gemini-pro carries a warranty (subscription_duration), so admin_update_order_status's
+  // own certificate-issuing step should have fired the moment the order landed on completed.
+  check(finished.includes("عرض شهادة الضمان"),
+        "the console shows a link to the certificate it just issued");
+  const certHref = await p.locator("#detailBody a", { hasText: "عرض شهادة الضمان" }).getAttribute("href");
+  const certCode = new URL(certHref).searchParams.get("cert");
+  check(/^JNR-[0-9A-F]{14}$/.test(certCode || ""), `the link carries a real certificate code (${certCode})`);
+
   // the customer's tracking page must now agree
   const track = await p.evaluate(async ([b, n, ph]) => {
     const r = await fetch(`${b}/functions/v1/track-order`, {
@@ -225,6 +234,40 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   }, [BASE, seeded.number, seeded.phone]);
   check(track?.order?.status === "completed",
         `the customer's tracking page shows the new status (${track?.order?.status_label || "—"})`);
+
+  const trackedCertCode = track?.order?.items?.[0]?.certificate_code;
+  check(trackedCertCode === certCode,
+        `the customer's own tracking page carries the same certificate code the console showed (${trackedCertCode})`);
+  check(!!track?.order?.items?.[0]?.certificate_ends_at,
+        "and the warranty end date it computed from the plan's duration");
+
+  // a code-only lookup (no phone, no login) returns the same certificate --
+  // that is the whole point of a link the admin can just forward
+  const cert = await p.evaluate(async ([b, code]) => (await (await fetch(
+    `${b}/functions/v1/get-certificate`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) }
+  )).json()).certificate, [BASE, certCode]);
+  check(cert?.order_number === seeded.number, "the certificate resolves to the right order");
+  check(cert?.certificate_code === certCode, "and carries the exact code that was on the link");
+  check(cert?.activation_fields?.some(f => f.value === "console@gmail.com"),
+        "the activation data the customer typed is on their own certificate");
+
+  // a wrong/unknown code must not resolve to anything
+  const badCert = await p.evaluate(async (b) => (await fetch(
+    `${b}/functions/v1/get-certificate`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: "JNR-DOES-NOT-EXIST" }) }
+  )).status, BASE);
+  check(badCert === 404, `an unknown certificate code is refused (HTTP ${badCert})`);
+
+  // and the storefront's own certificate page renders it from just the ?cert= link
+  const cp = await newPage({ viewport: { width: 800, height: 1000 } });
+  await cp.goto(`${BASE}/frontend/index.html?cert=${certCode}`, { waitUntil: "networkidle" });
+  await cp.waitForSelector("#certDoc", { timeout: 10000 });
+  const certPageText = await cp.locator("#certBody").innerText();
+  check(certPageText.includes(seeded.number), "the storefront certificate page shows the order number");
+  check(certPageText.includes(certCode), "and the certificate code itself");
+  check(certPageText.includes("console@gmail.com"), "and the activation data it was issued for");
+  await cp.close();
 
   await p.click("#back");
   await p.waitForSelector("#queue:not(.hidden)");

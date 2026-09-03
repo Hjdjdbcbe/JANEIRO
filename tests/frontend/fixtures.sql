@@ -38,6 +38,16 @@ select p.id, pl.id, round(pl.price * 0.80, 2), now() - interval '2 hours', now()
   from products p join product_plans pl on pl.product_id = p.id
  where p.slug = 'notion-plus' and pl.sort_order = 1;
 
+-- Gemini Pro's plans carry a real duration, the way an owner would fill
+-- them in the product editor -- warranty_certificates needs it to compute
+-- an end date for a 'subscription_duration' product's certificate.
+update product_plans set duration_value = 1,  duration_unit = 'month'
+ where product_id = (select id from products where slug = 'gemini-pro') and name = 'شهر واحد';
+update product_plans set duration_value = 3,  duration_unit = 'month'
+ where product_id = (select id from products where slug = 'gemini-pro') and name = '3 أشهر';
+update product_plans set duration_value = 12, duration_unit = 'month'
+ where product_id = (select id from products where slug = 'gemini-pro') and name = '12 شهراً';
+
 delete from orders;
 delete from rate_limits;
 

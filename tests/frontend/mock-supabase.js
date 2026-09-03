@@ -136,7 +136,12 @@ async function rest(url, res) {
                 'order_activation_data', coalesce((
                    select jsonb_agg(jsonb_build_object(
                      'field_label', a.field_label, 'field_value', a.field_value))
-                     from order_activation_data a where a.order_item_id = i.id), '[]'::jsonb)))
+                     from order_activation_data a where a.order_item_id = i.id), '[]'::jsonb),
+                'warranty_certificates', coalesce((
+                   select jsonb_agg(jsonb_build_object(
+                     'certificate_code', wc.certificate_code,
+                     'starts_at', wc.starts_at, 'ends_at', wc.ends_at))
+                     from warranty_certificates wc where wc.order_item_id = i.id), '[]'::jsonb)))
               from order_items i where i.order_id = o.id), '[]'::jsonb) as order_items,
             coalesce((select jsonb_agg(jsonb_build_object(
                 'old_status', h.old_status, 'new_status', h.new_status,
@@ -232,6 +237,7 @@ const MSG = {
   MISSING_ACTIVATION_FIELD: "يرجى إكمال بيانات التفعيل المطلوبة.",
   INVALID_EMAIL_FIELD: "البريد الإلكتروني المدخل غير صحيح.",
   INVALID_FILE_TYPE: "الملف يجب أن يكون صورة JPG أو PNG أو WebP.",
+  CERTIFICATE_NOT_FOUND: "لم نعثر على شهادة بهذا الرمز.",
 };
 const mapErr = e => {
   const code = String(e.message || "").split(":")[0].trim().replace(/[^A-Z_]/g, "");
@@ -304,6 +310,16 @@ async function fn(name, req, res) {
         if (m.code === "ORDER_NOT_FOUND" || m.code === "INVALID_TRACKING_INPUT")
           return send(res, 404, { ok: false, code: "ORDER_NOT_FOUND", message: "لم نعثر على طلب بهذه البيانات." });
         return send(res, 400, { ok: false, ...m });
+      }
+    }
+    if (name === "get-certificate") {
+      const b = JSON.parse(raw.toString());
+      try {
+        const rows = await asService("select get_certificate($1) as r", [b.code ?? ""]);
+        return send(res, 200, { ok: true, certificate: rows[0].r });
+      } catch (e) {
+        const m = mapErr(e);
+        return send(res, m.code === "CERTIFICATE_NOT_FOUND" ? 404 : 400, { ok: false, ...m });
       }
     }
     if (name === "translate-content") {

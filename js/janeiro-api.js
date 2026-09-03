@@ -353,6 +353,13 @@ export async function trackOrder(orderNumber, phone) {
   return res.order;
 }
 
+/* ---------------- warranty certificate ---------------- */
+
+export async function getCertificate(code) {
+  const res = await callFn("get-certificate", { code });
+  return res.certificate;
+}
+
 /* ---------------- catalogue translation ---------------- */
 
 /**

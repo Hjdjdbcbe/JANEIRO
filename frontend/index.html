@@ -917,6 +917,40 @@ header.stuck .hbar{height:54px}
   color:var(--ink-2);margin-top:var(--s4);display:flex;gap:10px}
 .hint svg{flex:none;color:var(--accent-ink);margin-top:2px}
 
+/* ============ WARRANTY CERTIFICATE ============ */
+.cert-doc{background:var(--card);border:1px solid var(--accent-ink);border-radius:var(--r-card);
+  overflow:hidden;color:var(--text-on-light);margin-top:var(--s4)}
+/* Fixed dark chrome, not the theme's --ink: --ink flips to a LIGHT
+   colour in dark mode (it is meant for text on the page background),
+   which would turn this header invisible. A certificate reads the
+   same whether the site around it is light or dark, like a printed
+   page -- so it borrows --poster-ink, the one other place the file
+   already needed a colour immune to the theme switch. */
+.cert-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);
+  background:var(--poster-ink);color:#fff;padding:var(--s6)}
+.cert-eyebrow{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#B79BFF;
+  font-weight:700;margin-bottom:6px}
+.cert-title{font-size:22px;font-weight:400;line-height:1.25}
+.cert-sub{font-size:12.5px;opacity:.75;margin-top:6px}
+.cert-body{padding:var(--s6)}
+.cert-lede{font-size:13.5px;color:var(--ink-2);margin-bottom:var(--s6)}
+.cert-dl div{align-items:baseline}
+.cert-dl b{font-weight:700}
+.cert-terms{background:var(--surface);border-radius:14px;padding:var(--s4);margin-top:var(--s6)}
+.cert-terms b{display:block;margin-bottom:8px;font-size:13.5px}
+.cert-terms ul{margin:0;padding-inline-start:18px;display:grid;gap:6px;font-size:12.5px;color:var(--ink-2)}
+.cert-foot{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);
+  margin-top:var(--s6)}
+.cert-brand{font-size:13px;font-weight:700;color:var(--accent-ink)}
+@media print{
+  .noprint,header,footer,#wa{display:none!important}
+  body{background:#fff}
+  .page{min-height:0;padding:0;background:none}
+  .cert-doc{border-color:#ccc;box-shadow:none;margin-top:0}
+  .cert-head{background:#15152a!important;color:#fff!important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
 /* dark-page search field (shop / category pages) — distinct from the header's light .hsearch */
 .dsearch{display:flex;align-items:center;gap:var(--s2);background:var(--tint-1);
   border:1px solid var(--line);border-radius:var(--r-pill);padding:11px 16px;
@@ -1615,6 +1649,16 @@ footer ul button:hover{color:var(--text-on-dark)}
   </div>
 </section>
 
+<!-- ================= WARRANTY CERTIFICATE ================= -->
+<section id="cert" class="hidden page">
+  <div class="wrap noprint" style="max-width:640px">
+    <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
+  </div>
+  <div class="wrap" style="max-width:640px">
+    <div id="certBody"></div>
+  </div>
+</section>
+
 <!-- ================= ABOUT ================= -->
 <section id="about" class="hidden page">
   <div class="wrap" style="max-width:720px">
@@ -1955,6 +1999,31 @@ const I18N = {
   track_sub: { ar:"أدخل رقم طلبك للاستعلام عن حالته — لا تحتاج حساباً.", fr:"Entrez votre numéro de commande pour vérifier son statut — aucun compte requis.", en:"Enter your order number to check its status — no account needed." },
   track_hint: { ar:"يمكنك أيضاً الاستعلام مباشرة على واتساب برقم طلبك.", fr:"Vous pouvez aussi vous renseigner directement sur WhatsApp avec votre numéro de commande.", en:"You can also ask directly on WhatsApp with your order number." },
 
+  cert_view:      { ar:"عرض شهادة الضمان", fr:"Voir le certificat de garantie", en:"View Warranty Certificate" },
+  cert_loading:   { ar:"جارٍ تحميل الشهادة…", fr:"Chargement du certificat…", en:"Loading certificate…" },
+  cert_not_found: { ar:"لم نعثر على شهادة بهذا الرمز.", fr:"Aucun certificat trouvé avec ce code.", en:"No certificate found for this code." },
+  cert_title:     { ar:"شهادة ضمان", fr:"Certificat de garantie", en:"Warranty Certificate" },
+  cert_lede:      { ar:"تؤكد هذه الشهادة تغطية الضمان الخاصة بطلبك من Janeiro Store، ويمكن طباعتها أو الاحتفاظ بها كمرجع.",
+                    fr:"Ce certificat confirme la couverture de garantie de votre commande chez Janeiro Store ; vous pouvez l'imprimer ou le conserver comme référence.",
+                    en:"This certificate confirms the warranty coverage for your Janeiro Store order; you can print it or keep it for reference." },
+  cert_customer:  { ar:"العميل", fr:"Client", en:"Customer" },
+  cert_product:   { ar:"المنتج", fr:"Produit", en:"Product" },
+  cert_plan:      { ar:"الخطة", fr:"Formule", en:"Plan" },
+  cert_starts:    { ar:"تاريخ البداية", fr:"Date de début", en:"Start Date" },
+  cert_ends:      { ar:"تاريخ الانتهاء", fr:"Date d'expiration", en:"Expiration Date" },
+  cert_code:      { ar:"كود الشهادة", fr:"Code du certificat", en:"Certificate Code" },
+  cert_terms_h:   { ar:"شروط الضمان", fr:"Conditions de garantie", en:"Warranty Terms" },
+  cert_terms_1:   { ar:"في حال وجود عطل من طرف Janeiro Store، تتم إعادة التفعيل أو المعالجة أولاً.",
+                    fr:"En cas de panne imputable à Janeiro Store, une réactivation ou une correction est tentée en premier.",
+                    en:"If a fault is Janeiro Store's responsibility, reactivation or a fix is attempted first." },
+  cert_terms_2:   { ar:"إذا تعذّر الحل، يُسترجع المبلغ عن المدة غير المستخدمة من الضمان.",
+                    fr:"Si la résolution est impossible, le montant de la période de garantie non utilisée est remboursé.",
+                    en:"If that isn't possible, the unused warranty period is refunded." },
+  cert_terms_3:   { ar:"لا يغطي الضمان الأعطال الناتجة عن تصرف العميل (تغيير كلمة المرور، مخالفة شروط المنصة، إلخ).",
+                    fr:"La garantie ne couvre pas les pannes causées par le client (changement de mot de passe, non-respect des règles de la plateforme, etc.).",
+                    en:"The warranty does not cover faults caused by the customer (changing the password, violating the platform's rules, etc.)." },
+  cert_print:     { ar:"طباعة", fr:"Imprimer", en:"Print" },
+
   step_word: { ar:"الخطوة", fr:"Étape", en:"Step" },
   of_4: { ar:"من 4", fr:"sur 4", en:"of 4" },
   step1_lbl: { ar:"قناة المتابعة وبياناتك", fr:"Canal de suivi et vos informations", en:"Follow-up channel & your details" },
@@ -2056,6 +2125,10 @@ function applyLang(){
        preview relabel too, without touching what the customer typed */
     if(orderStep===4) buildReview();
   }
+  /* the certificate page is built from data fetched once and cached --
+     no need to re-fetch it, just re-render the same data in the new
+     language, the same way buildReview() relabels the review step */
+  if(certData) renderCertificate(certData);
   /* Product/category/bundle text the owner typed in the dashboard --
      not the frontend's own dictionary -- so it needs its own,
      separate (and asynchronous) trip. Fired after the synchronous
@@ -2561,7 +2634,7 @@ document.addEventListener("keydown", e => {
 /* ================================================================
    NAVIGATION
    ================================================================ */
-const PAGES=["home","shop","detail","bundles","bundle","order","sent","track","about","policies"];
+const PAGES=["home","shop","detail","bundles","bundle","order","sent","track","cert","about","policies"];
 /* Pages are swapped in place rather than being real documents, so the
    browser has no history entry to restore the scroll position from --
    go() has to do it. Only the two browsable lists are remembered:
@@ -3271,12 +3344,89 @@ async function runTrack(){
         <div><span>تاريخ الطلب</span><b class="mono">${new Date(o.created_at).toLocaleDateString("en-GB")}</b></div>
       </div>
       ${o.items&&o.items.length?`<div class="summary" style="margin-top:var(--s4)">${
-        o.items.map(i=>`<div class="r"><span>${i.name} — ${i.plan}${i.quantity>1?` ×${i.quantity}`:""}</span></div>`).join("")
+        o.items.map(i=>`<div class="r"><span>${i.name} — ${i.plan}${i.quantity>1?` ×${i.quantity}`:""}</span></div>${
+          i.certificate_code?`<button class="btn btn-soft" style="margin-top:8px;width:100%"
+            onclick="openCertificate('${i.certificate_code}')">${t("cert_view")}</button>`:""}`).join("")
       }</div>`:""}
     </div>`;
   }catch(err){
     out.innerHTML=`<div class="hint"><span>${err.message||"لم نعثر على طلب بهذه البيانات."}</span></div>`;
   }
+}
+
+/* ================================================================
+   WARRANTY CERTIFICATE
+   ================================================================ */
+let certData=null;
+
+function certDate(iso){
+  if(!iso) return null;
+  const locale = LANG==="ar" ? "ar-DZ" : LANG==="fr" ? "fr-FR" : "en-US";
+  return new Date(iso).toLocaleDateString(locale, {day:"2-digit",month:"long",year:"numeric"});
+}
+
+async function openCertificate(code){
+  go("cert");
+  certData=null;
+  $("#certBody").innerHTML=`<div class="hint"><span>${t("cert_loading")}</span></div>`;
+  try{
+    certData=await API.getCertificate(code);
+    renderCertificate(certData);
+  }catch(err){
+    certData=null;
+    $("#certBody").innerHTML=`<div class="hint"><span>${err.message||t("cert_not_found")}</span></div>`;
+  }
+}
+
+function renderCertificate(c){
+  const starts=certDate(c.starts_at), ends=certDate(c.ends_at);
+  $("#certBody").innerHTML=`
+    <div class="cert-doc" id="certDoc">
+      <div class="cert-head">
+        <div>
+          <div class="cert-eyebrow">${t("cert_title")}</div>
+          <div class="cert-title">Janeiro Store</div>
+          <div class="cert-sub">${c.product_name}</div>
+        </div>
+        <div class="jmark"><img src="assets/janeiro-logo.png" alt="" width="34" height="34"></div>
+      </div>
+      <div class="cert-body">
+        <p class="cert-lede">${t("cert_lede")}</p>
+        <div class="dl cert-dl">
+          <div><span>${t("order_number_label")}</span><b class="mono">${c.order_number}</b></div>
+          <div><span>${t("cert_customer")}</span><b>${c.customer_name}</b></div>
+          ${(c.activation_fields||[]).map(f=>`<div><span>${f.label}</span><b>${f.value}</b></div>`).join("")}
+          <div><span>${t("cert_product")}</span><b>${c.product_name}</b></div>
+          <div><span>${t("cert_plan")}</span><b>${c.plan_name}</b></div>
+          ${c.warranty_label?`<div><span>${t("warranty_label")}</span><b>${c.warranty_label}</b></div>`:""}
+          <div><span>${t("cert_starts")}</span><b class="mono">${starts}</b></div>
+          ${ends?`<div><span>${t("cert_ends")}</span><b class="mono">${ends}</b></div>`:""}
+          <div><span>${t("cert_code")}</span><b class="mono">${c.certificate_code}</b></div>
+        </div>
+        <div class="cert-terms">
+          <b>${t("cert_terms_h")}</b>
+          <ul>
+            <li>${t("cert_terms_1")}</li>
+            <li>${t("cert_terms_2")}</li>
+            <li>${t("cert_terms_3")}</li>
+          </ul>
+        </div>
+        <div class="cert-foot noprint">
+          <span class="cert-brand">Janeiro Store</span>
+          <button class="btn btn-primary" onclick="window.print()">${t("cert_print")}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* A shared link opens straight to the certificate: ?cert=CODE in the
+   URL, checked once at boot, same idea as the theme/language FOUC
+   guards resolving state before first paint. */
+function checkCertRoute(){
+  try{
+    const code=new URLSearchParams(location.search).get("cert");
+    if(code) openCertificate(code);
+  }catch(e){}
 }
 
 /* ================================================================
@@ -3427,6 +3577,7 @@ Object.assign(window, {
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
   nextFromDetails, validateName, validatePhone, validateChannel, validateDetails, clearErr,
   runTrack, contactWhatsApp, toast, toggleTheme, addToCart, toggleHeaderSearch, setLang, toggleLangMenu,
+  openCertificate,
 });
 
 /* The page opens on home without go() ever running, so the flag it sets
@@ -3444,6 +3595,7 @@ document.documentElement.dataset.page = "home";
 try{ const l = localStorage.getItem(LANG_KEY); if(LANGS.includes(l)) LANG = l; }catch(e){}
 applyLang();
 boot();
+checkCertRoute();
 </script>
 </body>
 </html>

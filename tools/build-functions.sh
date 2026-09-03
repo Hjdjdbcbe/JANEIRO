@@ -23,7 +23,7 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 
 SHARED=supabase/functions/_shared/util.ts
 
-for fn in create-order upload-receipt submit-order track-order translate-content; do
+for fn in create-order upload-receipt submit-order track-order translate-content get-certificate; do
   src="supabase/functions/$fn/index.ts"
   out="$OUT/$fn.ts"
 
@@ -48,4 +48,4 @@ done
 
 echo
 echo "تُلصق كل واحدة في: Supabase Dashboard → Edge Functions → Deploy a new function"
-echo "اسم الدالة يجب أن يطابق اسم الملف بالضبط (بلا .ts): create-order, upload-receipt, submit-order, track-order, translate-content"
+echo "اسم الدالة يجب أن يطابق اسم الملف بالضبط (بلا .ts): create-order, upload-receipt, submit-order, track-order, translate-content, get-certificate"

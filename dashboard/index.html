@@ -1334,15 +1334,26 @@ async function loadQueue() {
 }
 
 /* ---------------- one order ---------------- */
+let SITE_URL = null;
+async function siteUrl() {
+  if (SITE_URL === null) {
+    const rows = await rest("store_settings?select=key,value");
+    SITE_URL = rows.find(r => r.key === "site_url")?.value || "";
+  }
+  return SITE_URL;
+}
+
 async function openOrder(id) {
   const [o] = await rest(
     "orders?select=*,payment_methods(label,type)," +
     "order_items(product_name_snapshot,plan_name_snapshot,quantity,unit_price,total_price,activation_type," +
-    "warranty_label_snapshot,order_activation_data(field_label,field_value))," +
+    "warranty_label_snapshot,order_activation_data(field_label,field_value)," +
+    "warranty_certificates(certificate_code,starts_at,ends_at))," +
     "order_status_history(old_status,new_status,note,created_at)" +
     `&id=eq.${id}`);
   if (!o) return toast("لم نعثر على الطلب.");
 
+  const site = await siteUrl();
   const next = await rest(`order_status_transitions?select=to_status&from_status=eq.${o.status}`);
   const history = (o.order_status_history || [])
     .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -1388,6 +1399,10 @@ async function openOrder(id) {
               <b>${esc(a.field_value)}</b>
               <button class="copy" data-copy="${esc(a.field_value)}">نسخ</button>
             </div>`).join("")}</div>` : ""}
+          ${(it.warranty_certificates || [])[0] && site ? `
+            <a class="btn" style="margin-top:10px;display:inline-block" target="_blank" rel="noopener"
+               href="${site}/?cert=${(it.warranty_certificates[0].certificate_code)}">عرض شهادة الضمان</a>
+          ` : ""}
         </div>`).join("")}
     </div>
 
