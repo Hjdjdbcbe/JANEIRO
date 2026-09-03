@@ -1250,9 +1250,9 @@ footer ul button:hover{color:var(--text-on-dark)}
 <main id="home">
   <section class="hero">
     <div class="wrap heroCopy">
-      <span class="eyebrow">متجر رقمي جزائري</span>
-      <h1>كل أدواتك الرقمية،<br><span class="g">في مكان واحد.</span></h1>
-      <p class="lede">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
+      <span class="eyebrow" data-i18n="hero_badge">متجر رقمي جزائري</span>
+      <h1><span data-i18n="hero_title_line1">كل أدواتك الرقمية،</span><br><span class="g" data-i18n="hero_title_line2">في مكان واحد.</span></h1>
+      <p class="lede" data-i18n="hero_subtitle">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
       <div class="hero-cta">
         <button class="btn hbtn-1" data-i18n="hero_browse" onclick="go('shop','all')">تصفح المنتجات</button>
         <button class="btn hbtn-2" data-i18n="hero_offers" onclick="go('shop','__offers')">اكتشف العروض</button>
@@ -1289,7 +1289,7 @@ footer ul button:hover{color:var(--text-on-dark)}
         <button class="carr prev hidden" onclick="scrollCats(-1)" data-i18n-aria="cat_prev" aria-label="السابق">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>
         </button>
-        <div class="category-carousel" id="catGrid" role="tablist" aria-label="التصنيفات"></div>
+        <div class="category-carousel" id="catGrid" role="tablist" data-i18n-aria="categories_aria" aria-label="التصنيفات"></div>
         <button class="carr next hidden" onclick="scrollCats(1)" data-i18n-aria="cat_next" aria-label="التالي">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
@@ -1803,6 +1803,12 @@ const I18N = {
 
   hero_browse:   { ar:"تصفح المنتجات",        fr:"Parcourir les produits",   en:"Browse Products" },
   hero_offers:   { ar:"اكتشف العروض",         fr:"Découvrir les offres",     en:"Discover Deals" },
+  hero_badge:       { ar:"متجر رقمي جزائري", fr:"Boutique numérique algérienne", en:"Algerian Digital Store" },
+  hero_title_line1: { ar:"كل أدواتك الرقمية،", fr:"Tous vos outils numériques,", en:"All your digital tools," },
+  hero_title_line2: { ar:"في مكان واحد.",     fr:"en un seul endroit.",           en:"in one place." },
+  hero_subtitle:    { ar:"اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.",
+                      fr:"Des abonnements et produits numériques fiables, à des prix adaptés au marché algérien et une activation rapide.",
+                      en:"Trusted subscriptions and digital products, at prices fit for the Algerian market, with fast activation." },
   bundles_cta:   { ar:"اكتشف الباقات",        fr:"Découvrir les packs",      en:"Discover Bundles" },
 
   view_details:  { ar:"عرض التفاصيل",         fr:"Voir les détails",         en:"View Details" },
