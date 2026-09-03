@@ -813,8 +813,8 @@ header.stuck .hbar{height:54px}
 
 /* ============ TRUST ============ */
 .trust{background:var(--dark-surface-2)}
-.trustgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s6) var(--s4)}
-@media(min-width:820px){.trustgrid{grid-template-columns:repeat(4,1fr);gap:var(--s8)}}
+.trustgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s6) var(--s4)}
+@media(min-width:820px){.trustgrid{grid-template-columns:repeat(3,1fr);gap:var(--s8)}}
 .trow{display:flex;flex-direction:column;gap:9px}
 .trow i{width:38px;height:38px;border-radius:11px;background:var(--accent-soft);color:var(--accent-ink);
   display:grid;place-items:center}
@@ -1355,8 +1355,7 @@ footer ul button:hover{color:var(--text-on-dark)}
     <div class="wrap">
       <div class="sechead rv"><div><h2 data-i18n="trust_h">الأمان يهمنا بقدر ما يهمك</h2><p data-i18n="trust_sub">لا نطلب أكثر مما تحتاجه الخدمة فعلاً</p></div></div>
       <div class="trustgrid rv">
-        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></i><b data-i18n="trust1_t">كلمة مرور عند الحاجة فقط</b><p data-i18n="trust1_p">لا نطلبها إلا إذا كان المنتج نفسه يتطلب ذلك فعلاً، ونوضح هذا بصراحة قبل الطلب.</p></div>
-        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6" stroke-linecap="round"/></svg></i><b data-i18n="trust2_t">ضمان محدد لكل منتج</b><p data-i18n="trust2_p">مدة الضمان موضحة في صفحة كل منتج قبل الشراء.</p></div>
+        <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6" stroke-linecap="round"/></svg></i><b data-i18n="trust2_t">ضمان محدد لكل منتج</b><p data-i18n="trust2_p">مدة الضمان موضحة في صفحة كل منتج قبل الشراء، ونوفر وثيقة ضمان لكل عملية شراء.</p></div>
         <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></i><b data-i18n="trust3_t">مراجعة يدوية للدفع</b><p data-i18n="trust3_p">كل عملية دفع تُراجع يدوياً قبل بدء التفعيل.</p></div>
         <div class="trow"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5" stroke-linejoin="round"/></svg></i><b data-i18n="trust4_t">متابعة حتى الاكتمال</b><p data-i18n="trust4_p">نبقى معك حتى يكتمل تفعيل طلبك بالكامل.</p></div>
       </div>
@@ -1857,10 +1856,8 @@ const I18N = {
 
   trust_h:   { ar:"الأمان يهمنا بقدر ما يهمك", fr:"La sécurité nous importe autant qu'à vous", en:"Security matters to us as much as it does to you" },
   trust_sub: { ar:"لا نطلب أكثر مما تحتاجه الخدمة فعلاً", fr:"Nous ne demandons que ce que le service exige réellement", en:"We never ask for more than the service actually needs" },
-  trust1_t: { ar:"كلمة مرور عند الحاجة فقط", fr:"Mot de passe seulement si nécessaire", en:"Password only when needed" },
-  trust1_p: { ar:"لا نطلبها إلا إذا كان المنتج نفسه يتطلب ذلك فعلاً، ونوضح هذا بصراحة قبل الطلب.", fr:"Nous ne le demandons que si le produit lui-même l'exige réellement, et nous le précisons clairement avant la commande.", en:"We only ask for it if the product itself genuinely requires it, and we say so plainly before you order." },
   trust2_t: { ar:"ضمان محدد لكل منتج", fr:"Une garantie précise pour chaque produit", en:"A clear warranty for every product" },
-  trust2_p: { ar:"مدة الضمان موضحة في صفحة كل منتج قبل الشراء.", fr:"La durée de la garantie est indiquée sur la page de chaque produit avant l'achat.", en:"The warranty period is shown on every product's page before you buy." },
+  trust2_p: { ar:"مدة الضمان موضحة في صفحة كل منتج قبل الشراء، ونوفر وثيقة ضمان لكل عملية شراء.", fr:"La durée de la garantie est indiquée sur la page de chaque produit avant l'achat, et nous fournissons un document de garantie pour chaque achat.", en:"The warranty period is shown on every product's page before you buy, and we provide a warranty document for every purchase." },
   trust3_t: { ar:"مراجعة يدوية للدفع", fr:"Vérification manuelle du paiement", en:"Manual payment review" },
   trust3_p: { ar:"كل عملية دفع تُراجع يدوياً قبل بدء التفعيل.", fr:"Chaque paiement est vérifié manuellement avant le début de l'activation.", en:"Every payment is manually reviewed before activation begins." },
   trust4_t: { ar:"متابعة حتى الاكتمال", fr:"Suivi jusqu'à l'achèvement", en:"Follow-up until it's done" },
