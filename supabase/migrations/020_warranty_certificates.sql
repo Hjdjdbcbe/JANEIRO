@@ -159,9 +159,15 @@ grant execute on function admin_update_order_status(uuid,order_status,text) to a
 -- 56-bit random token that is itself the credential — knowing it is
 -- exactly the "hand the link to this one customer" bar the store
 -- needs, the same trust model as any invoice/receipt link.
+-- Not `stable`: PostgREST runs a function it believes is read-only
+-- inside a READ ONLY transaction, and this one calls check_rate_limit(),
+-- which writes to rate_limits (deletes stale rows, inserts the new hit)
+-- -- exactly what broke it: "cannot execute DELETE in a read-only
+-- transaction". track_order() has the same rate-limit call and was
+-- never marked stable either, for the same reason.
 create or replace function get_certificate(p_code text)
 returns jsonb
-language plpgsql stable security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $$
 declare
   v_cert   warranty_certificates%rowtype;
   v_item   order_items%rowtype;

@@ -31,13 +31,49 @@ async function asAnon(sql, params = []) {
 }
 const asService = (sql, params = []) => pool.query(sql, params).then(r => r.rows);
 
-/* Runs as the `authenticated` role with request.jwt.claims set from the
-   bearer token, which is what makes auth.uid() and therefore is_admin()
-   work exactly as they do in production. Falls back to anon. */
-async function asUser(sql, params = [], uid = null) {
+/* PostgREST decides read-only vs read-write for an RPC call from the
+   target function's own declared volatility (pg_proc.provolatile),
+   not from which role/key is calling it -- a STABLE or IMMUTABLE
+   function gets a READ ONLY transaction even when it is called with
+   the service-role key. A function marked stable that turns out to
+   write anywhere in its call chain (directly, or through something
+   like check_rate_limit()) fails there in production with "cannot
+   execute ... in a read-only transaction" -- exactly the shape of bug
+   a plain asService() call can never catch, since it just runs the
+   SQL in an ordinary read-write session regardless of what the
+   function says about itself. Used for every mock RPC call that
+   stands in for a real .rpc() call in js/janeiro-api.js or an Edge
+   Function, so a wrongly-declared function fails locally the same
+   way it fails on Supabase. */
+async function asServiceRpc(fnName, sql, params = []) {
+  const vol = await pool.query("select provolatile from pg_proc where proname = $1", [fnName]);
+  const readOnly = vol.rows[0] && (vol.rows[0].provolatile === "s" || vol.rows[0].provolatile === "i");
   const c = await pool.connect();
   try {
-    await c.query("begin");
+    await c.query("begin" + (readOnly ? " read only" : ""));
+    const r = await c.query(sql, params);
+    await c.query("commit");
+    return r.rows;
+  } catch (e) { await c.query("rollback"); throw e; }
+  finally { c.release(); }
+}
+
+/* Runs as the `authenticated` role with request.jwt.claims set from the
+   bearer token, which is what makes auth.uid() and therefore is_admin()
+   work exactly as they do in production. Falls back to anon.
+
+   fnName, when given, is the RPC function this call stands in for --
+   its declared volatility (see asServiceRpc's comment above) decides
+   whether PostgREST would have opened a read-only transaction here.
+   Omitted for the plain table reads elsewhere in this file, which
+   were never RPC calls to begin with. */
+async function asUser(sql, params = [], uid = null, fnName = null) {
+  const readOnly = fnName && await pool.query(
+    "select provolatile from pg_proc where proname = $1", [fnName]
+  ).then(r => r.rows[0] && (r.rows[0].provolatile === "s" || r.rows[0].provolatile === "i"));
+  const c = await pool.connect();
+  try {
+    await c.query("begin" + (readOnly ? " read only" : ""));
     if (uid) {
       await c.query("select set_config('request.jwt.claims', $1, true)",
         [JSON.stringify({ sub: uid, role: "authenticated" })]);
@@ -174,43 +210,43 @@ async function adminRpc(name, req, res) {
   const body = JSON.parse((await readBody(req)).toString() || "{}");
   try {
     if (name === "admin_order_counts") {
-      const rows = await asUser("select admin_order_counts() as r", [], uid);
+      const rows = await asUser("select admin_order_counts() as r", [], uid, "admin_order_counts");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_dashboard_stats") {
-      const rows = await asUser("select admin_dashboard_stats() as r", [], uid);
+      const rows = await asUser("select admin_dashboard_stats() as r", [], uid, "admin_dashboard_stats");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_list_products") {
-      const rows = await asUser("select admin_list_products() as r", [], uid);
+      const rows = await asUser("select admin_list_products() as r", [], uid, "admin_list_products");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_upsert_product") {
       const rows = await asUser("select admin_upsert_product($1::jsonb) as r",
-                                [JSON.stringify(body.p_payload)], uid);
+                                [JSON.stringify(body.p_payload)], uid, "admin_upsert_product");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_list_bundles") {
-      const rows = await asUser("select admin_list_bundles() as r", [], uid);
+      const rows = await asUser("select admin_list_bundles() as r", [], uid, "admin_list_bundles");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_upsert_bundle") {
       const rows = await asUser("select admin_upsert_bundle($1::jsonb) as r",
-                                [JSON.stringify(body.p_payload)], uid);
+                                [JSON.stringify(body.p_payload)], uid, "admin_upsert_bundle");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_delete_bundle") {
-      const rows = await asUser("select admin_delete_bundle($1::uuid) as r", [body.p_id], uid);
+      const rows = await asUser("select admin_delete_bundle($1::uuid) as r", [body.p_id], uid, "admin_delete_bundle");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_archive_product") {
-      const rows = await asUser("select admin_archive_product($1) as r", [body.p_slug], uid);
+      const rows = await asUser("select admin_archive_product($1) as r", [body.p_slug], uid, "admin_archive_product");
       return send(res, 200, rows[0].r);
     }
     if (name === "admin_update_order_status") {
       const rows = await asUser(
         "select admin_update_order_status($1::uuid, $2::order_status, $3) as r",
-        [body.p_order_id, body.p_new_status, body.p_note ?? null], uid);
+        [body.p_order_id, body.p_new_status, body.p_note ?? null], uid, "admin_update_order_status");
       return send(res, 200, rows[0].r);
     }
     return send(res, 404, { message: `no rpc ${name}` });
@@ -272,7 +308,7 @@ async function fn(name, req, res) {
         bundle_id: i.bundle_id ? String(i.bundle_id) : null,
         activation: Array.isArray(i.activation) ? i.activation : [],
       }));
-      const rows = await asService(
+      const rows = await asServiceRpc("create_order",
         "select create_order($1,$2,$3,$4::uuid,$5::jsonb,$6,$7,$8) as r",
         [b.name ?? "", b.phone ?? "", b.wilaya ?? null, b.payment_method_id,
          JSON.stringify(items), b.idempotency_key, "203.0.113.5", b.note ?? null]);
@@ -296,14 +332,14 @@ async function fn(name, req, res) {
     }
     if (name === "submit-order") {
       const b = JSON.parse(raw.toString());
-      const rows = await asService("select submit_order($1::uuid,$2) as r", [b.order_id, b.payment_reference ?? null]);
+      const rows = await asServiceRpc("submit_order", "select submit_order($1::uuid,$2) as r", [b.order_id, b.payment_reference ?? null]);
       const wa = await asService("select value from store_settings where key='whatsapp_number'");
       return send(res, 200, { ok: true, order: rows[0].r, whatsapp_number: wa[0]?.value ?? "" });
     }
     if (name === "track-order") {
       const b = JSON.parse(raw.toString());
       try {
-        const rows = await asService("select track_order($1,$2) as r", [b.order_number ?? "", b.phone ?? ""]);
+        const rows = await asServiceRpc("track_order", "select track_order($1,$2) as r", [b.order_number ?? "", b.phone ?? ""]);
         return send(res, 200, { ok: true, order: rows[0].r });
       } catch (e) {
         const m = mapErr(e);
@@ -315,7 +351,7 @@ async function fn(name, req, res) {
     if (name === "get-certificate") {
       const b = JSON.parse(raw.toString());
       try {
-        const rows = await asService("select get_certificate($1) as r", [b.code ?? ""]);
+        const rows = await asServiceRpc("get_certificate", "select get_certificate($1) as r", [b.code ?? ""]);
         return send(res, 200, { ok: true, certificate: rows[0].r });
       } catch (e) {
         const m = mapErr(e);
