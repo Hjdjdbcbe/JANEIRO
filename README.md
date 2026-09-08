@@ -660,6 +660,15 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 | `bot_cards` | الأكواد: `available` / `reserved` / `sold` |
 | `bot_issues` | سجل كل طلب ونتيجته — ومنه يُحسب عدّاد كل بائع |
 
+**من الهاتف بلا حاسوب:** ممكن بالكامل — متصفّح وتليجرام فقط.
+لصقتان (`docs/bot-setup.sql` في SQL Editor، والدالة في محرّر Edge
+Functions) ورابط واحد في شريط العنوان لربط الـwebhook.
+الخطوات بالتفصيل في `docs/telegram-bot.md` §5-ب.
+
+للبوت وحده دون بقية المتجر: **`docs/bot-setup.sql`** (36 ك.ب) بدل
+`docs/full-setup.sql` (228 ك.ب). يُولَّد بـ`bash tools/build-bot-sql.sh`،
+وآمن لصقه فوق مشروع فيه المتجر أصلاً.
+
 الهجرة: `supabase/migrations/021_gift_card_bot.sql`.
 الاختبارات: `tests/bot.test.sql` + `tests/local/bot-concurrency.test.sh`
 + `tests/local/bot-e2e.test.js` (تشغّل الدالة نفسها على Deno).

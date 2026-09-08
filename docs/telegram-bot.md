@@ -173,6 +173,95 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 
 ---
 
+## 5-ب. التركيب من الهاتف — بلا حاسوب إطلاقاً
+
+ممكن بالكامل. كل ما تحتاجه: **متصفّح + تليجرام**. لا سطر أوامر ولا
+`supabase` CLI ولا حتى ملف تنزّله.
+
+> افتح المتصفّح في **وضع خاص/تصفّح متخفٍّ**. ستضع التوكن والسرّ في
+> رابط، والروابط تُحفظ في سجلّ التصفّح.
+
+**١. البوت والرقم** (تليجرام)
+
+* **@BotFather** ← `/newbot` ← انسخ التوكن.
+* **@userinfobot** ← انسخ رقمك.
+
+**٢. اخترع السرّ**
+
+أي نص عشوائي طويل (30 حرفاً فأكثر، حروف لاتينية وأرقام فقط، بلا
+مسافات). اكتبه في **مفكّرة هاتفك** — ستلصقه مرتين ثم لن تحتاجه أبداً.
+
+**٣. مشروع Supabase**
+
+`supabase.com` ← Sign up ← New project. من رابط المشروع خذ الـ`ref`:
+`supabase.com/dashboard/project/`**`xxxxxxxx`** ← هذا هو الـ`ref`.
+
+**٤. القاعدة** — لصقة واحدة
+
+افتح **`docs/bot-setup.sql`** في GitHub من هاتفك، واضغط زر **نسخ
+الملف الخام** (أيقونة النسخ فوق الملف). ثم في Supabase:
+**SQL Editor ← New query ← الصق ← Run**.
+
+هذا الملف ~36 كيلوبايت ويكفي للبوت وحده. (`docs/full-setup.sql` هو
+المتجر كاملاً، 228 كيلوبايت — لا تحتاجه إن أردت البوت فقط، وإن
+كنت نشرت المتجر أصلاً فلصق هذا فوقه آمن ولا يمسّ شيئاً قائماً.)
+
+**٥. الدالة** — لصقة ثانية
+
+في Supabase: **Edge Functions ← Deploy a new function**، الاسم
+`telegram-bot` بالضبط. الصق محتوى
+**`supabase/functions/telegram-bot/index.ts`** (نفس زر النسخ الخام في
+GitHub)، وقبل النشر **أطفئ خيار Verify JWT**.
+
+> إن لم تجد محرّراً في لوحتك، فهذه الخطوة وحدها تحتاج حاسوباً أو
+> ربط المستودع بـGitHub Integration. الباقي كله يعمل من الهاتف.
+
+**٦. الأسرار**
+
+في Supabase: **Edge Functions ← Secrets** (أو Project Settings ←
+Edge Functions)، أضف ثلاثة:
+
+| الاسم | القيمة |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | توكن BotFather |
+| `TELEGRAM_OWNER_ID` | رقمك من @userinfobot |
+| `TELEGRAM_WEBHOOK_SECRET` | السرّ من خطوة ٢ |
+
+**٧. اربط الـwebhook — من شريط العنوان**
+
+تليجرام يقبل هذه الأوامر عبر رابط عادي، فلا حاجة لـ`curl`. عدّل
+القيمتين والصق الرابط في المتصفّح:
+
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<REF>.supabase.co/functions/v1/telegram-bot&secret_token=<السرّ>
+```
+
+الردّ الصحيح:
+
+```json
+{"ok":true,"result":true,"description":"Webhook was set"}
+```
+
+(لا حاجة لـ`allowed_updates` هنا: `message` و`callback_query` من
+الأنواع الافتراضية التي يرسلها تليجرام أصلاً.)
+
+للفحص لاحقاً — نفس الطريقة:
+
+```
+https://api.telegram.org/bot<TOKEN>/getWebhookInfo
+```
+
+يجب أن يظهر رابطك بلا `last_error_message`.
+
+**٨. افتح البوت وأرسل `/start`**
+
+تُفتح لك قائمة المالك. اشحن أكوادك وأضف بائعيك من داخل البوت — §3.
+
+**بعدها لا حاجة للحاسوب أبداً**: الشحن، إضافة المنتجات والمدد،
+إضافة البائعين وتعطيلهم، والتقارير — كلها من داخل البوت في هاتفك.
+
+---
+
 ## 6. الأمان
 
 **من ليس في جدول `bot_admins` لا يرى شيئاً.** أي شخص يفتح البوت
