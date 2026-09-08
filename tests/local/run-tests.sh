@@ -5,8 +5,9 @@
 #
 #   bash tests/local/run-tests.sh
 #
-# Steps: shim -> 7 migrations -> migrations again (re-run check)
+# Steps: shim -> migrations -> migrations again (re-run check)
 #        -> backend.test.sql -> concurrency.test.sh
+#        -> bot.test.sql -> bot-concurrency.test.sh -> bot-e2e.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
 # role matching $PGUSER (default: the current OS user).
@@ -64,6 +65,23 @@ set +o pipefail
 
 bold "==> concurrency.test.sh"
 bash "$HERE/concurrency.test.sh" "$DB"
+
+bold "==> bot.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/bot.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: bot.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> bot-concurrency.test.sh"
+bash "$HERE/bot-concurrency.test.sh" "$DB"
+
+# البوت دالة Deno، فاختباره الكامل يحتاج deno مثبّتاً. بدونه
+# يتخطّى نفسه برسالة واضحة بدل أن يفشل التشغيل كله.
+bold "==> bot-e2e.test.js"
+node "$HERE/bot-e2e.test.js" "$DB"
 
 echo
 green "ALL LOCAL TESTS PASSED"

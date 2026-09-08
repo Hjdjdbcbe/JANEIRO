@@ -212,6 +212,11 @@ janeiro-backend/
 | رفع الوصل | `POST /functions/v1/upload-receipt` |
 | تأكيد الطلب + Telegram | `POST /functions/v1/submit-order` |
 | تتبع الطلب | `POST /functions/v1/track-order` |
+| بوت المخزون على تليجرام | `POST /functions/v1/telegram-bot` |
+
+> `telegram-bot` وحدها تُنشر بـ `--no-verify-jwt`: تليجرام لا يرسل
+> مفتاح Supabase. ما يحرسها ترويسة سرّية، وبدونها ترفض كل شيء.
+> التفاصيل في §17 و`docs/telegram-bot.md`.
 
 ---
 
@@ -619,4 +624,42 @@ select from_status, to_status from order_status_transitions order by 1;
 - ✅ `SERVICE_ROLE_KEY` غير موجود في أي ملف فرونت إند
 - ✅ `TELEGRAM_BOT_TOKEN` في Supabase Secrets فقط
 - ✅ `.env` الحقيقي **لا يُرفع لـgit** — `.env` مضاف إلى `.gitignore` بالفعل
+- ✅ جداول البوت (`bot_*`) عليها RLS بلا policy، ولا صلاحية لـ`anon` عليها ولا على دوالها
 - ⚠️ قبل الإطلاق: غيّر `ALLOWED_ORIGIN` من `*` إلى نطاقك، وإلا أي موقع يستطيع استدعاء دوالك
+- ⚠️ `TELEGRAM_WEBHOOK_SECRET` ليس اختيارياً: بوت المخزون منشور بلا تحقق من JWT، وهذا السر وحده ما يمنع تحديثاً مزوّراً من تفريغ المخزون
+
+---
+
+## 17. بوت المخزون على تليجرام
+
+بوت للأدمن، لا يراه زبون. البائع يطلب بطاقة → تُحجز ويُعرض كودها →
+**تأكيد** فتصبح مباعة وتُحسب له، أو **إلغاء** فترجع للمخزون فوراً.
+والمنتجات تُزاد من داخل البوت بلا هجرة.
+
+الدليل الكامل — التركيب، الأوامر، الأمان، الأسئلة المتكرّرة —
+في **[`docs/telegram-bot.md`](docs/telegram-bot.md)**. مختصره:
+
+```bash
+supabase secrets set TELEGRAM_BOT_TOKEN=...
+supabase secrets set TELEGRAM_OWNER_ID=<رقمك في تليجرام>
+supabase secrets set TELEGRAM_WEBHOOK_SECRET="$(openssl rand -hex 32)"
+supabase functions deploy telegram-bot --no-verify-jwt
+curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://<REF>.supabase.co/functions/v1/telegram-bot",
+       "secret_token":"<نفس السر>",
+       "allowed_updates":["message","callback_query"]}'
+```
+
+ثم `/start` في البوت.
+
+| الجدول | ما فيه |
+|---|---|
+| `bot_admins` | من يدخل، ودوره (`owner` / `admin`) |
+| `bot_products` / `bot_variants` | المنتجات ومددها — تُزاد من البوت |
+| `bot_cards` | الأكواد: `available` / `reserved` / `sold` |
+| `bot_issues` | سجل كل طلب ونتيجته — ومنه يُحسب عدّاد كل بائع |
+
+الهجرة: `supabase/migrations/021_gift_card_bot.sql`.
+الاختبارات: `tests/bot.test.sql` + `tests/local/bot-concurrency.test.sh`
++ `tests/local/bot-e2e.test.js` (تشغّل الدالة نفسها على Deno).

@@ -6,7 +6,7 @@
 #
 #     bash tools/build-functions.sh
 #
-# الناتج: dist-functions/<اسم الدالة>.ts — أربعة ملفات.
+# الناتج: dist-functions/<اسم الدالة>.ts — ملف لكل دالة.
 #
 # لماذا ملف واحد لكل دالة: الدوال الأربع تستورد من
 # supabase/functions/_shared/util.ts، ومحرّر اللوحة يقبل كودك
@@ -22,6 +22,12 @@ OUT=dist-functions
 rm -rf "$OUT"; mkdir -p "$OUT"
 
 SHARED=supabase/functions/_shared/util.ts
+
+# telegram-bot لا يستورد util.ts أصلاً — فهو قائم بذاته كما هو.
+# دمج util.ts فيه كان سيكرّر استيراد supabase-js من نفس الوحدة،
+# وهو تصادم أسماء يرفضه Deno.
+cp supabase/functions/telegram-bot/index.ts "$OUT/telegram-bot.ts"
+echo "  telegram-bot.ts  ($(wc -l < "$OUT/telegram-bot.ts") سطراً)"
 
 for fn in create-order upload-receipt submit-order track-order translate-content get-certificate; do
   src="supabase/functions/$fn/index.ts"
@@ -48,4 +54,5 @@ done
 
 echo
 echo "تُلصق كل واحدة في: Supabase Dashboard → Edge Functions → Deploy a new function"
-echo "اسم الدالة يجب أن يطابق اسم الملف بالضبط (بلا .ts): create-order, upload-receipt, submit-order, track-order, translate-content, get-certificate"
+echo "اسم الدالة يجب أن يطابق اسم الملف بالضبط (بلا .ts): create-order, upload-receipt, submit-order, track-order, translate-content, get-certificate, telegram-bot"
+echo "و telegram-bot وحدها تُنشر بـ Verify JWT = مطفأ (تليجرام لا يرسل مفتاح Supabase)."
