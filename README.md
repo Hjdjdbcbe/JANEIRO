@@ -660,6 +660,10 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 | `bot_cards` | الأكواد: `available` / `reserved` / `sold` |
 | `bot_issues` | سجل كل طلب ونتيجته — ومنه يُحسب عدّاد كل بائع |
 
+**لم يردّ البوت بعد النشر؟** `bash tools/check-bot.sh` — يفحص
+التوكن والدالة والـwebhook والسرّ ويقول أين الخلل بالضبط، ويمرّر
+رسالة حقيقية في المسار كاملاً للتأكّد.
+
 **من الهاتف بلا حاسوب:** ممكن بالكامل — متصفّح وتليجرام فقط.
 لصقتان (`docs/bot-setup.sql` في SQL Editor، والدالة في محرّر Edge
 Functions) ورابط واحد في شريط العنوان لربط الـwebhook.
