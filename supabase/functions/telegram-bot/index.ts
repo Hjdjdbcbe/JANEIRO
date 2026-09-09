@@ -37,7 +37,14 @@ function db(): SupabaseClient {
 // ------------------------------------------------------------
 // Telegram helpers
 // ------------------------------------------------------------
-type Button = { text: string; callback_data: string };
+// copy_text زر نسخ أصلي في تليجرام (Bot API 7.11+): ينسخ النص
+// إلى الحافظة بضغطة، بلا تحديد يدوي. الكود يبقى كذلك داخل
+// <code> فوقه، فالنقر عليه ينسخ أيضاً على العملاء الأقدم.
+type Button = {
+  text: string;
+  callback_data?: string;
+  copy_text?: { text: string };
+};
 
 async function tg(method: string, body: unknown): Promise<Record<string, unknown> | null> {
   try {
@@ -184,34 +191,51 @@ function stockText(catalog: Product[]): string {
   return out.join("\n").trim();
 }
 
+type BreakItem = {
+  product: string; variant: string; confirmed: number; cancelled: number;
+};
 type Stat = {
   telegram_id: number; name: string; role: string; is_active: boolean;
   confirmed: number; cancelled: number; pending: number; today: number; this_month: number;
+  items: BreakItem[];
 };
 
-function statsText(rows: Stat[], all: boolean): string {
+/** «• نتفليكس — سنة: 8» — سطر لكل مدة بيعت فعلاً. */
+function itemLines(items: BreakItem[], pad = "   "): string[] {
+  return (items ?? []).map((it) =>
+    `${pad}• ${esc(it.product)} — ${esc(it.variant)}: <b>${it.confirmed}</b>` +
+    (it.cancelled ? ` <i>(ملغاة ${it.cancelled})</i>` : ""));
+}
+
+function statsText(rows: Stat[], all: boolean, title?: string): string {
   if (!rows.length) return "لا مبيعات بعد.";
+
   if (!all) {
     const s = rows[0];
-    return [
-      "📊 <b>مبيعاتك</b>", "",
+    const out = [
+      title ?? "📊 <b>مبيعاتك</b>", "",
       `✅ عمليات ناجحة: <b>${s.confirmed}</b>`,
       `📅 اليوم: <b>${s.today}</b>`,
       `🗓 هذا الشهر: <b>${s.this_month}</b>`,
       `❌ ملغاة: ${s.cancelled}`,
       `⏳ معلّقة الآن: ${s.pending}`,
-    ].join("\n");
+    ];
+    if (s.items?.length) out.push("", "<b>ماذا بعت بالضبط:</b>", ...itemLines(s.items, ""));
+    return out.join("\n");
   }
+
   const out = ["🏆 <b>مبيعات كل الأدمن</b>", ""];
   rows.forEach((s, i) => {
     const medal = ["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`;
     out.push(`${medal} <b>${esc(s.name)}</b>${s.is_active ? "" : " (معطّل)"}`);
-    out.push(`     ✅ ${s.confirmed} · اليوم ${s.today} · الشهر ${s.this_month}` +
+    out.push(`   ✅ ${s.confirmed} · اليوم ${s.today} · الشهر ${s.this_month}` +
              ` · ❌ ${s.cancelled} · ⏳ ${s.pending}`);
+    out.push(...itemLines(s.items));
+    out.push("");
   });
   const total = rows.reduce((n, s) => n + s.confirmed, 0);
-  out.push("", `الإجمالي: <b>${total}</b> عملية ناجحة`);
-  return out.join("\n");
+  out.push(`الإجمالي: <b>${total}</b> عملية ناجحة`);
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
 type Pending = {
@@ -248,10 +272,11 @@ function issueText(d: {
   ].join("\n");
 }
 
-const issueButtons = (id: string): Button[][] => [[
-  { text: "✅ تأكيد", callback_data: `ok:${id}` },
-  { text: "❌ إلغاء", callback_data: `no:${id}` },
-]];
+const issueButtons = (id: string, code: string): Button[][] => [
+  [{ text: "📋 نسخ الكود", copy_text: { text: code } }],
+  [{ text: "✅ تأكيد", callback_data: `ok:${id}` },
+   { text: "❌ إلغاء", callback_data: `no:${id}` }],
+];
 
 const HELP = [
   "<b>الأوامر</b>", "",
@@ -375,13 +400,15 @@ async function handleCommand(
     }
 
     case "/stats": {
-      const r = await rpc<Stat[]>(client, "bot_stats", { p_telegram_id: tgId, p_scope: "me" });
+      const r = await rpc<Stat[]>(client, "bot_breakdown",
+        { p_telegram_id: tgId, p_scope: "me", p_target: null });
       await send(chat, r.error ?? statsText(r.data!, false), [backRow]);
       return;
     }
 
     case "/allstats": {
-      const r = await rpc<Stat[]>(client, "bot_stats", { p_telegram_id: tgId, p_scope: "all" });
+      const r = await rpc<Stat[]>(client, "bot_breakdown",
+        { p_telegram_id: tgId, p_scope: "all", p_target: null });
       await send(chat, r.error ?? statsText(r.data!, true), [backRow]);
       return;
     }
@@ -555,8 +582,8 @@ async function handleCallback(
       case "stats":
       case "all": {
         const all = arg === "all";
-        const r = await rpc<Stat[]>(client, "bot_stats",
-          { p_telegram_id: tgId, p_scope: all ? "all" : "me" });
+        const r = await rpc<Stat[]>(client, "bot_breakdown",
+          { p_telegram_id: tgId, p_scope: all ? "all" : "me", p_target: null });
         if (r.error) { await answer(cbId, r.error, true); return; }
         await answer(cbId);
         await edit(chat, msg, statsText(r.data!, all), [backRow]);
@@ -577,15 +604,35 @@ async function handleCallback(
           client, "bot_list_admins", { p_telegram_id: tgId });
         if (r.error) { await answer(cbId, r.error, true); return; }
         await answer(cbId);
+        // كل أدمن زر: الضغط عليه يفتح ماذا باع بالضبط وكم من كل مدة
+        const rows: Button[][] = r.data!.map((a) => [{
+          text: `${a.role === "owner" ? "👑" : "👤"} ${a.name} — ✅ ${a.confirmed}`,
+          callback_data: `adm:${a.telegram_id}`,
+        }]);
         await edit(chat, msg, ["👥 <b>الأدمن</b>", "", ...r.data!.map((a) =>
           `${a.role === "owner" ? "👑" : "•"} <b>${esc(a.name)}</b> — <code>${a.telegram_id}</code>` +
           `${a.is_active ? "" : " (معطّل)"} · ✅ ${a.confirmed}`),
-          "", "لإضافة أدمن: <code>/addadmin رقمه الاسم</code>",
-          "لتعطيله: <code>/deladmin رقمه</code>"].join("\n"), [backRow]);
+          "", "اضغط على أحدهم لترى ماذا باع بالتفصيل.",
+          "لإضافة أدمن: <code>/addadmin رقمه الاسم</code>",
+          "لتعطيله: <code>/deladmin رقمه</code>"].join("\n"), [...rows, backRow]);
         return;
       }
     }
     await answer(cbId);
+    return;
+  }
+
+  // ---------- تفصيل مبيعات أدمن بعينه (للمالك) ----------
+  if (verb === "adm") {
+    const r = await rpc<Stat[]>(client, "bot_breakdown",
+      { p_telegram_id: tgId, p_scope: "me", p_target: Number(arg) });
+    if (r.error) { await answer(cbId, r.error, true); return; }
+    await answer(cbId);
+    const who = r.data![0];
+    await edit(chat, msg,
+      who ? statsText(r.data!, false, `📊 <b>مبيعات ${esc(who.name)}</b>`)
+          : "لا مبيعات لهذا الأدمن بعد.",
+      [[{ text: "⬅️ الأدمن", callback_data: "m:admins" }], backRow]);
     return;
   }
 
@@ -629,37 +676,55 @@ async function handleCallback(
     if (r.error) { await answer(cbId, r.error, true); return; }
     await answer(cbId, "تم حجز بطاقة");
     // رسالة جديدة لا تعديل: تبقى القائمة في مكانها ليبيع مرة أخرى.
-    await send(chat, issueText(r.data!), issueButtons(r.data!.issue_id));
+    await send(chat, issueText(r.data!), issueButtons(r.data!.issue_id, r.data!.card_code));
     return;
   }
 
   // ---------- تأكيد ----------
   if (verb === "ok") {
-    const r = await rpc<{ card_code: string; seller_sales: number; remaining: number }>(
-      client, "bot_confirm_issue", { p_telegram_id: tgId, p_issue_id: arg });
+    const r = await rpc<{
+      card_code: string; product_name: string; variant_name: string;
+      customer_ref: string | null; seller_sales: number;
+      seller_sales_of_variant: number; remaining: number;
+    }>(client, "bot_confirm_issue", { p_telegram_id: tgId, p_issue_id: arg });
     if (r.error) { await answer(cbId, r.error, true); return; }
-    await answer(cbId, "✅ تمّت");
+    const d = r.data!;
+    await answer(cbId, `✅ ${d.variant_name}`);
     await edit(chat, msg, [
       "✅ <b>عملية ناجحة</b>", "",
-      `<code>${esc(r.data!.card_code)}</code>`, "",
-      `مبيعاتك الآن: <b>${r.data!.seller_sales}</b>`,
-      `المتبقي في المخزون: ${r.data!.remaining}`,
-    ].join("\n"), [[{ text: "🛒 بيع أخرى", callback_data: "m:sell" }], backRow]);
+      // ماذا بيع، لا الكود وحده: البائع يغلق عشر عمليات في اليوم
+      // ولا يميّز بينها من كود مجرّد.
+      `🎟 <b>${esc(d.product_name)} — ${esc(d.variant_name)}</b>`,
+      `<code>${esc(d.card_code)}</code>`,
+      ...(d.customer_ref ? [`👤 ${esc(d.customer_ref)}`] : []),
+      "",
+      `بعت من «${esc(d.variant_name)}»: <b>${d.seller_sales_of_variant}</b>`,
+      `إجمالي مبيعاتك: <b>${d.seller_sales}</b>`,
+      `المتبقي في المخزون: ${d.remaining}`,
+    ].join("\n"), [
+      [{ text: "📋 نسخ الكود", copy_text: { text: d.card_code } }],
+      [{ text: "🛒 بيع أخرى", callback_data: "m:sell" }],
+      backRow,
+    ]);
     return;
   }
 
   // ---------- إلغاء ----------
   if (verb === "no") {
-    const r = await rpc<{ remaining: number }>(
-      client, "bot_cancel_issue", { p_telegram_id: tgId, p_issue_id: arg });
+    const r = await rpc<{
+      product_name: string; variant_name: string; remaining: number;
+    }>(client, "bot_cancel_issue", { p_telegram_id: tgId, p_issue_id: arg });
     if (r.error) { await answer(cbId, r.error, true); return; }
+    const d = r.data!;
     await answer(cbId, "❌ أُلغيت");
     // الكود يُمحى من الرسالة: البطاقة رجعت للمخزون وقد تُسلَّم
-    // لزبون آخر، فلا تبقى معروضة في محادثة قديمة.
+    // لزبون آخر، فلا تبقى معروضة في محادثة قديمة. واسم المدة يبقى
+    // ليعرف البائع أيّ عملية أُلغيت.
     await edit(chat, msg, [
       "❌ <b>عملية ملغاة</b>", "",
+      `🎟 ${esc(d.product_name)} — ${esc(d.variant_name)}`, "",
       "رجعت البطاقة إلى المخزون ولم تُحسب لك.",
-      `المتاح الآن: <b>${r.data!.remaining}</b>`,
+      `المتاح الآن: <b>${d.remaining}</b>`,
     ].join("\n"), [[{ text: "🛒 بيع أخرى", callback_data: "m:sell" }], backRow]);
     return;
   }

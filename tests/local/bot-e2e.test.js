@@ -297,9 +297,11 @@ async function run() {
   const card = last("sendMessage");
   assert(card.payload.text.includes("E2E-A"), "أول بطاقة في الطابور هي أول ما أُضيف");
   assert(card.payload.text.includes("المتبقي في المخزون: <b>3</b>"), "المتبقي 3 بعد الحجز");
-  const okBtn = card.payload.reply_markup.inline_keyboard[0][0];
-  const noBtn = card.payload.reply_markup.inline_keyboard[0][1];
-  assert(okBtn.text.includes("تأكيد") && noBtn.text.includes("إلغاء"), "زرّا التأكيد والإلغاء");
+  // بالنص لا بالموضع: صفّ زر النسخ يسبقهما الآن
+  const kb = (m) => (m.payload.reply_markup?.inline_keyboard ?? []).flat();
+  const okBtn = kb(card).find((b) => b.text.includes("تأكيد"));
+  const noBtn = kb(card).find((b) => b.text.includes("إلغاء"));
+  assert(!!okBtn && !!noBtn, "زرّا التأكيد والإلغاء");
   assert(sql(`select status from bot_cards where code='E2E-A'`) === "reserved",
          "البطاقة محجوزة لا مباعة");
 
@@ -320,22 +322,59 @@ async function run() {
   const card2 = last("sendMessage");
   assert(card2.payload.text.includes("E2E-A"), "نفس البطاقة تُطرح من جديد بعد الإلغاء");
   drain();
-  await update(tap(SELLER, card2.payload.reply_markup.inline_keyboard[0][0].callback_data));
+  const ok2 = kb(card2).find((b) => b.text.includes("تأكيد"));
+  await update(tap(SELLER, ok2.callback_data));
   const done = lastText("editMessageText");
   assert(done.includes("ناجحة"), "التأكيد يعلن نجاح العملية");
-  assert(done.includes("مبيعاتك الآن: <b>1</b>"), "ويعرض عدّاد البائع");
+  assert(done.includes("إجمالي مبيعاتك: <b>1</b>"), "ويعرض عدّاد البائع");
   assert(sql(`select status from bot_cards where code='E2E-A'`) === "sold", "والبطاقة صارت مباعة");
 
   // تأكيد ثانٍ لنفس الرسالة
   drain();
-  await update(tap(SELLER, card2.payload.reply_markup.inline_keyboard[0][0].callback_data));
+  await update(tap(SELLER, ok2.callback_data));
   assert(last("answerCallbackQuery").payload.text.includes("مغلقة"),
          "ضغطة ثانية على تأكيد تُردّ برسالة واضحة");
+
+  // ========== زر النسخ والتفصيل (022) ==========
+  // البطاقة الأخيرة أُكِّدت أعلاه؛ نطلب واحدة جديدة لنفحص أزرارها
+  drain();
+  await update(tap(SELLER, yearBtn.callback_data));
+  const withCopy = last("sendMessage").payload.reply_markup.inline_keyboard;
+  const copyBtn = withCopy.flat().find((b) => b.copy_text);
+  assert(!!copyBtn, "رسالة البطاقة فيها زر نسخ");
+  assert(copyBtn.copy_text.text === "E2E-B",
+         "وزر النسخ يحمل الكود نفسه، وجد: " + JSON.stringify(copyBtn.copy_text));
+  assert(!copyBtn.callback_data, "زر النسخ ينسخ ولا يرسل شيئاً للبوت");
+
+  drain();
+  await update(tap(SELLER, withCopy.flat().find((b) => b.text.includes("تأكيد")).callback_data));
+  const conf = lastText("editMessageText");
+  assert(conf.includes("منتج الاختبار") && conf.includes("سنة"),
+         "رسالة التأكيد تقول أي اشتراك بيع");
+  assert(conf.includes("بعت من «سنة»: <b>2</b>"),
+         "وتقول كم باع من هذه المدة تحديداً");
+  assert(conf.includes("إجمالي مبيعاتك: <b>2</b>"), "وإجماليه");
+  assert(!!buttons("editMessageText").find((b) => b.copy_text),
+         "وزر النسخ يبقى بعد التأكيد");
+
+  // الإلغاء يسمّي المدة كذلك
+  drain();
+  await update(tap(SELLER, yearBtn.callback_data));
+  const c3 = last("sendMessage").payload.reply_markup.inline_keyboard.flat();
+  drain();
+  await update(tap(SELLER, c3.find((b) => b.text.includes("إلغاء")).callback_data));
+  const canc = lastText("editMessageText");
+  assert(canc.includes("سنة"), "رسالة الإلغاء تقول أي اشتراك رجع");
+  assert(!canc.includes("E2E-"), "ومع ذلك تمحو الكود");
 
   // ========== العدّاد ==========
   drain();
   await update(message(SELLER, "/stats"));
-  assert(lastText("sendMessage").includes("عمليات ناجحة: <b>1</b>"), "/stats يعطي البائع رقمه");
+  const mine = lastText("sendMessage");
+  assert(mine.includes("عمليات ناجحة: <b>2</b>"), "/stats يعطي البائع رقمه");
+  assert(mine.includes("ماذا بعت بالضبط"), "/stats يفصّل ماذا باع");
+  assert(mine.includes("منتج الاختبار — سنة: <b>2</b>"),
+         "والتفصيل يذكر المنتج والمدة والكمية");
   drain();
   await update(message(SELLER, "/allstats"));
   assert(lastText("sendMessage").includes("للمالك وحده"), "البائع لا يرى مبيعات غيره");
@@ -343,6 +382,30 @@ async function run() {
   await update(message(OWNER, "/allstats"));
   const all = lastText("sendMessage");
   assert(all.includes("بائع الاختبار") && all.includes("🥇"), "المالك يرى ترتيب الجميع");
+  assert(all.includes("منتج الاختبار — سنة: <b>2</b>"),
+         "ويرى تحت كل بائع ماذا باع بالتفصيل");
+
+  // قائمة الأدمن -> ضغطة على بائع -> تفصيله وحده
+  drain();
+  await update(tap(OWNER, "m:admins"));
+  const admButtons = buttons("editMessageText")
+    .filter((b) => (b.callback_data || "").startsWith("adm:"));
+  assert(admButtons.length >= 2, "كل أدمن في القائمة زر يفتح تفصيله");
+  // زرّ البائع تحديداً: أول زرّ هو المالك (بلا مبيعات) فلا يثبت شيئاً
+  const sellerBtn = admButtons.find((b) => b.callback_data === `adm:${SELLER}`);
+  assert(!!sellerBtn, "وزر البائع يحمل رقمه");
+  drain();
+  await update(tap(OWNER, sellerBtn.callback_data));
+  const detail = lastText("editMessageText");
+  assert(detail.includes("بائع الاختبار"), "الضغط عليه يفتح تفصيل مبيعاته باسمه");
+  assert(detail.includes("منتج الاختبار — سنة: <b>2</b>"),
+         "وفيه ماذا باع بالضبط وكم");
+
+  // والبائع لا يفتح تفصيل غيره ولو خمّن الزر
+  drain();
+  await update(tap(SELLER, `adm:${OWNER}`));
+  assert(last("answerCallbackQuery").payload.text.includes("للمالك وحده"),
+         "البائع لا يفتح تفصيل غيره حتى بضغطة مباشرة");
 
   // ========== نفاد المخزون ==========
   sql(`update bot_cards set status='sold' where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year')`);

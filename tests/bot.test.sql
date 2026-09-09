@@ -232,6 +232,69 @@ begin
          'stats: owner sees at least the three accounts of this run';
   raise notice 'PASS  عدّاد المبيعات لكل أدمن';
 
+  -- ========== التفصيل: ماذا بيع، لا كم بيع (022) ==========
+  -- «3 أشهر» استُنفدت في فحص نفاد المخزون أعلاه؛ تُشحن من جديد
+  -- لأن هذا القسم يحتاج مدّتين مختلفتين ليثبت أنه لا يخلط بينهما.
+  perform bot_add_cards(v_owner_tg, v_three, array['T-901','T-902']);
+
+  -- التأكيد يقول أي اشتراك أُغلق
+  v_res := bot_request_card(v_b_tg, v_year);
+  v_res := bot_confirm_issue(v_b_tg, (v_res->>'issue_id')::uuid);
+  assert v_res->>'product_name' = 'بطاقة جيفت كارد',
+         'confirm names the product, got: ' || coalesce(v_res->>'product_name','null');
+  assert v_res->>'variant_name' = 'سنة',
+         'confirm names the duration, got: ' || coalesce(v_res->>'variant_name','null');
+  assert (v_res->>'seller_sales_of_variant')::int = 1,
+         'confirm counts this seller''s sales OF THIS duration';
+  assert (v_res->>'seller_sales')::int = 1, 'and their overall total';
+  raise notice 'PASS  التأكيد يقول أي اشتراك بيع';
+
+  -- الإلغاء كذلك
+  v_res  := bot_request_card(v_b_tg, v_three);
+  v_res  := bot_cancel_issue(v_b_tg, (v_res->>'issue_id')::uuid);
+  assert v_res->>'variant_name' = '3 أشهر', 'cancel names the duration too';
+  raise notice 'PASS  الإلغاء يقول أي اشتراك رجع';
+
+  -- تفصيل البائع: سطر لكل مدة باع منها
+  v_res := bot_breakdown(v_b_tg, 'me') -> 0;
+  assert (v_res->>'confirmed')::int = 1, 'breakdown: overall total';
+  assert jsonb_array_length(v_res->'items') = 1,
+         'breakdown: only durations actually SOLD appear, got '
+         || jsonb_array_length(v_res->'items');
+  assert v_res->'items'->0->>'variant' = 'سنة', 'breakdown: the right duration';
+  assert (v_res->'items'->0->>'confirmed')::int = 1, 'breakdown: the right count';
+  -- 3 أشهر أُلغيت ولم تُبَع: لا تظهر كصفّ صفري
+  assert not exists (
+    select 1 from jsonb_array_elements(v_res->'items') e
+     where e->>'variant' = '3 أشهر'
+  ), 'breakdown: a cancelled-only duration is not listed as a sale';
+  raise notice 'PASS  تفصيل «ماذا بعت» لكل مدة';
+
+  -- بائعان مختلفان -> صفّان مختلفان، لا خلط
+  v_res := bot_breakdown(v_owner_tg, 'all');
+  assert jsonb_array_length(v_res) >= 3, 'breakdown all: every admin has a row';
+  assert (select (e->>'confirmed')::int
+            from jsonb_array_elements(v_res) e
+           where (e->>'telegram_id')::bigint = v_b_tg) = 1,
+         'breakdown all: seller ب credited with exactly their own sale';
+
+  -- أدمن بعينه — للمالك وحده
+  v_res := bot_breakdown(v_owner_tg, 'me', v_b_tg);
+  assert (v_res->0->>'telegram_id')::bigint = v_b_tg, 'breakdown: targeted admin';
+  begin
+    perform bot_breakdown(v_b_tg, 'me', v_owner_tg);
+    assert false, 'a plain admin read someone else''s breakdown';
+  exception when others then
+    assert sqlerrm like 'NOT_OWNER%', 'targeting is owner-only, got: ' || sqlerrm;
+  end;
+  begin
+    perform bot_breakdown(v_owner_tg, 'me', 909090909);
+    assert false, 'breakdown accepted an unknown admin';
+  exception when others then
+    assert sqlerrm like 'ADMIN_NOT_FOUND%', 'unknown target rejected, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  المالك يرى تفصيل كل أدمن، والبائع لا يرى غيره';
+
   -- ========== قابلية إضافة منتجات ==========
   v_res := bot_add_product(v_owner_tg, 'netflix', 'نتفليكس');
   perform bot_add_variant(v_owner_tg, 'netflix', '6months', '6 أشهر');
@@ -275,11 +338,17 @@ begin
 
   -- ========== تعطيل بائع ==========
   -- للبائع أ طلبان معلّقان: تعطيله يرجع بطاقتيهما للمخزون
+  -- الفرق هو المقصود لا الرقم المطلق: للبائع أ بطاقتان معلّقتان،
+  -- فتعطيله يجب أن يزيد المتاح باثنتين مهما كان المخزون قبله.
   select count(*) into v_n from bot_cards where variant_id = v_three and status = 'available';
-  assert v_n = 0, 'setup: 3 أشهر fully reserved, got ' || v_n;
+  assert (select count(*) from bot_issues i
+           where i.variant_id = v_three and i.status = 'pending'
+             and i.admin_id = (select id from bot_admins where telegram_id = v_a_tg)) = 2,
+         'setup: seller أ is holding two 3-months cards';
   perform bot_remove_admin(v_owner_tg, v_a_tg);
-  select count(*) into v_n from bot_cards where variant_id = v_three and status = 'available';
-  assert v_n = 2, 'removing an admin releases the cards they were holding, got ' || v_n;
+  assert (select count(*) from bot_cards where variant_id = v_three and status = 'available')
+         = v_n + 2,
+         'removing an admin releases the cards they were holding';
   assert (select count(*) from bot_issues where status = 'pending'
            and admin_id = (select id from bot_admins where telegram_id = v_a_tg)) = 0,
          'their pending issues are cancelled, not left hanging';

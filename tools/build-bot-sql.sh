@@ -22,13 +22,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CORE=supabase/migrations/001_core_schema.sql
-BOT=supabase/migrations/021_gift_card_bot.sql
 OUT=docs/bot-setup.sql
+
+# كل هجرات البوت بالترتيب، لا 021 وحدها. أول ما أُضيفت 022 بقي
+# هذا الملف على 021 بصمت، فكان من ينشر من الصفر يأخذ نصف البوت.
+BOT_MIGRATIONS=(supabase/migrations/*bot*.sql)
+[ -e "${BOT_MIGRATIONS[0]}" ] || { echo "لا توجد هجرات بوت" >&2; exit 1; }
 
 {
   echo "-- ============================================================"
   echo "-- Janeiro — بوت المخزون وحده. وُلِّد آلياً، لا تُعدّله يدوياً."
-  echo "-- المصدر: $CORE + $BOT"
+  echo "-- المصدر: $CORE + ${BOT_MIGRATIONS[*]}"
   echo "--"
   echo "-- الصقه كاملاً في Supabase → SQL Editor واضغط Run، مرة واحدة."
   echo "-- آمن على مشروع فيه المتجر أصلاً: لا ينشئ ما هو موجود."
@@ -41,8 +45,11 @@ OUT=docs/bot-setup.sql
     | sed '$d'
   sed -n '/^-- ---------- store settings (key\/value) ----------$/,/^  for each row execute function set_updated_at();$/p' "$CORE"
   echo
-  echo "-- ── 021_gift_card_bot.sql ─────────────────────────────────"
-  cat "$BOT"
+  for m in "${BOT_MIGRATIONS[@]}"; do
+    echo "-- ── $(basename "$m") ─────────────────────────────────────"
+    cat "$m"
+    echo
+  done
 } > "$OUT"
 
 echo "wrote $OUT ($(wc -l < "$OUT") lines, $(du -h "$OUT" | cut -f1))"

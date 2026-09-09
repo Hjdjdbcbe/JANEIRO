@@ -673,6 +673,8 @@ Functions) ورابط واحد في شريط العنوان لربط الـwebho
 `docs/full-setup.sql` (228 ك.ب). يُولَّد بـ`bash tools/build-bot-sql.sh`،
 وآمن لصقه فوق مشروع فيه المتجر أصلاً.
 
-الهجرة: `supabase/migrations/021_gift_card_bot.sql`.
+الهجرات: `supabase/migrations/021_gift_card_bot.sql` +
+`022_bot_sales_detail.sql` (زر نسخ الكود، ورسالة التأكيد تسمّي
+الاشتراك المباع، وتفصيل «من باع ماذا وكم» لكل أدمن).
 الاختبارات: `tests/bot.test.sql` + `tests/local/bot-concurrency.test.sh`
 + `tests/local/bot-e2e.test.js` (تشغّل الدالة نفسها على Deno).
