@@ -24,6 +24,9 @@ const OWNER_ID   = Number(Deno.env.get("TELEGRAM_OWNER_ID") ?? "0");
 // tests/local/bot-e2e.test.js توجيه النداءات إلى خادم وهمي
 // ويفحص ما أرسله البوت فعلاً — لا يُضبط في الإنتاج.
 const API_BASE   = Deno.env.get("TELEGRAM_API_BASE") ?? "https://api.telegram.org";
+// رابط هذه الدالة نفسها، كما يفتحه الزبون. يُشتق من SUPABASE_URL
+// فلا متغيّر بيئة إضافي على من يركّب.
+const SELF_URL   = `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/telegram-bot`;
 const API        = `${API_BASE}/bot${TG_TOKEN}`;
 
 function db(): SupabaseClient {
@@ -305,8 +308,9 @@ const who = (c: CustomerField[]): string =>
   c?.length ? c.map((f) => esc(f.value)).join(" · ") : "—";
 
 function expiringText(rows: Expiring[], days: number): string {
-  if (!rows.length) return `⏰ لا اشتراك ينتهي خلال ${days} يوماً.`;
-  const out = [`⏰ <b>تنتهي خلال ${days} يوماً</b>`, ""];
+  const span = days === 0 ? "اليوم" : `خلال ${days} يوماً`;
+  if (!rows.length) return `⏰ لا اشتراك ينتهي ${span}.`;
+  const out = [`⏰ <b>تنتهي ${span}</b> — ${rows.length}`, ""];
   for (const r of rows) {
     out.push(`• <b>${who(r.customer)}</b>`);
     out.push(`  ${esc(r.product_name)} — ${esc(r.variant_name)}`);
@@ -394,6 +398,9 @@ const HELP = [
   "<code>/addcards giftcard year\nCODE-1\nCODE-2</code>",
   "/allstats — مبيعات الجميع",
   "/breakdown — المبيعات حسب المنتج",
+  "/contacts — قنوات التواصل أسفل وثيقة الزبون",
+  "/addcontact &lt;التسمية&gt; | &lt;القيمة&gt; | [رابط]",
+  "/delcontact &lt;التسمية&gt;",
   "/fields — بيانات الزبون المطلوبة لكل منتج",
   "/addfield &lt;رمز المنتج&gt; &lt;اسم الحقل&gt; [optional]",
   "   مثال: <code>/addfield giftcard يوزر الأنستا</code>",
@@ -478,6 +485,119 @@ async function loadCards(
   ].join("\n"), [backRow]);
 }
 
+// ============================================================
+// صفحات الزبون — نفس الدالة تخدمها عبر GET/POST عاديين.
+//
+// الزبون لا يملك تليجرام بالضرورة ولا حساباً عندنا. الرمز في
+// الرابط هو مفتاحه الوحيد: 256 بت للاستمارة (مرة واحدة، وتنتهي)،
+// و56 بت للوثيقة (دائمة، كأي رابط فاتورة).
+// ============================================================
+type Contact = { label: string; value: string; url: string | null; icon: string | null };
+
+function page(title: string, body: string, extraHead = ""): Response {
+  return new Response(
+    `<!doctype html><html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title><style>
+:root{--ink:#14121F;--muted:#6B6880;--line:#E7E4F2;--bg:#F7F6FB;--card:#fff;--accent:#6C35FF;--soft:#F1EDFF}
+@media(prefers-color-scheme:dark){:root{--ink:#F3F1FA;--muted:#A7A3BC;--line:#2C2842;--bg:#131120;--card:#1B1830;--soft:#241F3E}}
+*{box-sizing:border-box}
+body{margin:0;padding:20px 14px;background:var(--bg);color:var(--ink);
+ font:16px/1.65 system-ui,"Segoe UI",Tahoma,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:520px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;
+ box-shadow:0 1px 2px rgba(20,18,31,.04),0 8px 28px rgba(20,18,31,.06)}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+label{display:block;font-size:14px;font-weight:600;margin:16px 0 6px}
+.opt{color:var(--muted);font-weight:400}
+input{width:100%;padding:13px 14px;font:inherit;color:inherit;background:var(--bg);
+ border:1px solid var(--line);border-radius:12px}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+button{width:100%;margin-top:22px;padding:14px;font:inherit;font-weight:700;color:#fff;
+ background:var(--accent);border:0;border-radius:12px;cursor:pointer}
+button:active{transform:translateY(1px)}
+.badge{display:inline-block;background:var(--soft);color:var(--accent);border-radius:999px;
+ padding:4px 12px;font-size:13px;font-weight:700;margin-bottom:14px}
+.dl{margin:0;border-top:1px solid var(--line)}
+.dl>div{display:flex;justify-content:space-between;gap:14px;padding:11px 0;
+ border-bottom:1px solid var(--line);font-size:15px}
+.dl span{color:var(--muted)}
+.dl b{text-align:left;word-break:break-word}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.4px}
+.note{margin-top:18px;padding:13px 15px;background:var(--soft);border-radius:12px;
+ font-size:14px;color:var(--ink)}
+.err{border-color:#E5484D;color:#E5484D;background:rgba(229,72,77,.06)}
+.contacts{margin-top:22px;padding-top:18px;border-top:2px dashed var(--line)}
+.contacts h2{font-size:15px;margin:0 0 12px}
+.contacts a,.contacts div.c{display:flex;align-items:center;gap:10px;padding:11px 13px;
+ margin-bottom:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;
+ color:inherit;text-decoration:none;font-size:15px}
+.contacts b{margin-inline-start:auto;font-weight:600}
+.brand{text-align:center;color:var(--muted);font-size:13px;margin-top:22px}
+@media print{body{background:#fff;padding:0}.noprint{display:none!important}
+ .card{border:0;box-shadow:none}}
+</style>${extraHead}</head><body><div class="wrap">${body}</div></body></html>`,
+    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
+  );
+}
+
+const errPage = (msg: string) =>
+  page("Janeiro", `<div class="card"><h1>تعذّر فتح الصفحة</h1>
+    <p class="sub">${esc(msg)}</p>
+    <div class="note">تواصل مع البائع الذي أرسل لك الرابط.</div></div>`);
+
+/** الاستمارة: الزبون يكتب بياناته بنفسه. */
+function formPage(token: string, d: {
+  product_name: string; variant_name: string;
+  fields: { label: string; is_required: boolean }[];
+}): Response {
+  const inputs = d.fields.map((f, i) => `
+    <label for="f${i}">${esc(f.label)}${f.is_required ? "" : ' <span class="opt">(اختياري)</span>'}</label>
+    <input id="f${i}" name="f${i}" ${f.is_required ? "required" : ""}
+           autocomplete="off" placeholder="${esc(f.label)}">`).join("");
+
+  return page("بياناتك — Janeiro", `<div class="card">
+    <span class="badge">${esc(d.product_name)} — ${esc(d.variant_name)}</span>
+    <h1>أدخل بياناتك</h1>
+    <p class="sub">لتصدر لك وثيقة ضمان اشتراكك. تُملأ مرة واحدة.</p>
+    <form method="POST" action="?fill=${encodeURIComponent(token)}">
+      ${inputs}
+      <button type="submit">إصدار الوثيقة</button>
+    </form>
+  </div><p class="brand">Janeiro</p>`);
+}
+
+/** الوثيقة: يحفظها الزبون أو يطبعها PDF، وتحتها قنوات التواصل. */
+function certPage(c: Certificate & { contacts?: Contact[] }): Response {
+  const rows = (c.customer ?? []).map((f) =>
+    `<div><span>${esc(f.label)}</span><b>${esc(f.value)}</b></div>`).join("");
+
+  const contacts = (c.contacts ?? []).map((k) => {
+    const inner = `<span>${k.icon ? esc(k.icon) + " " : ""}${esc(k.label)}</span>` +
+                  `<b>${esc(k.value)}</b>`;
+    return k.url
+      ? `<a href="${esc(k.url)}" target="_blank" rel="noopener">${inner}</a>`
+      : `<div class="c">${inner}</div>`;
+  }).join("");
+
+  return page("وثيقة الضمان — Janeiro", `<div class="card">
+    <span class="badge">وثيقة ضمان</span>
+    <h1>${esc(c.product_name)} — ${esc(c.variant_name)}</h1>
+    <p class="sub">${c.expired ? "انتهت مدة هذا الاشتراك."
+      : c.days_left !== null ? `يتبقّى ${c.days_left} يوماً.` : "اشتراك سارٍ."}</p>
+    <div class="dl">
+      ${rows}
+      <div><span>يبدأ</span><b class="mono">${day(c.starts_at)}</b></div>
+      ${c.ends_at ? `<div><span>ينتهي</span><b class="mono">${day(c.ends_at)}</b></div>` : ""}
+      <div><span>رمز التحقق</span><b class="mono">${esc(c.code)}</b></div>
+    </div>
+    <div class="note">احفظ هذه الصفحة أو خزّن الرابط. رمز التحقق أعلاه يثبت اشتراكك عند أي مراجعة.</div>
+    ${contacts ? `<div class="contacts"><h2>للتواصل معنا</h2>${contacts}</div>` : ""}
+    <button class="noprint" onclick="window.print()">حفظ أو طباعة PDF</button>
+  </div><p class="brand">Janeiro</p>`);
+}
+
 // ------------------------------------------------------------
 // الوثيقة: بعد التأكيد، تُجمع بيانات الزبون ثم تصدر
 // ------------------------------------------------------------
@@ -498,14 +618,16 @@ async function afterConfirm(
   if (d.has_certificate) return;
 
   if (d.fields.length) {
-    const lines = d.fields.map((x, i) =>
-      `${i + 1}. ${esc(x.label)}${x.is_required ? "" : " <i>(اختياري)</i>"}`);
-    await ask(chat, [
-      `${CERT_PROMPT} — ${issueId}`, "",
-      "ردّ على هذه الرسالة ببيانات الزبون، قيمة في كل سطر وبنفس الترتيب:",
-      "", ...lines,
-      "", "<i>سطر فارغ أو «-» يتخطّى حقلاً اختيارياً.</i>",
-    ].join("\n"));
+    // من يعبّي؟ الزبون أدقّ في يوزره ورقمه، والبائع أسرع إن كان
+    // الزبون أمامه. الاثنان متاحان، وأول من يعبّي يُصدر الوثيقة.
+    await send(chat, [
+      "🧾 <b>بقيت بيانات الزبون</b>", "",
+      "المطلوب: " + d.fields.map((x) =>
+        `<b>${esc(x.label)}</b>${x.is_required ? "" : " (اختياري)"}`).join(" · "),
+    ].join("\n"), [
+      [{ text: "🔗 يعبّيها الزبون بنفسه", callback_data: `cl:${issueId}` }],
+      [{ text: "✍️ أكتبها أنا", callback_data: `cf:${issueId}` }],
+    ]);
     return;
   }
 
@@ -529,6 +651,45 @@ async function issueCertificate(
     backRow,
   ]);
   await send(chat, "⬆️ أعد توجيه الرسالة أعلاه للزبون — هي وثيقته.");
+}
+
+/** «أكتبها أنا»: يعرض الحقول مرقّمة ويطلب ردّاً. */
+async function askCertificateFields(
+  client: SupabaseClient, chat: number, tgId: number, issueId: string,
+) {
+  const f = await rpc<IssueFields>(client, "bot_issue_fields",
+    { p_telegram_id: tgId, p_issue_id: issueId });
+  if (f.error) { await send(chat, f.error); return; }
+  const lines = f.data!.fields.map((x, i) =>
+    `${i + 1}. ${esc(x.label)}${x.is_required ? "" : " <i>(اختياري)</i>"}`);
+  await ask(chat, [
+    `${CERT_PROMPT} — ${issueId}`, "",
+    "ردّ على هذه الرسالة ببيانات الزبون، قيمة في كل سطر وبنفس الترتيب:",
+    "", ...lines,
+    "", "<i>سطر فارغ أو «-» يتخطّى حقلاً اختيارياً.</i>",
+  ].join("\n"));
+}
+
+/** «يعبّيها الزبون»: رابط يُرسل له في سناب أو واتساب. */
+async function sendFillLink(
+  client: SupabaseClient, chat: number, tgId: number, issueId: string,
+) {
+  const r = await rpc<{ token: string; expires_at: string }>(
+    client, "bot_fill_link", { p_telegram_id: tgId, p_issue_id: issueId, p_days: 7 });
+  if (r.error) { await send(chat, r.error, [backRow]); return; }
+
+  const link = `${SELF_URL}?fill=${r.data!.token}`;
+  await send(chat, [
+    "🔗 <b>رابط الزبون</b>", "",
+    "أرسله له في سناب أو واتساب. يفتحه، يكتب بياناته، وتظهر له",
+    "الوثيقة جاهزة للحفظ أو الطباعة.", "",
+    `<code>${esc(link)}</code>`, "",
+    `<i>صالح حتى ${day(r.data!.expires_at)}، ويُستعمل مرة واحدة.</i>`,
+  ].join("\n"), [
+    [{ text: "📋 نسخ الرابط", copy_text: { text: link } }],
+    [{ text: "✍️ أكتبها أنا بدلاً منه", callback_data: `cf:${issueId}` }],
+    backRow,
+  ]);
 }
 
 /** ردّ البائع: قيمة في كل سطر، بترتيب الحقول المعروضة. */
@@ -632,10 +793,56 @@ async function handleCommand(
     }
 
     case "/expiring": {
-      const d = Number(args[0]) || 7;
+      const d = args[0] === undefined || Number.isNaN(Number(args[0])) ? 7 : Number(args[0]);
       const r = await rpc<Expiring[]>(client, "bot_expiring",
         { p_telegram_id: tgId, p_days: d });
       await send(chat, r.error ?? expiringText(r.data!, d), [backRow]);
+      return;
+    }
+
+    case "/contacts": {
+      const r = await rpc<Contact[]>(client, "bot_list_contacts", { p_telegram_id: tgId });
+      if (r.error) { await send(chat, r.error); return; }
+      const out = ["📇 <b>قنوات التواصل</b>", "",
+                   "<i>تظهر أسفل وثيقة كل زبون.</i>", ""];
+      if (!r.data!.length) out.push("لا شيء بعد.");
+      for (const k of r.data!) {
+        out.push(`${k.icon ?? "•"} <b>${esc(k.label)}</b>: ${esc(k.value)}` +
+                 (k.url ? `\n   <code>${esc(k.url)}</code>` : ""));
+      }
+      out.push("", "الإضافة — الأجزاء مفصولة بـ <code>|</code>:",
+        "<code>/addcontact سناب شات | janeiro_store | https://snapchat.com/add/janeiro_store</code>",
+        "<code>/addcontact الهاتف | 0550112233</code>",
+        "<code>/addcontact تليجرام | @janeiro | https://t.me/janeiro</code>",
+        "الحذف: <code>/delcontact سناب شات</code>");
+      await send(chat, out.join("\n"), [backRow]);
+      return;
+    }
+
+    case "/addcontact": {
+      // الفصل بـ | لا بمسافة: التسميات عربية وفيها مسافات
+      const parts = text.slice(cmd.length).split("|").map((x) => x.trim());
+      if (parts.length < 2 || !parts[0] || !parts[1]) {
+        await send(chat, "الصيغة:\n<code>/addcontact سناب شات | janeiro_store | " +
+                         "https://snapchat.com/add/janeiro_store</code>\n\n" +
+                         "الرابط اختياري. نفس التسمية تُحدَّث ولا تتكرّر.");
+        return;
+      }
+      const r = await rpc(client, "bot_add_contact", {
+        p_telegram_id: tgId, p_label: parts[0], p_value: parts[1],
+        p_url: parts[2] || null, p_icon: parts[3] || null,
+      });
+      await send(chat, r.error ??
+        `✅ حُفظت «${esc(parts[0])}». ستظهر أسفل وثيقة كل زبون.`, [backRow]);
+      return;
+    }
+
+    case "/delcontact": {
+      const label = text.slice(cmd.length).trim();
+      if (!label) { await send(chat, "الصيغة: <code>/delcontact سناب شات</code>"); return; }
+      const r = await rpc(client, "bot_remove_contact",
+        { p_telegram_id: tgId, p_label: label });
+      await send(chat, r.error ?? "✅ حُذفت.", [backRow]);
       return;
     }
 
@@ -832,7 +1039,8 @@ async function handleCallback(
         if (r.error) { await answer(cbId, r.error, true); return; }
         await answer(cbId);
         await edit(chat, msg, expiringText(r.data!, 7), [
-          [{ text: "30 يوماً", callback_data: "exp:30" },
+          [{ text: "اليوم", callback_data: "exp:0" },
+           { text: "30 يوماً", callback_data: "exp:30" },
            { text: "90 يوماً", callback_data: "exp:90" }],
           backRow,
         ]);
@@ -895,15 +1103,21 @@ async function handleCallback(
     return;
   }
 
+  // ---------- بيانات الزبون: من يعبّيها ----------
+  if (verb === "cf") { await answer(cbId); await askCertificateFields(client, chat, tgId, arg); return; }
+  if (verb === "cl") { await answer(cbId); await sendFillLink(client, chat, tgId, arg); return; }
+
   // ---------- مدى أطول لقائمة «تنتهي قريباً» ----------
   if (verb === "exp") {
-    const d = Number(arg) || 7;
+    // Number(arg) || 7 كان يبتلع الصفر ويحوّل «اليوم» إلى أسبوع
+    const d = arg === "" || Number.isNaN(Number(arg)) ? 7 : Number(arg);
     const r = await rpc<Expiring[]>(client, "bot_expiring",
       { p_telegram_id: tgId, p_days: d });
     if (r.error) { await answer(cbId, r.error, true); return; }
     await answer(cbId);
     await edit(chat, msg, expiringText(r.data!, d), [
-      [{ text: "7 أيام", callback_data: "exp:7" },
+      [{ text: "اليوم", callback_data: "exp:0" },
+       { text: "7 أيام", callback_data: "exp:7" },
        { text: "30 يوماً", callback_data: "exp:30" },
        { text: "90 يوماً", callback_data: "exp:90" }],
       backRow,
@@ -1044,7 +1258,89 @@ async function showVariants(chat: number, msg: number, p: Product, loading: bool
 // ============================================================
 // المدخل
 // ============================================================
+/** أخطاء الروابط -> عربية للزبون، لا للبائع. */
+const LINK_ERRORS: Record<string, string> = {
+  LINK_NOT_FOUND: "هذا الرابط غير صحيح.",
+  LINK_USED:      "عُبِّئت البيانات من هذا الرابط مسبقاً.",
+  LINK_EXPIRED:   "انتهت صلاحية هذا الرابط.",
+  CERTIFICATE_NOT_FOUND: "لا توجد وثيقة بهذا الرمز.",
+  CERTIFICATE_EXISTS: "صدرت الوثيقة لهذه العملية مسبقاً.",
+};
+const linkError = (raw: string): string =>
+  LINK_ERRORS[raw.split(":")[0].trim().replace(/[^A-Z_]/g, "")] ?? "تعذّر إتمام الطلب.";
+
+/**
+ * صفحات الزبون. لا تمرّ بالترويسة السرّية — الزبون ليس تليجرام
+ * ولا يملكها. ما يحرسها الرمز في الرابط نفسه، ولذلك تُفصل بمعامل
+ * صريح في العنوان: لا يمكن لطلب استمارة أن يُقرأ كتحديث تليجرام
+ * ولا العكس.
+ */
+async function customerRoute(req: Request, url: URL): Promise<Response | null> {
+  const fill = url.searchParams.get("fill");
+  const cert = url.searchParams.get("cert");
+  if (!fill && !cert) return null;
+
+  const client = db();
+
+  if (cert) {
+    const { data, error } = await client.rpc("bot_public_certificate", { p_code: cert });
+    if (error) return errPage(linkError(String(error.message ?? "")));
+    return certPage(data as Certificate & { contacts: Contact[] });
+  }
+
+  if (req.method === "GET") {
+    const { data, error } = await client.rpc("bot_fill_form", { p_token: fill });
+    if (error) return errPage(linkError(String(error.message ?? "")));
+    return formPage(fill!, data as {
+      product_name: string; variant_name: string;
+      fields: { label: string; is_required: boolean }[];
+    });
+  }
+
+  if (req.method === "POST") {
+    // الحقول تصل بترتيبها f0, f1, … كما بنتها formPage
+    const form = await req.formData().catch(() => null);
+    if (!form) return errPage("تعذّر قراءة البيانات.");
+
+    const shape = await client.rpc("bot_fill_form", { p_token: fill });
+    if (shape.error) return errPage(linkError(String(shape.error.message ?? "")));
+    const fields = (shape.data as { fields: { label: string }[] }).fields;
+
+    const values = fields
+      .map((f, i) => ({ label: f.label, value: String(form.get(`f${i}`) ?? "").trim() }))
+      .filter((v) => v.value !== "");
+
+    const { data, error } = await client.rpc("bot_fill_submit",
+      { p_token: fill, p_values: values });
+    if (error) return errPage(linkError(String(error.message ?? "")));
+
+    const c = data as Certificate & { seller_telegram_id: number };
+
+    // البائع يعرف أن زبونه عبّأ، بلا أن يسأل
+    await send(Number(c.seller_telegram_id), [
+      "✅ <b>الزبون عبّأ بياناته</b>", "",
+      `🎟 ${esc(c.product_name)} — ${esc(c.variant_name)}`,
+      ...(c.customer ?? []).map((f) => `${esc(f.label)}: <b>${esc(f.value)}</b>`),
+      "", `🔖 <code>${esc(c.code)}</code>`,
+    ].join("\n"));
+
+    const full = await client.rpc("bot_public_certificate", { p_code: c.code });
+    return certPage((full.data ?? c) as Certificate & { contacts: Contact[] });
+  }
+
+  return errPage("طلب غير مدعوم.");
+}
+
 Deno.serve(async (req) => {
+  const url = new URL(req.url);
+
+  // صفحات الزبون أولاً: لها مفتاحها الخاص في العنوان.
+  const customer = await customerRoute(req, url).catch((e) => {
+    console.error("customer route failed", e);
+    return errPage("حدث خطأ غير متوقع.");
+  });
+  if (customer) return customer;
+
   if (req.method !== "POST") return new Response("ok");
 
   // الترويسة السرّية هي كل الحماية: بدونها يستطيع أي أحد يعرف

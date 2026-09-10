@@ -513,6 +513,115 @@ begin
   end;
   raise notice 'PASS  لا حقل لكلمة سر';
 
+  -- ========== الزبون يعبّي بنفسه (024) ==========
+  v_res  := bot_request_card(v_b_tg, v_year);
+  v_issue := (v_res->>'issue_id')::uuid;
+
+  -- لا رابط قبل التأكيد
+  begin
+    perform bot_fill_link(v_b_tg, v_issue);
+    assert false, 'a fill link was issued for a pending sale';
+  exception when others then
+    assert sqlerrm like 'ISSUE_NOT_CONFIRMED%', 'link needs a confirmed sale, got: ' || sqlerrm;
+  end;
+
+  perform bot_confirm_issue(v_b_tg, v_issue);
+  v_res  := bot_fill_link(v_b_tg, v_issue);
+  v_code := v_res->>'token';
+  assert char_length(v_code) = 64, 'token is 64 hex chars, got ' || char_length(v_code);
+
+  -- طلبه مرتين لا ينشئ رابطين
+  assert bot_fill_link(v_b_tg, v_issue)->>'token' = v_code,
+         'asking twice returns the same link, never a second one';
+
+  -- ما يراه الزبون: الحقول فقط، ولا أثر لكود البطاقة
+  v_res := bot_fill_form(v_code);
+  assert jsonb_array_length(v_res->'fields') = 1, 'form: the product''s fields';
+  assert v_res->>'product_name' = 'متابعين انستا', 'form: names the product';
+  assert not (v_res::text like '%INS-%'), 'form NEVER leaks the card code';
+
+  -- رابط مجهول أو منتهٍ
+  begin
+    perform bot_fill_form('deadbeef' || repeat('0', 56));
+    assert false, 'unknown token accepted';
+  exception when others then
+    assert sqlerrm like 'LINK_NOT_FOUND%', 'unknown token rejected, got: ' || sqlerrm;
+  end;
+
+  -- الزبون يرسل بياناته -> الوثيقة، منسوبة للبائع لا للزبون
+  v_res := bot_fill_submit(v_code,
+    '[{"label":"يوزر الأنستا","value":"@customer_self"}]'::jsonb);
+  assert v_res->>'code' like 'JNR-%', 'submit issues the certificate';
+  assert (v_res->>'seller_telegram_id')::bigint = v_b_tg,
+         'the sale stays credited to the seller, not the customer';
+  assert (select count(*) from bot_issues i join bot_admins a on a.id = i.admin_id
+           where i.id = v_issue and a.telegram_id = v_b_tg and i.status = 'confirmed') = 1,
+         'and the sale itself is untouched';
+
+  -- الرابط يُستعمل مرة واحدة
+  begin
+    perform bot_fill_submit(v_code, '[{"label":"يوزر الأنستا","value":"@again"}]'::jsonb);
+    assert false, 'a fill link worked twice';
+  exception when others then
+    assert sqlerrm like 'LINK_USED%', 'second submit blocked, got: ' || sqlerrm;
+  end;
+  begin
+    perform bot_fill_form(v_code);
+    assert false, 'a used link still opened the form';
+  exception when others then
+    assert sqlerrm like 'LINK_USED%', 'used link cannot reopen, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  رابط الزبون: مرة واحدة، ولا يسرّب كود البطاقة';
+
+  -- الوثيقة العامة: بالرمز وحده، بلا هوية
+  v_code := v_res->>'code';
+  v_res  := bot_public_certificate(v_code);
+  assert v_res->>'product_name' = 'متابعين انستا', 'public cert: product';
+  assert v_res->'customer'->0->>'value' = '@customer_self', 'public cert: what they typed';
+  assert not (v_res::text like '%INS-%'), 'public cert NEVER leaks the card code';
+  assert v_res->>'seller' is null, 'public cert does not name the seller';
+  assert bot_public_certificate(lower(v_code))->>'code' = v_code,
+         'public cert tolerates lowercase';
+  raise notice 'PASS  الوثيقة العامة بالرمز وحده';
+
+  -- قنوات التواصل أسفل الوثيقة
+  perform bot_add_contact(v_owner_tg, 'سناب شات', 'janeiro_store',
+                          'https://snapchat.com/add/janeiro_store', '👻');
+  perform bot_add_contact(v_owner_tg, 'الهاتف', '0550112233');
+  v_res := bot_public_certificate(v_code);
+  assert jsonb_array_length(v_res->'contacts') = 2, 'contacts ride along with the document';
+  -- نفس التسمية تُحدَّث لا تتكرّر
+  perform bot_add_contact(v_owner_tg, 'الهاتف', '0770998877');
+  assert jsonb_array_length(bot_public_certificate(v_code)->'contacts') = 2,
+         'same label updates in place';
+  assert bot_public_certificate(v_code)::text like '%0770998877%', 'with the new value';
+  begin
+    perform bot_add_contact(v_owner_tg, 'موقع', 'janeiro', 'ftp://nope');
+    assert false, 'a non-http url was accepted';
+  exception when others then
+    assert sqlerrm like 'INVALID_URL%', 'bad url rejected, got: ' || sqlerrm;
+  end;
+  begin
+    perform bot_add_contact(v_b_tg, 'تسلل', 'x');
+    assert false, 'a plain admin edited the store contacts';
+  exception when others then
+    assert sqlerrm like 'NOT_OWNER%', 'contacts are owner-only, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  قنوات التواصل تظهر أسفل وثيقة الزبون';
+
+  -- «من ينتهي اشتراكه اليوم؟»
+  update bot_certificates
+     set starts_at = now() - interval '300 days', ends_at = date_trunc('day', now()) + interval '20 hours'
+   where code = v_code;
+  assert jsonb_array_length(bot_expiring(v_b_tg, 0)) = 1, 'expiring today: found';
+  update bot_certificates
+     set ends_at = date_trunc('day', now()) + interval '2 days'
+   where code = v_code;
+  assert jsonb_array_length(bot_expiring(v_b_tg, 0)) = 0,
+         'expiring today: tomorrow is not today';
+  assert jsonb_array_length(bot_expiring(v_b_tg, 7)) = 1, 'but it is within the week';
+  raise notice 'PASS  «من ينتهي اشتراكه اليوم» سؤال له جواب';
+
   raise notice '===== bot tests passed =====';
 end $$;
 

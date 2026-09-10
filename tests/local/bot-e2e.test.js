@@ -169,6 +169,7 @@ function seed() {
          select i.id from bot_issues i join bot_admins a on a.id = i.admin_id
           where a.telegram_id >= 970000000)`);
   sql(`delete from bot_fields where product_id in (select id from bot_products where code='e2e')`);
+  sql(`delete from bot_contacts where label like 'E2E%'`);
   sql(`delete from bot_issues where admin_id in (select id from bot_admins where telegram_id >= 970000000)`);
   sql(`delete from bot_cards where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e')`);
   sql(`delete from bot_variants where product_id in (select id from bot_products where code='e2e')`);
@@ -453,9 +454,16 @@ async function run() {
   const cardC = last("sendMessage");
   drain();
   await update(tap(SELLER, kb(cardC).find((b) => b.text.includes("تأكيد")).callback_data));
+  // التأكيد يعرض خيارين؛ «أكتبها أنا» هو ما يفتح السؤال
+  const pick = telegramCalls.filter((c) => c.method === "sendMessage")
+    .find((c) => (c.payload.text || "").includes("بقيت بيانات الزبون"));
+  assert(!!pick, "بعد التأكيد يعرض خياري تعبئة البيانات");
+  drain();
+  await update(tap(SELLER, kb(pick).find((b) =>
+    (b.callback_data || "").startsWith("cf:")).callback_data));
   const askMsg = telegramCalls.filter((c) => c.method === "sendMessage")
     .find((c) => (c.payload.text || "").startsWith("🧾 بيانات الزبون"));
-  assert(!!askMsg, "بعد التأكيد يسأل البوت عن بيانات الزبون");
+  assert(!!askMsg, "«أكتبها أنا» يسأل البائع عن بيانات الزبون");
   assert(askMsg.payload.reply_markup.force_reply === true, "بردّ إجباري");
   assert(askMsg.payload.text.includes("1. يوزر الأنستا"),
          "ويعرض الحقول مرقّمة بالترتيب");
@@ -513,6 +521,89 @@ async function run() {
   const exp = lastText("sendMessage");
   assert(exp.includes("@ahmed_dz") && exp.includes("تنتهي خلال 7"),
          "وبعد ثلاثة أيام يظهر في القائمة");
+
+  // ========== الزبون يعبّي بنفسه على الويب (024) ==========
+  // نفس الدالة تخدم صفحات الزبون، فتُفتح هنا كما يفتحها هو
+  const web = (qs, init) => fetch(`http://127.0.0.1:${BOT}/?${qs}`, init);
+
+  await update(message(OWNER,
+    "/addcontact E2E سناب | janeiro_e2e | https://snapchat.com/add/janeiro_e2e"));
+  drain();
+  await update(message(OWNER, "/contacts"));
+  assert(lastText("sendMessage").includes("janeiro_e2e"), "المالك يضبط قنوات التواصل");
+
+  sql(`select bot_add_cards(${OWNER}, (select v.id from bot_variants v
+        join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year'),
+        array['WEB-1'])`);
+  drain();
+  await update(tap(SELLER, yearBtn.callback_data));
+  const cW = last("sendMessage");
+  drain();
+  await update(tap(SELLER, kb(cW).find((b) => b.text.includes("تأكيد")).callback_data));
+
+  // بعد التأكيد: خياران، من يعبّي؟
+  const choice = telegramCalls.filter((c) => c.method === "sendMessage")
+    .find((c) => (c.payload.text || "").includes("بقيت بيانات الزبون"));
+  assert(!!choice, "بعد التأكيد يعرض خياري التعبئة");
+  const linkBtn = kb(choice).find((b) => (b.callback_data || "").startsWith("cl:"));
+  assert(!!linkBtn && !!kb(choice).find((b) => (b.callback_data || "").startsWith("cf:")),
+         "زر للزبون وزر للبائع");
+
+  drain();
+  await update(tap(SELLER, linkBtn.callback_data));
+  const linkMsg = lastText("sendMessage");
+  const token = (linkMsg.match(/\?fill=([0-9a-f]{64})/) || [])[1];
+  assert(!!token, "زر «يعبّيها الزبون» ينتج رابطاً");
+  assert(!!buttons("sendMessage").find((b) => b.copy_text),
+         "مع زر نسخ ليُرسل في سناب أو واتساب");
+
+  // الزبون يفتح الرابط
+  const formHtml = await web(`fill=${token}`).then((r) => r.text());
+  assert(formHtml.includes('dir="rtl"'), "صفحة الزبون عربية من اليمين");
+  assert(formHtml.includes("يوزر الأنستا"), "وفيها الحقول المطلوبة");
+  assert(!formHtml.includes("WEB-1"), "ولا تسرّب كود البطاقة أبداً");
+  assert(formHtml.includes("<form method=\"POST\""), "واستمارة تُرسل");
+
+  // ويعبّيها ويضغط إرسال
+  const body = new URLSearchParams({ f0: "@self_filled" });
+  const certHtml = await web(`fill=${token}`,
+    { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString() }).then((r) => r.text());
+  assert(certHtml.includes("وثيقة ضمان"), "الإرسال يعطيه الوثيقة فوراً");
+  assert(certHtml.includes("@self_filled"), "بما كتبه هو");
+  assert(/يبدأ[\s\S]{0,80}\d{4}-\d{2}-\d{2}/.test(certHtml), "وتاريخ البداية");
+  assert(/ينتهي[\s\S]{0,80}\d{4}-\d{2}-\d{2}/.test(certHtml), "وتاريخ النهاية");
+  assert(certHtml.includes("window.print()"), "وزر حفظ أو طباعة PDF");
+  assert(certHtml.includes("janeiro_e2e"), "وقنوات تواصلك أسفلها");
+  assert(!certHtml.includes("WEB-1"), "ولا كود البطاقة");
+  const webCode = (certHtml.match(/JNR-[A-Z0-9]+/) || [])[0];
+  assert(!!webCode, "ورمز تحقّق");
+
+  // والبائع يُبلَّغ بلا أن يسأل
+  const notice = telegramCalls.filter((c) => c.method === "sendMessage")
+    .find((c) => (c.payload.text || "").includes("الزبون عبّأ بياناته"));
+  assert(!!notice, "والبائع يصله إشعار أن زبونه عبّأ");
+  assert(notice.payload.chat_id === SELLER, "الإشعار للبائع صاحب البيعة");
+
+  // الرابط لا يُستعمل مرتين
+  const again = await web(`fill=${token}`).then((r) => r.text());
+  assert(again.includes("مسبقاً"), "والرابط لا يُفتح مرة ثانية");
+
+  // ورابط الوثيقة يبقى يعمل — الزبون يحفظه
+  const revisit = await web(`cert=${webCode}`).then((r) => r.text());
+  assert(revisit.includes("@self_filled") && revisit.includes("janeiro_e2e"),
+         "ورابط الوثيقة نفسه يبقى مفتوحاً ليحفظه الزبون");
+  const bogus = await web("cert=JNR-NOTHINGHERE00").then((r) => r.text());
+  assert(bogus.includes("تعذّر"), "ورمز مخترَع لا يفتح شيئاً");
+
+  // «من ينتهي اشتراكه اليوم؟»
+  sql(`update bot_certificates set starts_at = now() - interval '300 days',
+        ends_at = date_trunc('day', now()) + interval '20 hours' where code='${webCode}'`);
+  drain();
+  await update(tap(OWNER, "exp:0"));
+  const today = lastText("editMessageText");
+  assert(today.includes("تنتهي اليوم"), "زر «اليوم» يسأل عن اليوم نفسه");
+  assert(today.includes("@self_filled"), "ويجد من ينتهي اشتراكه فيه");
 
   // ========== نفاد المخزون ==========
   sql(`update bot_cards set status='sold' where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year')`);
