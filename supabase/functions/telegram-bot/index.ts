@@ -113,6 +113,12 @@ const ERRORS: Record<string, string> = {
   CANNOT_REMOVE_SELF:    "لا يمكنك حذف نفسك.",
   CANNOT_REMOVE_OWNER:   "لا يمكن حذف المالك.",
   NOT_FOUND:             "لم أجد المطلوب.",
+  ISSUE_NOT_CONFIRMED:   "الوثيقة تصدر بعد تأكيد البيعة فقط.",
+  CERTIFICATE_NOT_FOUND: "لا توجد وثيقة بهذا الرمز.",
+  FIELD_EXISTS:          "هذا الحقل موجود في المنتج مسبقاً.",
+  FIELD_NOT_FOUND:       "لا يوجد حقل بهذا الاسم في المنتج.",
+  INVALID_LABEL:         "اسم الحقل فارغ أو طويل جداً.",
+  QUERY_TOO_SHORT:       "اكتب حرفين على الأقل للبحث.",
   INVALID_KIND:          "نوع غير معروف.",
 };
 
@@ -123,6 +129,15 @@ function human(err: unknown): string {
     const n = raw.split(":")[1]?.trim();
     return n ? `الحد ${n} عمليات معلّقة. أغلق واحدة بتأكيد أو إلغاء أولاً.` : ERRORS.PENDING_LIMIT;
   }
+  if (code === "FIELD_REQUIRED") {
+    const f = raw.split(":").slice(1).join(":").trim();
+    return f ? `ينقص حقل مطلوب: ${f}` : "ينقص حقل مطلوب.";
+  }
+  if (code === "CERTIFICATE_EXISTS") {
+    const c = raw.split(":").slice(1).join(":").trim();
+    return c ? `صدرت وثيقة لهذه البيعة مسبقاً: ${c}` : "صدرت وثيقة لهذه البيعة مسبقاً.";
+  }
+  if (code === "FIELD_TOO_LONG") return "إحدى القيم طويلة جداً.";
   if (ERRORS[code]) return ERRORS[code];
   console.error("unmapped bot error:", raw);
   return "حدث خطأ غير متوقع. حاول مرة أخرى.";
@@ -155,6 +170,8 @@ function mainMenu(isOwner: boolean): Button[][] {
     [{ text: "⏳ المعلّقة", callback_data: "m:pending" },
      { text: "📊 مبيعاتي", callback_data: "m:stats" }],
   ];
+  rows.push([{ text: "⏰ تنتهي قريباً", callback_data: "m:exp" },
+             { text: "🔎 بحث عن زبون", callback_data: "m:find" }]);
   if (isOwner) {
     rows.push([{ text: "📦 المخزون", callback_data: "m:stock" },
                { text: "🏆 مبيعات الكل", callback_data: "m:all" }]);
@@ -238,6 +255,83 @@ function statsText(rows: Stat[], all: boolean, title?: string): string {
   return out.join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
+type CustomerField = { label: string; value: string };
+
+type Certificate = {
+  code: string; product_name: string; variant_name: string;
+  card_code?: string; seller?: string; customer: CustomerField[];
+  starts_at: string; ends_at: string | null;
+  days_left: number | null; expired?: boolean;
+};
+
+/** يوم واحد بصيغة ثابتة: 2026-09-10 */
+const day = (iso: string | null): string =>
+  iso ? new Date(iso).toISOString().slice(0, 10) : "—";
+
+/**
+ * الوثيقة كما تُرسل للزبون: رسالة واحدة قائمة بذاتها يعيد البائع
+ * توجيهها كما هي. لا رابط ولا مرفق — تعمل على أي هاتف بلا إنترنت
+ * إضافي، ورمز التحقق فيها يكفي لمراجعتها لاحقاً بـ/cert.
+ */
+function certificateText(c: Certificate): string {
+  const out = [
+    "🧾 <b>وثيقة ضمان — Janeiro</b>", "",
+    `<b>${esc(c.product_name)} — ${esc(c.variant_name)}</b>`, "",
+  ];
+  if (c.customer?.length) {
+    out.push("👤 <b>الزبون</b>");
+    for (const f of c.customer) out.push(`${esc(f.label)}: <b>${esc(f.value)}</b>`);
+    out.push("");
+  }
+  out.push(`📅 يبدأ: <b>${day(c.starts_at)}</b>`);
+  if (c.ends_at) {
+    out.push(`📅 ينتهي: <b>${day(c.ends_at)}</b>` +
+      (c.expired ? " — <b>منتهٍ</b>"
+                 : c.days_left !== null ? ` (${c.days_left} يوماً)` : ""));
+  } else {
+    out.push("📅 المدة: غير محدّدة");
+  }
+  out.push("", `🔖 رمز التحقق: <code>${esc(c.code)}</code>`);
+  if (c.seller) out.push(`البائع: ${esc(c.seller)}`);
+  return out.join("\n");
+}
+
+type Expiring = {
+  code: string; product_name: string; variant_name: string;
+  customer: CustomerField[]; ends_at: string; days_left: number; seller: string;
+};
+
+const who = (c: CustomerField[]): string =>
+  c?.length ? c.map((f) => esc(f.value)).join(" · ") : "—";
+
+function expiringText(rows: Expiring[], days: number): string {
+  if (!rows.length) return `⏰ لا اشتراك ينتهي خلال ${days} يوماً.`;
+  const out = [`⏰ <b>تنتهي خلال ${days} يوماً</b>`, ""];
+  for (const r of rows) {
+    out.push(`• <b>${who(r.customer)}</b>`);
+    out.push(`  ${esc(r.product_name)} — ${esc(r.variant_name)}`);
+    out.push(`  ينتهي ${day(r.ends_at)} — <b>${r.days_left}</b> يوماً`);
+    out.push(`  <code>${esc(r.code)}</code>`);
+    out.push("");
+  }
+  return out.join("\n").trim();
+}
+
+function foundText(rows: Certificate[]): string {
+  if (!rows.length) return "لم أجد زبوناً بهذا الاسم أو الرمز.";
+  const out = [`🔎 <b>${rows.length} نتيجة</b>`, ""];
+  for (const r of rows) {
+    out.push(`• <b>${who(r.customer)}</b>`);
+    out.push(`  ${esc(r.product_name)} — ${esc(r.variant_name)}`);
+    out.push(`  ${day(r.starts_at)} ← ${day(r.ends_at)}` +
+             (r.expired ? " — <b>منتهٍ</b>" : ""));
+    out.push(`  <code>${esc(r.code)}</code>`);
+    out.push("");
+  }
+  out.push("للوثيقة كاملة: <code>/cert الرمز</code>");
+  return out.join("\n").trim();
+}
+
 type Pending = {
   issue_id: string; card_code: string; product_name: string; variant_name: string;
   customer_ref: string | null; requested_at: string; seller: string; mine: boolean;
@@ -284,6 +378,9 @@ const HELP = [
   "/stock — المخزون",
   "/stats — مبيعاتك",
   "/pending — عملياتك المعلّقة",
+  "/cert &lt;الرمز&gt; — وثيقة ضمان بالرمز",
+  "/find &lt;اسم أو يوزر أو رقم&gt; — ابحث عن زبون",
+  "/expiring [أيام] — اشتراكات تنتهي قريباً (7 افتراضياً)",
   "/id — رقمك في تليجرام",
   "", "<b>للمالك</b>", "",
   "/admins — قائمة الأدمن",
@@ -297,6 +394,10 @@ const HELP = [
   "<code>/addcards giftcard year\nCODE-1\nCODE-2</code>",
   "/allstats — مبيعات الجميع",
   "/breakdown — المبيعات حسب المنتج",
+  "/fields — بيانات الزبون المطلوبة لكل منتج",
+  "/addfield &lt;رمز المنتج&gt; &lt;اسم الحقل&gt; [optional]",
+  "   مثال: <code>/addfield giftcard يوزر الأنستا</code>",
+  "/delfield &lt;رمز المنتج&gt; &lt;اسم الحقل&gt;",
 ].join("\n");
 
 // ------------------------------------------------------------
@@ -341,6 +442,13 @@ function findVariant(cat: Product[], productCode: string, variantCode: string) {
 const LOAD_PROMPT = "📥 شحن أكواد";
 const LOAD_RE = new RegExp(`^${LOAD_PROMPT} — (\\S+) / (\\S+)`);
 
+// بيانات الزبون بعد التأكيد: رقم العملية داخل نصّ السؤال نفسه،
+// فلا حاجة لجدول حالة — نفس حيلة شحن الأكواد.
+const CERT_PROMPT = "🧾 بيانات الزبون";
+const CERT_RE = new RegExp(`^${CERT_PROMPT} — ([0-9a-f-]{36})`);
+
+const FIND_PROMPT = "🔎 بحث عن زبون";
+
 function parseCodes(body: string): string[] {
   return body.split(/[\n\r,;]+/).map((c) => c.trim()).filter(Boolean);
 }
@@ -368,6 +476,75 @@ async function loadCards(
     `أُضيفت: <b>${d.added}</b>` + (d.duplicates ? `\nمكرّرة تُجوهلت: ${d.duplicates}` : ""),
     `المتاح الآن: <b>${d.available}</b>`,
   ].join("\n"), [backRow]);
+}
+
+// ------------------------------------------------------------
+// الوثيقة: بعد التأكيد، تُجمع بيانات الزبون ثم تصدر
+// ------------------------------------------------------------
+type IssueFields = {
+  fields: { label: string; is_required: boolean }[];
+  duration_value: number | null;
+  has_certificate: boolean;
+};
+
+/** يسأل عن الحقول، أو يصدر مباشرة إن لم يكن للمنتج حقول. */
+async function afterConfirm(
+  client: SupabaseClient, chat: number, tgId: number, issueId: string,
+) {
+  const f = await rpc<IssueFields>(client, "bot_issue_fields",
+    { p_telegram_id: tgId, p_issue_id: issueId });
+  if (f.error) return;                       // التأكيد نجح؛ الوثيقة إضافة
+  const d = f.data!;
+  if (d.has_certificate) return;
+
+  if (d.fields.length) {
+    const lines = d.fields.map((x, i) =>
+      `${i + 1}. ${esc(x.label)}${x.is_required ? "" : " <i>(اختياري)</i>"}`);
+    await ask(chat, [
+      `${CERT_PROMPT} — ${issueId}`, "",
+      "ردّ على هذه الرسالة ببيانات الزبون، قيمة في كل سطر وبنفس الترتيب:",
+      "", ...lines,
+      "", "<i>سطر فارغ أو «-» يتخطّى حقلاً اختيارياً.</i>",
+    ].join("\n"));
+    return;
+  }
+
+  // بلا حقول: إن كانت للمدة مدّة محسوبة فالوثيقة تُصدر بتاريخيها.
+  if (d.duration_value === null) return;
+  await issueCertificate(client, chat, tgId, issueId, []);
+}
+
+async function issueCertificate(
+  client: SupabaseClient, chat: number, tgId: number,
+  issueId: string, values: { label: string; value: string }[],
+) {
+  const r = await rpc<Certificate>(client, "bot_issue_certificate",
+    { p_telegram_id: tgId, p_issue_id: issueId, p_values: values });
+  if (r.error) { await send(chat, r.error, [backRow]); return; }
+
+  await send(chat, certificateText(r.data!), [
+    // النسخ يشمل الرمز وحده: هو ما يُراجَع به لاحقاً
+    [{ text: "📋 نسخ رمز التحقق", copy_text: { text: r.data!.code } }],
+    [{ text: "🛒 بيع أخرى", callback_data: "m:sell" }],
+    backRow,
+  ]);
+  await send(chat, "⬆️ أعد توجيه الرسالة أعلاه للزبون — هي وثيقته.");
+}
+
+/** ردّ البائع: قيمة في كل سطر، بترتيب الحقول المعروضة. */
+async function certificateFromReply(
+  client: SupabaseClient, chat: number, tgId: number, issueId: string, body: string,
+) {
+  const f = await rpc<IssueFields>(client, "bot_issue_fields",
+    { p_telegram_id: tgId, p_issue_id: issueId });
+  if (f.error) { await send(chat, f.error); return; }
+
+  const lines = body.split("\n").map((l) => l.trim());
+  const values = f.data!.fields
+    .map((x, i) => ({ label: x.label, value: (lines[i] ?? "").replace(/^-+$/, "").trim() }))
+    .filter((v) => v.value !== "");
+
+  await issueCertificate(client, chat, tgId, issueId, values);
 }
 
 // ------------------------------------------------------------
@@ -436,6 +613,83 @@ async function handleCommand(
     case "/id":
       await send(chat, `رقمك في تليجرام: <code>${tgId}</code>`);
       return;
+
+    case "/cert": {
+      if (!args[0]) { await send(chat, "الصيغة: <code>/cert JNR-XXXXXXXX</code>"); return; }
+      const r = await rpc<Certificate>(client, "bot_certificate",
+        { p_telegram_id: tgId, p_code: args[0] });
+      await send(chat, r.error ?? certificateText(r.data!), [backRow]);
+      return;
+    }
+
+    case "/find": {
+      const q = args.join(" ");
+      if (!q) { await send(chat, "الصيغة: <code>/find اسم أو يوزر أو رقم</code>"); return; }
+      const r = await rpc<Certificate[]>(client, "bot_find_customer",
+        { p_telegram_id: tgId, p_query: q });
+      await send(chat, r.error ?? foundText(r.data!), [backRow]);
+      return;
+    }
+
+    case "/expiring": {
+      const d = Number(args[0]) || 7;
+      const r = await rpc<Expiring[]>(client, "bot_expiring",
+        { p_telegram_id: tgId, p_days: d });
+      await send(chat, r.error ?? expiringText(r.data!, d), [backRow]);
+      return;
+    }
+
+    case "/fields": {
+      const r = await rpc<{ product_code: string; product: string;
+                            fields: { label: string; is_required: boolean }[] }[]>(
+        client, "bot_fields_of", { p_telegram_id: tgId });
+      if (r.error) { await send(chat, r.error); return; }
+      const out = ["🧾 <b>بيانات الزبون المطلوبة لكل منتج</b>", ""];
+      for (const p of r.data!) {
+        out.push(`<b>${esc(p.product)}</b>  <code>${esc(p.product_code)}</code>`);
+        if (!p.fields.length) out.push("   (لا حقول — الوثيقة تصدر بالتواريخ فقط)");
+        for (const f of p.fields) {
+          out.push(`   • ${esc(f.label)}${f.is_required ? "" : " (اختياري)"}`);
+        }
+        out.push("");
+      }
+      out.push("إضافة: <code>/addfield insta يوزر الأنستا</code>",
+               "اختياري: <code>/addfield insta رقم الهاتف optional</code>",
+               "حذف: <code>/delfield insta يوزر الأنستا</code>");
+      await send(chat, out.join("\n"), [backRow]);
+      return;
+    }
+
+    case "/addfield": {
+      if (args.length < 2) {
+        await send(chat, "الصيغة: <code>/addfield insta يوزر الأنستا</code>\n" +
+                         "لجعله اختيارياً أضف <code>optional</code> في آخره.");
+        return;
+      }
+      // الكلمة الأخيرة optional تعني حقلاً غير مطلوب
+      const optional = args[args.length - 1].toLowerCase() === "optional";
+      const label = args.slice(1, optional ? -1 : undefined).join(" ");
+      const r = await rpc(client, "bot_add_field", {
+        p_telegram_id: tgId, p_product_code: args[0],
+        p_label: label, p_required: !optional,
+      });
+      await send(chat, r.error ??
+        `✅ أُضيف «${esc(label)}». سيُسأل عنه البائع بعد كل تأكيد لهذا المنتج.`,
+        [backRow]);
+      return;
+    }
+
+    case "/delfield": {
+      if (args.length < 2) {
+        await send(chat, "الصيغة: <code>/delfield insta يوزر الأنستا</code>"); return;
+      }
+      const r = await rpc(client, "bot_remove_field", {
+        p_telegram_id: tgId, p_product_code: args[0], p_label: args.slice(1).join(" "),
+      });
+      await send(chat, r.error ??
+        "✅ حُذف الحقل. الوثائق الصادرة لا تتأثر — بياناتها محفوظة فيها.", [backRow]);
+      return;
+    }
 
     case "/admins": {
       const r = await rpc<{ telegram_id: number; name: string; role: string;
@@ -572,6 +826,25 @@ async function handleCallback(
         return;
       }
 
+      case "exp": {
+        const r = await rpc<Expiring[]>(client, "bot_expiring",
+          { p_telegram_id: tgId, p_days: 7 });
+        if (r.error) { await answer(cbId, r.error, true); return; }
+        await answer(cbId);
+        await edit(chat, msg, expiringText(r.data!, 7), [
+          [{ text: "30 يوماً", callback_data: "exp:30" },
+           { text: "90 يوماً", callback_data: "exp:90" }],
+          backRow,
+        ]);
+        return;
+      }
+
+      case "find":
+        await answer(cbId);
+        await ask(chat, `${FIND_PROMPT}\n\n` +
+          "ردّ على هذه الرسالة باسم الزبون أو يوزره أو رقم هاتفه أو رمز وثيقته.");
+        return;
+
       case "stock": {
         const cat = await catalog(client, tgId, false);
         await answer(cbId);
@@ -619,6 +892,22 @@ async function handleCallback(
       }
     }
     await answer(cbId);
+    return;
+  }
+
+  // ---------- مدى أطول لقائمة «تنتهي قريباً» ----------
+  if (verb === "exp") {
+    const d = Number(arg) || 7;
+    const r = await rpc<Expiring[]>(client, "bot_expiring",
+      { p_telegram_id: tgId, p_days: d });
+    if (r.error) { await answer(cbId, r.error, true); return; }
+    await answer(cbId);
+    await edit(chat, msg, expiringText(r.data!, d), [
+      [{ text: "7 أيام", callback_data: "exp:7" },
+       { text: "30 يوماً", callback_data: "exp:30" },
+       { text: "90 يوماً", callback_data: "exp:90" }],
+      backRow,
+    ]);
     return;
   }
 
@@ -706,6 +995,9 @@ async function handleCallback(
       [{ text: "🛒 بيع أخرى", callback_data: "m:sell" }],
       backRow,
     ]);
+    // ثم الوثيقة: يسأل عن بيانات الزبون، أو يصدرها فوراً إن لم
+    // يكن للمنتج حقول. البيعة مثبتة أصلاً، فتعثّر الوثيقة لا يمسّها.
+    await afterConfirm(client, chat, tgId, arg);
     return;
   }
 
@@ -822,9 +1114,23 @@ Deno.serve(async (req) => {
 
     // ردّ على سؤال «شحن أكواد»؟ الرمزان في نصّ السؤال نفسه.
     const replied = update.message?.reply_to_message?.text ?? "";
+
     const m = replied.match(LOAD_RE);
     if (m) {
       await loadCards(client, chat, src.id, m[1], m[2], parseCodes(text));
+      return new Response("ok");
+    }
+
+    const c = replied.match(CERT_RE);
+    if (c) {
+      await certificateFromReply(client, chat, src.id, c[1], text);
+      return new Response("ok");
+    }
+
+    if (replied.startsWith(FIND_PROMPT)) {
+      const r = await rpc<Certificate[]>(client, "bot_find_customer",
+        { p_telegram_id: src.id, p_query: text });
+      await send(chat, r.error ?? foundText(r.data!), [backRow]);
       return new Response("ok");
     }
 

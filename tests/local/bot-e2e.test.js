@@ -52,7 +52,22 @@ function lit(v) {
   if (v === null || v === undefined) return "null";
   if (typeof v === "number")  return String(v);
   if (typeof v === "boolean") return v ? "true" : "false";
-  if (Array.isArray(v)) return `array[${v.map(lit).join(",")}]::text[]`;
+  /* مصفوفة نصوص -> text[] (أكواد البطاقات). أي شيء آخر مركّب
+     -> jsonb، لأن PostgREST يمرّر JSON كما هو إلى وسيط jsonb.
+     بلا هذا الفرق كانت مصفوفة الكائنات تصير
+     array['[object Object]']::text[] ويختفي الوسيط الصحيح. */
+  const json = (x) => {
+    const s = JSON.stringify(x);
+    let tag = "j";
+    while (s.includes(`$${tag}$`)) tag += "j";
+    return `$${tag}$${s}$${tag}$::jsonb`;
+  };
+  if (Array.isArray(v)) {
+    return v.every((e) => typeof e === "string")
+      ? `array[${v.map(lit).join(",")}]::text[]`
+      : json(v);
+  }
+  if (typeof v === "object") return json(v);
   const s = String(v);
   let tag = "q";
   while (s.includes(`$${tag}$`)) tag += "q";
@@ -148,6 +163,12 @@ function drain() { telegramCalls.length = 0; }
 
 // ---------- التهيئة ----------
 function seed() {
+  // الوثائق أولاً: bot_certificates.issue_id مقيّد بـ restrict عمداً،
+  // فلا تفقد وثيقةٌ بيعتَها. التنظيف يحترم الترتيب نفسه.
+  sql(`delete from bot_certificates where issue_id in (
+         select i.id from bot_issues i join bot_admins a on a.id = i.admin_id
+          where a.telegram_id >= 970000000)`);
+  sql(`delete from bot_fields where product_id in (select id from bot_products where code='e2e')`);
   sql(`delete from bot_issues where admin_id in (select id from bot_admins where telegram_id >= 970000000)`);
   sql(`delete from bot_cards where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e')`);
   sql(`delete from bot_variants where product_id in (select id from bot_products where code='e2e')`);
@@ -406,6 +427,92 @@ async function run() {
   await update(tap(SELLER, `adm:${OWNER}`));
   assert(last("answerCallbackQuery").payload.text.includes("للمالك وحده"),
          "البائع لا يفتح تفصيل غيره حتى بضغطة مباشرة");
+
+  // ========== وثيقة الضمان (023) ==========
+  // حقلان على المنتج: يوزر مطلوب وهاتف اختياري
+  drain();
+  await update(message(OWNER, "/addfield e2e يوزر الأنستا"));
+  assert(lastText("sendMessage").includes("✅"), "المالك يضيف حقل بيانات للزبون");
+  await update(message(OWNER, "/addfield e2e رقم الهاتف optional"));
+  drain();
+  await update(message(OWNER, "/fields"));
+  const fl = lastText("sendMessage");
+  assert(fl.includes("يوزر الأنستا") && fl.includes("رقم الهاتف (اختياري)"),
+         "/fields يعرض الحقول ويميّز الاختياري");
+
+  // المدة تحتاج قيمة ليُحسب الانتهاء — كما يضبطها المالك
+  sql(`update bot_variants set duration_value=1, duration_unit='year'
+        where code='year' and product_id=(select id from bot_products where code='e2e')`);
+  sql(`select bot_add_cards(${OWNER}, (select v.id from bot_variants v
+        join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year'),
+        array['CERT-1'])`);
+
+  // بيعة -> تأكيد -> البوت يسأل عن بيانات الزبون
+  drain();
+  await update(tap(SELLER, yearBtn.callback_data));
+  const cardC = last("sendMessage");
+  drain();
+  await update(tap(SELLER, kb(cardC).find((b) => b.text.includes("تأكيد")).callback_data));
+  const askMsg = telegramCalls.filter((c) => c.method === "sendMessage")
+    .find((c) => (c.payload.text || "").startsWith("🧾 بيانات الزبون"));
+  assert(!!askMsg, "بعد التأكيد يسأل البوت عن بيانات الزبون");
+  assert(askMsg.payload.reply_markup.force_reply === true, "بردّ إجباري");
+  assert(askMsg.payload.text.includes("1. يوزر الأنستا"),
+         "ويعرض الحقول مرقّمة بالترتيب");
+  assert(askMsg.payload.text.includes("اختياري"), "ويميّز الاختياري منها");
+
+  // ردّ ناقص: الحقل المطلوب فارغ
+  drain();
+  await update(message(SELLER, "-\n0550111222",
+                       askMsg.payload.text.replace(/<[^>]+>/g, "")));
+  assert(lastText("sendMessage").includes("ينقص حقل مطلوب: يوزر الأنستا"),
+         "حقل مطلوب فارغ يوقف الإصدار ويسمّي الحقل");
+
+  // ردّ صحيح -> الوثيقة
+  drain();
+  await update(message(SELLER, "@ahmed_dz\n0550111222",
+                       askMsg.payload.text.replace(/<[^>]+>/g, "")));
+  const certMsg = telegramCalls.filter((c) => c.method === "sendMessage")
+    .find((c) => (c.payload.text || "").includes("وثيقة ضمان"));
+  assert(!!certMsg, "الردّ الصحيح يُصدر الوثيقة");
+  const ct = certMsg.payload.text;
+  assert(ct.includes("@ahmed_dz") && ct.includes("0550111222"),
+         "وفيها بيانات الزبون كما أُدخلت");
+  assert(/📅 يبدأ: <b>\d{4}-\d{2}-\d{2}<\/b>/.test(ct), "وتاريخ البداية");
+  assert(/📅 ينتهي: <b>\d{4}-\d{2}-\d{2}<\/b>/.test(ct), "وتاريخ النهاية");
+  const certCode = (ct.match(/JNR-[A-Z0-9]+/) || [])[0];
+  assert(!!certCode, "ورمز تحقّق");
+  assert(!!kb(certMsg).find((b) => b.copy_text && b.copy_text.text === certCode),
+         "وزر نسخ يحمل الرمز");
+  assert(Number(sql(`select count(*) from bot_certificates where code='${certCode}'`)) === 1,
+         "والوثيقة مخزّنة في قاعدة البيانات");
+
+  // مراجعتها بالرمز، وبحروف صغيرة
+  drain();
+  await update(message(SELLER, `/cert ${certCode.toLowerCase()}`));
+  assert(lastText("sendMessage").includes("@ahmed_dz"),
+         "/cert يعيدها بالرمز ولو بحروف صغيرة");
+
+  // البحث عن الزبون
+  drain();
+  await update(message(SELLER, "/find ahmed"));
+  assert(lastText("sendMessage").includes("@ahmed_dz"), "/find يجده بيوزره");
+  drain();
+  await update(message(SELLER, "/find 0550111222"));
+  assert(lastText("sendMessage").includes("@ahmed_dz"), "و برقم هاتفه");
+
+  // تنتهي قريباً
+  drain();
+  await update(message(SELLER, "/expiring 7"));
+  assert(lastText("sendMessage").includes("لا اشتراك ينتهي"),
+         "اشتراك بعد سنة ليس «قريباً»");
+  sql(`update bot_certificates set starts_at = now() - interval '360 days',
+         ends_at = now() + interval '3 days' where code='${certCode}'`);
+  drain();
+  await update(message(SELLER, "/expiring 7"));
+  const exp = lastText("sendMessage");
+  assert(exp.includes("@ahmed_dz") && exp.includes("تنتهي خلال 7"),
+         "وبعد ثلاثة أيام يظهر في القائمة");
 
   // ========== نفاد المخزون ==========
   sql(`update bot_cards set status='sold' where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year')`);

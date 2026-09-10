@@ -371,6 +371,148 @@ begin
   end;
   raise notice 'PASS  تعطيل بائع يحرّر بطاقاته ويبقي سجله';
 
+  -- ========== وثيقة الضمان (023) ==========
+  -- منتج بحقول زبون: يوزر أنستا مطلوب، وهاتف اختياري
+  perform bot_add_product(v_owner_tg, 'insta', 'متابعين انستا');
+  perform bot_add_variant(v_owner_tg, 'insta', 'year', 'سنة');
+  select id into v_prod from bot_products where code = 'insta';
+  select id into v_year from bot_variants where product_id = v_prod and code = 'year';
+  -- المدة تُملأ كما يملؤها المالك من اللوحة
+  update bot_variants set duration_value = 1, duration_unit = 'year' where id = v_year;
+  perform bot_add_field(v_owner_tg, 'insta', 'يوزر الأنستا');
+  perform bot_add_field(v_owner_tg, 'insta', 'رقم الهاتف', false);
+  perform bot_add_cards(v_owner_tg, v_year, array['INS-1','INS-2','INS-3']);
+
+  -- ما الذي يسأل عنه البوت بعد التأكيد؟
+  v_res  := bot_request_card(v_b_tg, v_year);
+  v_issue := (v_res->>'issue_id')::uuid;
+  v_res  := bot_issue_fields(v_b_tg, v_issue);
+  assert jsonb_array_length(v_res->'fields') = 2, 'issue_fields: both fields listed';
+  assert v_res->'fields'->0->>'label' = 'يوزر الأنستا', 'issue_fields: in order';
+  assert (v_res->'fields'->1->>'is_required')::boolean = false,
+         'issue_fields: optional flag carried';
+
+  -- الوثيقة لا تصدر لبيعة لم تُؤكَّد
+  begin
+    perform bot_issue_certificate(v_b_tg, v_issue,
+      '[{"label":"يوزر الأنستا","value":"@x"}]'::jsonb);
+    assert false, 'issued a certificate for a pending sale';
+  exception when others then
+    assert sqlerrm like 'ISSUE_NOT_CONFIRMED%', 'pending sale blocked, got: ' || sqlerrm;
+  end;
+
+  perform bot_confirm_issue(v_b_tg, v_issue);
+
+  -- حقل مطلوب ناقص يوقف الإصدار
+  begin
+    perform bot_issue_certificate(v_b_tg, v_issue,
+      '[{"label":"رقم الهاتف","value":"0550111222"}]'::jsonb);
+    assert false, 'issued a certificate without a required field';
+  exception when others then
+    assert sqlerrm like 'FIELD_REQUIRED:يوزر الأنستا%',
+           'the missing field is named, got: ' || sqlerrm;
+  end;
+
+  v_res := bot_issue_certificate(v_b_tg, v_issue,
+    '[{"label":"يوزر الأنستا","value":"@ahmed_dz"},
+      {"label":"رقم الهاتف","value":"0550111222"}]'::jsonb);
+  v_code := v_res->>'code';
+  assert v_code like 'JNR-%', 'certificate code shape, got: ' || v_code;
+  assert (v_res->>'starts_at')::timestamptz <= now(), 'starts now';
+  -- سنة كاملة، محسوبة من المدة لا مكتوبة بيد
+  assert (v_res->>'ends_at')::timestamptz
+         between now() + interval '364 days' and now() + interval '367 days',
+         'ends one year later, computed from the duration';
+  assert (v_res->>'days_left')::int between 364 and 366, 'days_left ~ 365';
+  assert jsonb_array_length(v_res->'customer') = 2, 'both customer values stored';
+  raise notice 'PASS  الوثيقة تصدر بتاريخي البداية والنهاية';
+
+  -- لا وثيقتان لبيعة واحدة
+  begin
+    perform bot_issue_certificate(v_b_tg, v_issue,
+      '[{"label":"يوزر الأنستا","value":"@other"}]'::jsonb);
+    assert false, 'issued two certificates for one sale';
+  exception when others then
+    assert sqlerrm like 'CERTIFICATE_EXISTS%', 'second issue blocked, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  وثيقة واحدة لكل بيعة';
+
+  -- القراءة بالرمز
+  v_res := bot_certificate(v_b_tg, v_code);
+  assert v_res->>'product_name' = 'متابعين انستا', 'cert lookup: product';
+  assert (v_res->>'expired')::boolean = false, 'cert lookup: not expired yet';
+  -- الحروف الصغيرة والمسافات تُقبل: الزبون يعيد كتابة الرمز بيده
+  assert bot_certificate(v_b_tg, '  ' || lower(v_code) || ' ')->>'code' = v_code,
+         'cert lookup tolerates case and spaces';
+  begin
+    perform bot_certificate(v_b_tg, 'JNR-NOPENOPENOPE');
+    assert false, 'unknown code accepted';
+  exception when others then
+    assert sqlerrm like 'CERTIFICATE_NOT_FOUND%', 'unknown code rejected, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  قراءة الوثيقة بالرمز';
+
+  -- البحث عن الزبون بأي حقل
+  assert jsonb_array_length(bot_find_customer(v_b_tg, 'ahmed')) = 1,
+         'find: by instagram handle';
+  assert jsonb_array_length(bot_find_customer(v_b_tg, '0550111222')) = 1,
+         'find: by phone, same customer';
+  assert jsonb_array_length(bot_find_customer(v_b_tg, 'nobody-here')) = 0,
+         'find: no false positives';
+  begin
+    perform bot_find_customer(v_b_tg, 'a');
+    assert false, 'one-letter search accepted';
+  exception when others then
+    assert sqlerrm like 'QUERY_TOO_SHORT%', 'one letter rejected, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  البحث عن زبون بأي حقل';
+
+  -- الاشتراكات المنتهية قريباً
+  assert jsonb_array_length(bot_expiring(v_b_tg, 7)) = 0,
+         'expiring: a year away is not "soon"';
+  update bot_certificates set ends_at = now() + interval '3 days' where code = v_code;
+  assert jsonb_array_length(bot_expiring(v_b_tg, 7)) = 1,
+         'expiring: three days away shows up';
+  assert (bot_expiring(v_b_tg, 7) -> 0 ->> 'days_left')::int between 2 and 3,
+         'expiring: days_left is right';
+  -- اشتراك منتهٍ حقيقي: بدايته في الماضي كذلك. القيد
+  -- bot_cert_window_ok يرفض نهايةً قبل بدايةٍ — وهو محق، فعدّلا معاً.
+  update bot_certificates
+     set starts_at = now() - interval '400 days', ends_at = now() - interval '1 day'
+   where code = v_code;
+  assert jsonb_array_length(bot_expiring(v_b_tg, 7)) = 0,
+         'expiring: already expired is not "expiring"';
+  assert (bot_certificate(v_b_tg, v_code)->>'expired')::boolean,
+         'and it reads as expired';
+  raise notice 'PASS  اشتراكات تنتهي قريباً';
+
+  -- بائع لا يرى وثائق غيره
+  begin
+    perform bot_certificate(v_a_tg, v_code);
+    assert false, 'an admin read another admin''s certificate';
+  exception when others then
+    assert sqlerrm like 'NOT_YOUR_ISSUE%' or sqlerrm like 'NOT_AUTHORIZED%',
+           'cross-seller certificate blocked, got: ' || sqlerrm;
+  end;
+  -- والمالك يرى كل شيء
+  assert bot_certificate(v_owner_tg, v_code)->>'code' = v_code, 'owner reads any certificate';
+  raise notice 'PASS  كل بائع يرى وثائقه، والمالك يرى الكل';
+
+  -- حذف حقل لا يمسّ وثيقة صادرة
+  perform bot_remove_field(v_owner_tg, 'insta', 'رقم الهاتف');
+  assert jsonb_array_length(bot_certificate(v_owner_tg, v_code)->'customer') = 2,
+         'deleting a field leaves issued certificates untouched';
+  raise notice 'PASS  حذف حقل لا يغيّر وثيقة صادرة';
+
+  -- ولا نجمع كلمات سر، أبداً
+  begin
+    perform bot_add_field(v_owner_tg, 'insta', 'كلمة السر');
+    assert false, 'a password field was accepted';
+  exception when others then
+    assert sqlerrm not like 'FIELD_EXISTS%', 'password field rejected by the check';
+  end;
+  raise notice 'PASS  لا حقل لكلمة سر';
+
   raise notice '===== bot tests passed =====';
 end $$;
 
