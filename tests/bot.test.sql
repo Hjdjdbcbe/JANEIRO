@@ -611,7 +611,10 @@ begin
 
   -- «من ينتهي اشتراكه اليوم؟»
   update bot_certificates
-     set starts_at = now() - interval '300 days', ends_at = date_trunc('day', now()) + interval '20 hours'
+     set starts_at = now() - interval '300 days',
+         -- آخر ثانية من اليوم لا ساعة ثابتة: كانت 20:00، فكان
+         -- الاختبار يمرّ صباحاً ويفشل مساءً.
+         ends_at = date_trunc('day', now()) + interval '1 day' - interval '1 second'
    where code = v_code;
   assert jsonb_array_length(bot_expiring(v_b_tg, 0)) = 1, 'expiring today: found';
   update bot_certificates

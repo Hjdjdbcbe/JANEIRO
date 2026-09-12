@@ -8,7 +8,8 @@
 # Steps: shim -> migrations -> migrations again (re-run check)
 #        -> backend.test.sql -> concurrency.test.sh
 #        -> bot.test.sql -> bot-concurrency.test.sh
-#        -> engagement.test.sql -> forbidden-text.test.sh -> bot-e2e.test.js
+#        -> engagement.test.sql -> forbidden-text.test.sh
+#        -> qr.test.js -> bot-e2e.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
 # role matching $PGUSER (default: the current OS user).
@@ -92,6 +93,9 @@ set +o pipefail
 
 bold "==> forbidden-text.test.sh"
 bash "$HERE/forbidden-text.test.sh"
+
+bold "==> qr.test.js"
+node "$HERE/qr.test.js"
 
 bold "==> bot-e2e.test.js"
 node "$HERE/bot-e2e.test.js" "$DB"

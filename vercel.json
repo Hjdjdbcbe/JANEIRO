@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/warranty/:path*",
+      "destination": "https://nmzljzmltuwbwlbugwas.supabase.co/functions/v1/telegram-bot/warranty/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/warranty/:path*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
+  ]
+}

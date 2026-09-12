@@ -16,7 +16,9 @@
 // ترفض العمل أصلاً إن لم يكن TELEGRAM_WEBHOOK_SECRET مضبوطاً.
 // ============================================================
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { DOC, formatDate } from "./i18n.ts";
+import { DOC, LANGS, isLang, formatDate, commitmentLines, docError } from "./i18n.ts";
+import type { Lang } from "./i18n.ts";
+import { qrSvg } from "./qr.ts";
 
 const TG_TOKEN   = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
 const TG_SECRET  = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "";
@@ -33,10 +35,13 @@ const SELF_URL   = `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/telegram-
 // إلى هذه الدالة. بلا ضبطه تعمل الروابط على شكل المعاملات، فلا
 // يتوقّف شيء إن نُسي.
 const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") ?? "").replace(/\/+$/, "");
+// الاحتياط بمعاملات خاصة بوثيقة الالتزام (claim/doc/verify) لا
+// بـ fill/cert: هذان لفيتشر 024 وبياناتهما مختلفة، وخلطهما كان
+// يرسل زبون الالتزام إلى استمارة لا تخصّه.
 const claimUrl  = (t: string) =>
-  SITE_URL ? `${SITE_URL}/warranty/claim/${t}` : `${SELF_URL}?fill=${t}`;
+  SITE_URL ? `${SITE_URL}/warranty/claim/${t}` : `${SELF_URL}?claim=${t}`;
 const docUrl    = (c: string) =>
-  SITE_URL ? `${SITE_URL}/warranty/${c}` : `${SELF_URL}?cert=${c}`;
+  SITE_URL ? `${SITE_URL}/warranty/${c}` : `${SELF_URL}?doc=${c}`;
 const verifyUrl = (c: string) =>
   SITE_URL ? `${SITE_URL}/warranty/verify/${c}` : `${SELF_URL}?verify=${c}`;
 const API        = `${API_BASE}/bot${TG_TOKEN}`;
@@ -527,10 +532,16 @@ async function loadCards(
 // ============================================================
 type Contact = { label: string; value: string; url: string | null; icon: string | null };
 
-function page(title: string, body: string, extraHead = ""): Response {
+function page(
+  title: string, body: string, extraHead = "",
+  opts: { lang?: Lang; noindex?: boolean } = {},
+): Response {
+  const lang = opts.lang ?? "ar";
+  const dir  = DOC[lang].dir;
   return new Response(
-    `<!doctype html><html lang="ar" dir="rtl"><head>
+    `<!doctype html><html lang="${lang}" dir="${dir}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+${opts.noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
 <title>${title}</title><style>
 :root{--ink:#14121F;--muted:#6B6880;--line:#E7E4F2;--bg:#F7F6FB;--card:#fff;--accent:#6C35FF;--soft:#F1EDFF}
 @media(prefers-color-scheme:dark){:root{--ink:#F3F1FA;--muted:#A7A3BC;--line:#2C2842;--bg:#131120;--card:#1B1830;--soft:#241F3E}}
@@ -629,6 +640,180 @@ function certPage(c: Certificate & { contacts?: Contact[] }): Response {
     ${contacts ? `<div class="contacts"><h2>للتواصل معنا</h2>${contacts}</div>` : ""}
     <button class="noprint" onclick="window.print()">حفظ أو طباعة PDF</button>
   </div><p class="brand">Janeiro</p>`);
+}
+
+// ============================================================
+// صفحات وثيقة التزام الخدمة — بثلاث لغات
+// ============================================================
+type Engagement = {
+  code: string; ref_code: string; holder_name: string; instagram: string | null;
+  platform: string; months: number; bonus_days: number;
+  starts_at: string; ends_at: string | null;
+  status: "active" | "expired" | "revoked" | "pending";
+  days_left: number | null; contacts?: Contact[];
+};
+
+/** مبدّل اللغة: نفس المسار، بمعامل lang. */
+function langSwitch(path: string, current: Lang): string {
+  const names: Record<Lang, string> = { ar: "العربية", fr: "Français", en: "English" };
+  return `<div class="langs noprint">` + LANGS.map((l) =>
+    l === current
+      ? `<span class="on">${names[l]}</span>`
+      : `<a href="${esc(path)}?lang=${l}">${names[l]}</a>`).join("") + `</div>`;
+}
+
+const ENG_CSS = `
+.langs{display:flex;gap:6px;justify-content:center;margin-bottom:14px}
+.langs a,.langs span{padding:6px 12px;border-radius:999px;font-size:13px;
+ text-decoration:none;border:1px solid var(--line);color:var(--muted)}
+.langs .on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.head{background:#17142B;color:#fff;margin:-22px -22px 20px;padding:24px 22px;
+ border-radius:18px 18px 0 0}
+.head .brand{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.62}
+.head h1{font-size:20px;margin:8px 0 6px;letter-spacing:.02em}
+.head .sub{font-size:14px;opacity:.82;margin:0}
+.head .tag{font-size:12px;opacity:.52;margin:10px 0 0}
+.eng{margin-top:22px;padding-top:18px;border-top:2px dashed var(--line)}
+.eng h2{font-size:13px;letter-spacing:.1em;margin:0 0 12px}
+.eng ol{list-style:none;margin:0;padding:0}
+.eng li{display:flex;gap:10px;font-size:14px;line-height:1.6;margin-bottom:10px;color:var(--muted)}
+.eng .n{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;flex:none}
+.qr{display:flex;align-items:center;gap:14px;margin-top:20px;padding-top:16px;
+ border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.acts{display:flex;gap:8px;margin-top:20px}
+.acts a,.acts button{flex:1;margin:0;padding:12px;font-size:14px;text-align:center;
+ text-decoration:none;border-radius:12px;border:1px solid var(--line);
+ background:var(--bg);color:var(--ink);font-weight:600;cursor:pointer}
+.acts .primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.st{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:700}
+.st.active{background:#E7F7EE;color:#11794A}
+.st.expired,.st.revoked{background:#FBE9E9;color:#B42318}
+@media(prefers-color-scheme:dark){.st.active{background:#12301F;color:#66D9A0}
+ .st.expired,.st.revoked{background:#3A1A1A;color:#F5837C}}
+@media print{.head{margin:0 0 18px;border-radius:0}}
+`;
+
+/** استمارة الزبون — الحقول الثلاثة، بلغته. */
+function engFormPage(token: string, d: {
+  platform: string; months: number; bonus_days: number;
+}, lang: Lang): Response {
+  const t = DOC[lang];
+  const f = t.form;
+  const field = (id: string, label: string, hint: string, req: boolean, extra = "") => `
+    <label for="${id}">${esc(label)}${req ? "" : ` <span class="opt">(${esc(f.optional)})</span>`}</label>
+    <input id="${id}" name="${id}" ${req ? "required" : ""} autocomplete="off" ${extra}>
+    <p class="hint">${esc(hint)}</p>`;
+
+  return page(`${t.form.heading} — Janeiro Store`, `
+    ${langSwitch(`/warranty/claim/${token}`, lang)}
+    <div class="card">
+      <span class="badge">${esc(t.subtitle(d.platform))}</span>
+      <h1>${esc(f.heading)}</h1>
+      <p class="sub">${esc(f.intro)}</p>
+      <p class="sub"><b>${esc(t.labels.coverage)}:</b> ${esc(t.duration(d.months, d.bonus_days))}</p>
+      <form method="POST" action="/warranty/claim/${esc(token)}?lang=${lang}">
+        ${field("full_name", f.fullName, "", true, 'maxlength="80"')}
+        ${field("whatsapp", f.whatsapp, f.whatsappHint, true,
+                'inputmode="tel" placeholder="0550 00 00 00"')}
+        ${field("instagram", f.instagram, f.instagramHint, false, 'maxlength="40"')}
+        <button type="submit">${esc(f.submit)}</button>
+      </form>
+    </div><p class="brand">Janeiro Store</p>`,
+    `<style>${ENG_CSS}.hint{margin:6px 0 0;font-size:12px;color:var(--muted)}</style>`,
+    { lang, noindex: true });
+}
+
+/** الوثيقة نفسها. */
+function engDocPage(d: Engagement, lang: Lang): Response {
+  const t = DOC[lang];
+  const L = t.labels;
+  const row = (label: string, value: string) =>
+    `<div><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+
+  const contacts = (d.contacts ?? []).map((k) => {
+    const inner = `<span>${k.icon ? esc(k.icon) + " " : ""}${esc(k.label)}</span><b>${esc(k.value)}</b>`;
+    return k.url ? `<a href="${esc(k.url)}" target="_blank" rel="noopener">${inner}</a>`
+                 : `<div class="c">${inner}</div>`;
+  }).join("");
+
+  return page(`${t.title} — Janeiro Store`, `
+    ${langSwitch(`/warranty/${d.code}`, lang)}
+    <div class="card">
+      <div class="head">
+        <div class="brand">Janeiro Store</div>
+        <h1>${esc(t.title)}</h1>
+        <p class="sub">${esc(t.subtitle(d.platform))}</p>
+        <p class="tag">${esc(t.tagline)}</p>
+      </div>
+
+      <p class="sub"><span class="st ${d.status}">${esc(t.status[d.status])}</span>
+        ${d.status === "active" && d.days_left !== null
+          ? ` &nbsp;${esc(t.daysLeft(d.days_left))}` : ""}</p>
+
+      <div class="dl">
+        ${row(L.ref, d.ref_code)}
+        ${row(L.holder, d.holder_name)}
+        ${d.instagram ? row(L.account, "@" + d.instagram) : ""}
+        ${row(L.service, d.platform)}
+        ${row(L.coverage, t.duration(d.months, d.bonus_days))}
+        ${row(L.activatedOn, formatDate(d.starts_at, lang))}
+        ${d.ends_at ? row(L.coveredUntil, formatDate(d.ends_at, lang)) : ""}
+        ${row(L.key, d.code)}
+      </div>
+
+      <div class="eng">
+        <h2>${esc(t.commitmentHeading)}</h2>
+        <ol>${commitmentLines(lang).map((line) => {
+          const n = line.slice(0, 4);
+          return `<li><span class="n">${esc(n)}</span><span>${esc(line.slice(5))}</span></li>`;
+        }).join("")}</ol>
+      </div>
+
+      <div class="qr">
+        <div>${qrSvg(verifyUrl(d.code), 74)}</div>
+        <div>${esc(t.verifyHint)}<br><small>${esc(verifyUrl(d.code))}</small></div>
+      </div>
+
+      <div class="acts noprint">
+        <a class="primary" href="/warranty/${esc(d.code)}/image?lang=${lang}"
+           download="janeiro-${esc(d.code)}.png">${esc(t.actions.png)}</a>
+        <a href="/warranty/${esc(d.code)}/pdf?lang=${lang}">${esc(t.actions.pdf)}</a>
+        <button onclick="window.print()">${esc(t.actions.print)}</button>
+      </div>
+      <p class="note noprint">${esc(t.keep)}</p>
+      ${contacts ? `<div class="contacts"><h2>${esc(t.contactsHeading)}</h2>${contacts}</div>` : ""}
+    </div><p class="brand">Janeiro Store</p>`,
+    `<style>${ENG_CSS}</style>`, { lang, noindex: true });
+}
+
+/** صفحة التحقق التي يقصدها الـQR. */
+function engVerifyPage(v: {
+  found: boolean; code?: string; platform?: string; ends_at?: string | null;
+  status?: Engagement["status"]; holder_hint?: string | null;
+}, lang: Lang): Response {
+  const t = DOC[lang];
+  if (!v.found) {
+    return page(`Janeiro Store`, `${langSwitch("/warranty/verify/-", lang)}
+      <div class="card"><h1>${esc(t.errors.CERTIFICATE_NOT_FOUND)}</h1></div>`,
+      `<style>${ENG_CSS}</style>`, { lang, noindex: true });
+  }
+  return page(`${t.labels.key} — Janeiro Store`, `
+    ${langSwitch(`/warranty/verify/${v.code}`, lang)}
+    <div class="card">
+      <div class="head">
+        <div class="brand">Janeiro Store</div>
+        <h1>${esc(t.title)}</h1>
+        <p class="sub">${esc(t.verifyHint)}</p>
+      </div>
+      <p class="sub"><span class="st ${v.status}">${esc(t.status[v.status!])}</span></p>
+      <div class="dl">
+        ${v.holder_hint ? `<div><span>${esc(t.labels.holder)}</span><b>${esc(v.holder_hint)}</b></div>` : ""}
+        <div><span>${esc(t.labels.service)}</span><b>${esc(v.platform ?? "")}</b></div>
+        ${v.ends_at ? `<div><span>${esc(t.labels.coveredUntil)}</span><b>${esc(formatDate(v.ends_at, lang))}</b></div>` : ""}
+        <div><span>${esc(t.labels.key)}</span><b class="mono">${esc(v.code ?? "")}</b></div>
+      </div>
+    </div><p class="brand">Janeiro Store</p>`,
+    `<style>${ENG_CSS}</style>`, { lang, noindex: true });
 }
 
 // ------------------------------------------------------------
@@ -1558,11 +1743,99 @@ const linkError = (raw: string): string =>
  * ولا العكس.
  */
 async function customerRoute(req: Request, url: URL): Promise<Response | null> {
+  // المسارات الجميلة على دومين المتجر أولاً (vercel.json يحوّلها
+  // إلى هنا)، ثم المعاملات كاحتياط إن لم يُضبط PUBLIC_SITE_URL.
+  const p = url.pathname.replace(/\/+$/, "");
+  const mClaim  = p.match(/\/warranty\/claim\/([0-9a-f]{32,})$/i);
+  const mVerify = p.match(/\/warranty\/verify\/([A-Za-z0-9-]{8,})$/);
+  const mDoc    = p.match(/\/warranty\/(JW-[A-Za-z0-9]{6,})$/i);
+
+  const claim  = mClaim?.[1]  ?? url.searchParams.get("claim");
+  const verify = mVerify?.[1] ?? url.searchParams.get("verify");
+  const doc    = mDoc?.[1]    ?? url.searchParams.get("doc");
   const fill = url.searchParams.get("fill");
   const cert = url.searchParams.get("cert");
-  if (!fill && !cert) return null;
+  if (!claim && !verify && !doc && !fill && !cert) return null;
 
   const client = db();
+  const q = url.searchParams.get("lang");
+  const lang: Lang = isLang(q) ? q : "ar";
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "";
+
+  // ---------- وثيقة التزام الخدمة ----------
+  if (verify) {
+    const { data, error } = await client.rpc("bot_engagement_verify", { p_code: verify });
+    if (error) return page("Janeiro Store",
+      `<div class="card"><h1>${esc(docError(String(error.message ?? ""), lang))}</h1></div>`,
+      "", { lang, noindex: true });
+    return engVerifyPage(data as Parameters<typeof engVerifyPage>[0], lang);
+  }
+
+  if (doc) {
+    const { data, error } = await client.rpc("bot_engagement_public", { p_code: doc });
+    if (error) return page("Janeiro Store",
+      `<div class="card"><h1>${esc(docError(String(error.message ?? ""), lang))}</h1></div>`,
+      "", { lang, noindex: true });
+    return engDocPage(data as Engagement, lang);
+  }
+
+  if (claim) {
+    const shape = await client.rpc("bot_engagement_claim_form", { p_token: claim });
+    if (shape.error) return page("Janeiro Store",
+      `<div class="card"><h1>${esc(docError(String(shape.error.message ?? ""), lang))}</h1></div>`,
+      "", { lang, noindex: true });
+
+    if (req.method === "GET") {
+      return engFormPage(claim, shape.data as {
+        platform: string; months: number; bonus_days: number;
+      }, lang);
+    }
+
+    const form = await req.formData().catch(() => null);
+    if (!form) return errPage(DOC[lang].errors.UNKNOWN);
+
+    // الحدّ في نداء مستقل قبل العمل: استثناء الدالة يُرجِع
+    // معاملتها ومعها عدّاد المحاولات، فتصير المحاولة الفاشلة مجانية.
+    const guard = await client.rpc("bot_claim_guard", { p_token: claim, p_ip: ip });
+    if (guard.data === false) return page("Janeiro Store",
+      `<div class="card"><h1>${esc(DOC[lang].errors.RATE_LIMITED)}</h1></div>`,
+      "", { lang, noindex: true });
+
+    const { data, error } = await client.rpc("bot_engagement_claim", {
+      p_token: claim,
+      p_name: String(form.get("full_name") ?? ""),
+      p_whatsapp: String(form.get("whatsapp") ?? ""),
+      p_instagram: String(form.get("instagram") ?? "") || null,
+      p_ip: ip,
+    });
+    if (error) {
+      // الخطأ يُعاد داخل الاستمارة نفسها لا في صفحة ميتة
+      const body = (engFormPage(claim, shape.data as {
+        platform: string; months: number; bonus_days: number;
+      }, lang) as Response);
+      const html = await body.text();
+      return new Response(html.replace("<form",
+        `<div class="note err">${esc(docError(String(error.message ?? ""), lang))}</div><form`),
+        { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
+
+    const out = data as { code: string; issued_by_telegram_id: number };
+    await send(Number(out.issued_by_telegram_id), [
+      "✅ <b>الزبون عبّأ وثيقته</b>", "",
+      `🔖 <code>${esc(out.code)}</code>`, "",
+      `<a href="${esc(docUrl(out.code))}">الوثيقة</a>`,
+    ].join("\n"));
+
+    // إعادة توجيه إلى الوثيقة: التحديث لا يعيد الإرسال.
+    // الفاصل يُحسب لا يُفترض: الشكل الاحتياطي فيه «؟» أصلاً،
+    // فكان الرابط يخرج ?doc=JW-…?lang=fr بعلامتَي استفهام.
+    const base = docUrl(out.code);
+    return new Response(null, {
+      status: 303,
+      headers: { Location: `${base}${base.includes("?") ? "&" : "?"}lang=${lang}` },
+    });
+  }
+
 
   if (cert) {
     const { data, error } = await client.rpc("bot_public_certificate", { p_code: cert });

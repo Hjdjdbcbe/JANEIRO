@@ -604,8 +604,11 @@ async function run() {
   assert(bogus.includes("تعذّر"), "ورمز مخترَع لا يفتح شيئاً");
 
   // «من ينتهي اشتراكه اليوم؟»
+  // آخر ثانية من اليوم لا ساعة ثابتة: كانت 20:00، فكان الاختبار
+  // يمرّ صباحاً ويفشل مساءً — عيب في الاختبار لا في الدالة.
   sql(`update bot_certificates set starts_at = now() - interval '300 days',
-        ends_at = date_trunc('day', now()) + interval '20 hours' where code='${webCode}'`);
+        ends_at = date_trunc('day', now()) + interval '1 day' - interval '1 second'
+       where code='${webCode}'`);
   drain();
   await update(tap(OWNER, "exp:0"));
   const today = lastText("editMessageText");
@@ -700,8 +703,8 @@ async function run() {
   const okMsg = last("editMessageText");
   assert(okMsg.payload.text.includes("الوثيقة جاهزة"), "التأكيد يولّد الوثيقة");
   assert(/JS-[0-9A-F]{8}/.test(okMsg.payload.text), "ويعرض المرجعية JS-");
-  const claimTok = (okMsg.payload.text.match(/claim\/([0-9a-f]{64})|fill=([0-9a-f]{64})/) || [])
-                     .slice(1).find(Boolean);
+  // المسار الجميل حين يُضبط PUBLIC_SITE_URL، والمعامل حين لا يُضبط
+  const claimTok = (okMsg.payload.text.match(/(?:claim\/|claim=)([0-9a-f]{64})/) || [])[1];
   assert(!!claimTok, "ورابطاً فيه رمز 64 خانة");
   assert(okMsg.payload.text.includes("72 ساعة"), "ويقول مدة صلاحيته");
   const copyLink = kb(okMsg).find((b) => b.copy_text);
@@ -759,6 +762,111 @@ async function run() {
   drain();
   await update(message(OWNER, `/revoke ${engCode}`));
   assert(lastText("sendMessage").includes("ملغاة مسبقاً"), "ولا إبطال مرتين");
+
+  // ========== صفحات وثيقة الالتزام (ج) ==========
+  // نفس الدالة تخدمها؛ تُفتح هنا كما يفتحها الزبون تماماً
+  const wweb = (p, init) => fetch(`http://127.0.0.1:${BOT}${p}`, init);
+
+  // وثيقة جديدة لأجل الصفحات
+  drain();
+  await update(message(SELLER, "/warranty"));
+  await update(tap(SELLER, "wp:Netflix"));
+  await update(tap(SELLER, "wm:6"));
+  await update(tap(SELLER, "wb:14"));
+  drain();
+  await update(tap(SELLER, "wz:ok"));
+  const wTok = (lastText("editMessageText").match(/(?:claim\/|fill=|claim=)([0-9a-f]{64})/) || [])[1];
+  assert(!!wTok, "رابط تعبئة للوثيقة");
+
+  // الاستمارة بثلاث لغات
+  const formAr = await wweb(`/warranty/claim/${wTok}`).then((r) => r.text());
+  assert(formAr.includes('dir="rtl"') && formAr.includes('lang="ar"'),
+         "الاستمارة تفتح بالعربية من اليمين");
+  assert(formAr.includes("الاسم الكامل") && formAr.includes("رقم واتساب")
+         && formAr.includes("يوزر الانستغرام"), "وفيها الحقول الثلاثة");
+  assert(formAr.includes("noindex"), "وممنوعة الفهرسة");
+  assert(/6 شهر \+ 14 (يوم|أيام) هدية/.test(formAr), "وتقول التغطية مع الهدية");
+
+  const formFr = await wweb(`/warranty/claim/${wTok}?lang=fr`).then((r) => r.text());
+  assert(formFr.includes('lang="fr"') && formFr.includes('dir="ltr"'), "والفرنسية من اليسار");
+  assert(formFr.includes("Nom complet") && formFr.includes("6 mois + 14 jours offerts"),
+         "وبنصوصها الفرنسية");
+  const formEn = await wweb(`/warranty/claim/${wTok}?lang=en`).then((r) => r.text());
+  assert(formEn.includes("Full name") && formEn.includes("6 months + 14 days free"),
+         "والإنجليزية كذلك");
+
+  // رقم غير جزائري يُرفض داخل الاستمارة لا في صفحة ميتة
+  const badPhone = await wweb(`/warranty/claim/${wTok}?lang=ar`, {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ full_name: "أحمد بن يوسف", whatsapp: "0451234567" }).toString(),
+  }).then((r) => r.text());
+  assert(badPhone.includes("غير صحيح") && badPhone.includes("<form"),
+         "رقم ثابت يُرفض والاستمارة تبقى معروضة");
+
+  // التعبئة الصحيحة -> تحويل إلى الوثيقة
+  const wDone = await wweb(`/warranty/claim/${wTok}?lang=fr`, {
+    method: "POST", redirect: "manual",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      full_name: "Ahmed Benyoucef", whatsapp: "0550 99 88 77", instagram: "@ahmed.dz01",
+    }).toString(),
+  });
+  assert(wDone.status === 303, "الإرسال يحوّل (303) فلا يعيد التحديث الإرسال");
+  const wLoc = wDone.headers.get("location") || "";
+  assert(!/\?[^?]*\?/.test(wLoc), "ورابط التحويل سليم بعلامة استفهام واحدة: " + wLoc);
+  const wCode = (wLoc.match(/JW-[A-Z0-9]+/) || [])[0];
+  assert(!!wCode, "والتحويل إلى وثيقتها: " + wLoc);
+
+  // الوثيقة بثلاث لغات
+  const docFr = await wweb(`/warranty/${wCode}?lang=fr`).then((r) => r.text());
+  assert(docFr.includes("ENGAGEMENT DE SERVICE"), "العنوان الفرنسي");
+  assert(docFr.includes("Plus de services. Plus de possibilités."), "والـtagline");
+  assert(docFr.includes("Janeiro Store — abonnement Netflix"), "والسطر الفرعي");
+  assert(docFr.includes("NOTRE ENGAGEMENT"), "وعنوان الالتزام");
+  assert(docFr.includes("01 ·") && docFr.includes("05 ·"), "والنقاط مرقّمة 01· لا bullets");
+  assert(docFr.includes("Réf. Janeiro") && docFr.includes("Titulaire")
+         && docFr.includes("Clé de vérification"), "والتسميات الفرنسية");
+  assert(/Couvert jusqu'au[\s\S]{0,90}\d{1,2} \w+ 20\d\d/.test(docFr),
+         "وتاريخ فرنسي بصيغته");
+  assert(docFr.includes("Ahmed Benyoucef") && docFr.includes("@ahmed.dz01"),
+         "وبيانات الزبون");
+  assert(!docFr.includes("213550998877") && !docFr.includes("0550 99 88 77"),
+         "ولا رقم الواتساب أبداً");
+  assert(docFr.includes("<svg") && /warranty\/verify\/|[?&]verify=/.test(docFr),
+         "وQR يوجّه لصفحة التحقق");
+  assert(docFr.includes("window.print()"), "وزر الطباعة");
+
+  const docAr = await wweb(`/warranty/${wCode}`).then((r) => r.text());
+  assert(docAr.includes("وثيقة التزام الخدمة") && docAr.includes("التزامنا"),
+         "والعربية بعنوانها");
+  assert(docAr.includes("مرجع Janeiro") && docAr.includes("كلمة التحقق"),
+         "وتسمياتها");
+  const docEn = await wweb(`/warranty/${wCode}?lang=en`).then((r) => r.text());
+  assert(docEn.includes("SERVICE COMMITMENT") && docEn.includes("OUR COMMITMENT"),
+         "والإنجليزية");
+  assert(/Covered until[\s\S]{0,90}\w+ \d{1,2}, 20\d\d/.test(docEn),
+         "وتاريخ إنجليزي بصيغته");
+
+  // ولا عنوان من نماذج السوق في أي لغة
+  for (const [html, name] of [[docAr,"ar"],[docFr,"fr"],[docEn,"en"]]) {
+    for (const banned of ["CERTIFICAT DE GARANTIE","Conditions de garantie",
+                          "Numéro de commande","Nom d'utilisateur",
+                          "Plateforme d'activation","Code de garantie"]) {
+      assert(!html.includes(banned), `لا «${banned}» في وثيقة ${name}`);
+    }
+  }
+
+  // صفحة التحقق: تثبت بلا كشف
+  const wVer = await wweb(`/warranty/verify/${wCode}?lang=fr`).then((r) => r.text());
+  assert(wVer.includes("Netflix"), "التحقق يقول الخدمة");
+  assert(!wVer.includes("Ahmed Benyoucef"), "ولا يكشف الاسم كاملاً");
+  assert(wVer.includes("A***") || wVer.includes("***"), "بل تلميحاً");
+  const wVerBad = await wweb(`/warranty/verify/JW-0000000000`).then((r) => r.text());
+  assert(wVerBad.includes("لا توجد وثيقة"), "ورمز مخترَع لا يُثبت شيئاً");
+
+  // الرابط لا يُعمَّر مرتين
+  const wAgain = await wweb(`/warranty/claim/${wTok}`).then((r) => r.text());
+  assert(wAgain.includes("مسبقاً"), "ورابط التعبئة لا يُفتح بعد استعماله");
 
   // ========== نفاد المخزون ==========
   sql(`update bot_cards set status='sold' where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year')`);
