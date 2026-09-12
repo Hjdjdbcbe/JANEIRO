@@ -7,7 +7,8 @@
 #
 # Steps: shim -> migrations -> migrations again (re-run check)
 #        -> backend.test.sql -> concurrency.test.sh
-#        -> bot.test.sql -> bot-concurrency.test.sh -> bot-e2e.test.js
+#        -> bot.test.sql -> bot-concurrency.test.sh
+#        -> engagement.test.sql -> forbidden-text.test.sh -> bot-e2e.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
 # role matching $PGUSER (default: the current OS user).
@@ -80,6 +81,18 @@ bash "$HERE/bot-concurrency.test.sh" "$DB"
 
 # البوت دالة Deno، فاختباره الكامل يحتاج deno مثبّتاً. بدونه
 # يتخطّى نفسه برسالة واضحة بدل أن يفشل التشغيل كله.
+bold "==> engagement.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/engagement.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: engagement.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> forbidden-text.test.sh"
+bash "$HERE/forbidden-text.test.sh"
+
 bold "==> bot-e2e.test.js"
 node "$HERE/bot-e2e.test.js" "$DB"
 

@@ -24,10 +24,26 @@ cd "$(dirname "$0")/.."
 CORE=supabase/migrations/001_core_schema.sql
 OUT=docs/bot-setup.sql
 
-# كل هجرات البوت بالترتيب، لا 021 وحدها. أول ما أُضيفت 022 بقي
-# هذا الملف على 021 بصمت، فكان من ينشر من الصفر يأخذ نصف البوت.
-BOT_MIGRATIONS=(supabase/migrations/*bot*.sql)
-[ -e "${BOT_MIGRATIONS[0]}" ] || { echo "لا توجد هجرات بوت" >&2; exit 1; }
+# الهجرات تُختار بعلامة داخل الملف (`-- bundle: bot`) لا بنمط في
+# اسمه. مرّتين سقطت هجرة بصمت من هذه الحزمة: أول ما أُضيفت 022 وكان
+# الاسم مكتوباً صراحةً، ثم 025_service_engagement التي لا تحمل
+# كلمة bot في اسمها فما طابقت *bot*. من ينشر من الصفر كان يأخذ
+# نصف الفيتشر ولا يعرف.
+mapfile -t BOT_MIGRATIONS < <(grep -l '^-- bundle: bot' supabase/migrations/*.sql | sort)
+[ ${#BOT_MIGRATIONS[@]} -gt 0 ] || { echo "لا توجد هجرة تحمل '-- bundle: bot'" >&2; exit 1; }
+
+# وحارس على النسيان: هجرة تنشئ كائناً بـbot_ بلا العلامة تُوقف
+# البناء بدل أن تُترك خارج الحزمة بصمت.
+missing=()
+for m in supabase/migrations/*.sql; do
+  grep -qE 'create (table|or replace function)( if not exists)? bot_' "$m" || continue
+  grep -q '^-- bundle: bot' "$m" || missing+=("$(basename "$m")")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "هذه الهجرات تنشئ كائنات bot_ وتنقصها '-- bundle: bot' في أول سطر:" >&2
+  printf '  %s\n' "${missing[@]}" >&2
+  exit 1
+fi
 
 {
   echo "-- ============================================================"
