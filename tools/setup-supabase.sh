@@ -94,6 +94,8 @@ if [ -n "${TELEGRAM_OWNER_ID:-}" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
   fi
   supabase secrets set "TELEGRAM_OWNER_ID=$TELEGRAM_OWNER_ID" \
                        "TELEGRAM_WEBHOOK_SECRET=$WEBHOOK_SECRET" >/dev/null
+  # روابط وثيقة الالتزام على دومين المتجر
+  supabase secrets set "PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-$SITE_URL}" >/dev/null
   green "    بوت المخزون — المالك $TELEGRAM_OWNER_ID، والسرّ مضبوط (لا يُطبع)"
 elif [ -n "${TELEGRAM_OWNER_ID:-}" ]; then
   red   "    بوت المخزون: TELEGRAM_OWNER_ID موجود لكن TELEGRAM_BOT_TOKEN فارغ — يُتخطّى."

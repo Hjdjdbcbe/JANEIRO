@@ -16,6 +16,7 @@
 // ترفض العمل أصلاً إن لم يكن TELEGRAM_WEBHOOK_SECRET مضبوطاً.
 // ============================================================
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { DOC, formatDate } from "./i18n.ts";
 
 const TG_TOKEN   = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
 const TG_SECRET  = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "";
@@ -27,6 +28,17 @@ const API_BASE   = Deno.env.get("TELEGRAM_API_BASE") ?? "https://api.telegram.or
 // رابط هذه الدالة نفسها، كما يفتحه الزبون. يُشتق من SUPABASE_URL
 // فلا متغيّر بيئة إضافي على من يركّب.
 const SELF_URL   = `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/telegram-bot`;
+// دومين المتجر. الزبون يرى janeiro-store لا supabase.co — وهو ما
+// يجعله يحسّ أن الوثيقة من الموقع. vercel.json يحوّل /warranty/*
+// إلى هذه الدالة. بلا ضبطه تعمل الروابط على شكل المعاملات، فلا
+// يتوقّف شيء إن نُسي.
+const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") ?? "").replace(/\/+$/, "");
+const claimUrl  = (t: string) =>
+  SITE_URL ? `${SITE_URL}/warranty/claim/${t}` : `${SELF_URL}?fill=${t}`;
+const docUrl    = (c: string) =>
+  SITE_URL ? `${SITE_URL}/warranty/${c}` : `${SELF_URL}?cert=${c}`;
+const verifyUrl = (c: string) =>
+  SITE_URL ? `${SITE_URL}/warranty/verify/${c}` : `${SELF_URL}?verify=${c}`;
 const API        = `${API_BASE}/bot${TG_TOKEN}`;
 
 function db(): SupabaseClient {
@@ -122,6 +134,21 @@ const ERRORS: Record<string, string> = {
   FIELD_NOT_FOUND:       "لا يوجد حقل بهذا الاسم في المنتج.",
   INVALID_LABEL:         "اسم الحقل فارغ أو طويل جداً.",
   QUERY_TOO_SHORT:       "اكتب حرفين على الأقل للبحث.",
+  WIZARD_NOT_STARTED:    "ابدأ من /warranty.",
+  INVALID_PLATFORM:      "اسم المنصة فارغ أو طويل جداً.",
+  INVALID_MONTHS:        "المدة بالأشهر، من 1 إلى 120.",
+  INVALID_BONUS:         "أيام الهدية من 0 إلى 90.",
+  PLATFORM_MISSING:      "لم تُختَر المنصة بعد.",
+  MONTHS_MISSING:        "لم تُختَر المدة بعد.",
+  PLATFORM_NOT_FOUND:    "لا توجد منصة بهذا الاسم.",
+  ALREADY_CLAIMED:       "عُمِّرت هذه الوثيقة، فلا رابط جديد لها.",
+  ALREADY_REVOKED:       "هذه الوثيقة ملغاة مسبقاً.",
+  CERTIFICATE_REVOKED:   "هذه الوثيقة ملغاة.",
+  CERTIFICATE_PENDING:   "لم يعبّئها الزبون بعد.",
+  LINK_NOT_FOUND:        "هذا الرابط غير صحيح أو استُبدل.",
+  LINK_USED:             "استُعمل هذا الرابط مسبقاً.",
+  LINK_EXPIRED:          "انتهت صلاحية الرابط.",
+  RATE_LIMITED:          "محاولات كثيرة. انتظر قليلاً.",
   INVALID_KIND:          "نوع غير معروف.",
 };
 
@@ -173,6 +200,7 @@ function mainMenu(isOwner: boolean): Button[][] {
     [{ text: "⏳ المعلّقة", callback_data: "m:pending" },
      { text: "📊 مبيعاتي", callback_data: "m:stats" }],
   ];
+  rows.push([{ text: "🧾 وثيقة التزام", callback_data: "wz:start" }]);
   rows.push([{ text: "⏰ تنتهي قريباً", callback_data: "m:exp" },
              { text: "🔎 بحث عن زبون", callback_data: "m:find" }]);
   if (isOwner) {
@@ -382,6 +410,9 @@ const HELP = [
   "/stock — المخزون",
   "/stats — مبيعاتك",
   "/pending — عملياتك المعلّقة",
+  "/warranty — وثيقة التزام خدمة جديدة",
+  "/revoke &lt;JW-…&gt; — إبطال وثيقة",
+  "/relink &lt;JW-…&gt; — رابط جديد لوثيقة لم تُعمَّر",
   "/cert &lt;الرمز&gt; — وثيقة ضمان بالرمز",
   "/find &lt;اسم أو يوزر أو رقم&gt; — ابحث عن زبون",
   "/expiring [أيام] — اشتراكات تنتهي قريباً (7 افتراضياً)",
@@ -401,6 +432,8 @@ const HELP = [
   "/contacts — قنوات التواصل أسفل وثيقة الزبون",
   "/addcontact &lt;التسمية&gt; | &lt;القيمة&gt; | [رابط]",
   "/delcontact &lt;التسمية&gt;",
+  "/platforms — منصات أزرار الوثيقة",
+  "/addplatform &lt;الاسم&gt;   ·   /delplatform &lt;الاسم&gt;",
   "/fields — بيانات الزبون المطلوبة لكل منتج",
   "/addfield &lt;رمز المنتج&gt; &lt;اسم الحقل&gt; [optional]",
   "   مثال: <code>/addfield giftcard يوزر الأنستا</code>",
@@ -708,6 +741,152 @@ async function certificateFromReply(
   await issueCertificate(client, chat, tgId, issueId, values);
 }
 
+// ============================================================
+// وثيقة التزام الخدمة — الفلو في البوت
+//
+//   /warranty  ->  المنصة  ->  المدة  ->  أيام الهدية  ->  معاينة
+//                                          -> تأكيد فيُولَّد رابط
+//
+// الحالة في bot_wizard_state لا في نصّ الرسائل: أربع خطوات مع
+// «تعديل» لا تتحمّلها حيلة force_reply.
+// ============================================================
+const WZ_BONUS_PROMPT    = "🎁 أيام الهدية";
+const WZ_PLATFORM_PROMPT = "🏷 اسم المنصة";
+const WZ_BONUS_RE    = new RegExp(`^${WZ_BONUS_PROMPT}`);
+const WZ_PLATFORM_RE = new RegExp(`^${WZ_PLATFORM_PROMPT}`);
+
+/** المدد المعروضة. القائمة هنا لأنها شكل أزرار لا بيانات عمل. */
+const MONTH_CHOICES = [1, 3, 6, 12];
+const BONUS_CHOICES = [0, 7, 14];
+
+type Wizard = {
+  awaiting: string | null;
+  platform: string | null;
+  months: number | null;
+  bonus_days: number | null;
+  ready: boolean;
+  projected_start: string;
+  projected_end: string | null;
+};
+
+/** يوم بصيغة عربية للبائع — الوثيقة نفسها تتبع لغة الزبون. */
+const dayAr = (iso: string | null) => formatDate(iso, "ar");
+
+function wizardText(w: Wizard): string {
+  const line = (label: string, value: string | null) =>
+    `${label}: ${value ? `<b>${esc(value)}</b>` : "<i>—</i>"}`;
+
+  const out = ["🧾 <b>وثيقة التزام خدمة</b>", ""];
+  out.push(line("المنصة", w.platform));
+  out.push(line("المدة", w.months ? `${w.months} شهر` : null));
+  out.push(line("أيام الهدية",
+    w.bonus_days === null ? null : w.bonus_days === 0 ? "لا" : `${w.bonus_days}`));
+
+  if (w.ready) {
+    out.push("", `📅 يبدأ: <b>${dayAr(w.projected_start)}</b>`);
+    out.push(`📅 ينتهي: <b>${dayAr(w.projected_end)}</b>`);
+    out.push("", `<i>التغطية: ${esc(DOC.ar.duration(w.months!, w.bonus_days!))}</i>`);
+    out.push("", "<i>البداية الحقيقية تُثبَّت لحظة تعبئة الزبون، لا الآن.</i>");
+  } else {
+    out.push("", ({
+      platform:        "اختر المنصة:",
+      months:          "اختر المدة:",
+      bonus:           "أيام هدية؟",
+      bonus_manual:    "أرسل عدد الأيام (0–90).",
+      platform_manual: "أرسل اسم المنصة.",
+    } as Record<string, string>)[w.awaiting ?? ""] ?? "");
+  }
+  return out.join("\n").trim();
+}
+
+async function wizardKeyboard(
+  client: SupabaseClient, tgId: number, w: Wizard,
+): Promise<Button[][]> {
+  if (w.ready) {
+    return [
+      [{ text: "✅ تأكيد وتوليد الرابط", callback_data: "wz:ok" }],
+      [{ text: "✏️ المنصة", callback_data: "wz:back_platform" },
+       { text: "✏️ المدة",  callback_data: "wz:back_months" },
+       { text: "✏️ الهدية", callback_data: "wz:back_bonus" }],
+      [{ text: "✖️ إلغاء", callback_data: "wz:cancel" }],
+    ];
+  }
+
+  const rows: Button[][] = [];
+  if (w.awaiting === "platform") {
+    const r = await rpc<{ name: string }[]>(client, "bot_platforms_list",
+      { p_telegram_id: tgId });
+    const names = r.data ?? [];
+    // اثنتان في السطر: أسماء المنصات طويلة على هاتف
+    for (let i = 0; i < names.length; i += 2) {
+      rows.push(names.slice(i, i + 2).map((p) => ({
+        text: p.name, callback_data: `wp:${p.name}`,
+      })));
+    }
+    rows.push([{ text: "✏️ أخرى…", callback_data: "wz:platform_manual" }]);
+  } else if (w.awaiting === "months") {
+    rows.push(MONTH_CHOICES.map((m) => ({
+      text: `${m} شهر`, callback_data: `wm:${m}`,
+    })));
+  } else if (w.awaiting === "bonus") {
+    rows.push(BONUS_CHOICES.map((b) => ({
+      text: b === 0 ? "لا" : `${b} أيام`, callback_data: `wb:${b}`,
+    })));
+    rows.push([{ text: "✏️ إدخال يدوي", callback_data: "wz:bonus_manual" }]);
+  }
+  rows.push([{ text: "✖️ إلغاء", callback_data: "wz:cancel" }]);
+  return rows;
+}
+
+/** يرسم الخطوة الحالية: تعديل الرسالة نفسها إن كانت من زر. */
+async function wizardRender(
+  client: SupabaseClient, chat: number, tgId: number,
+  w: Wizard, msg?: number,
+) {
+  const kb = await wizardKeyboard(client, tgId, w);
+  if (msg) await edit(chat, msg, wizardText(w), kb);
+  else      await send(chat, wizardText(w), kb);
+}
+
+async function wizardStep(
+  client: SupabaseClient, chat: number, tgId: number,
+  step: string, value: string, msg?: number,
+) {
+  const r = await rpc<Wizard>(client, "bot_wizard_set",
+    { p_telegram_id: tgId, p_step: step, p_value: value });
+  if (r.error) { await send(chat, r.error, [backRow]); return; }
+  await wizardRender(client, chat, tgId, r.data!, msg);
+}
+
+/** التأكيد: الوثيقة معلّقة، والرابط جاهز للنسخ. */
+async function wizardConfirm(
+  client: SupabaseClient, chat: number, tgId: number, msg?: number,
+) {
+  const r = await rpc<{
+    code: string; ref_code: string; token: string;
+    platform: string; months: number; bonus_days: number; expires_at: string;
+  }>(client, "bot_engagement_confirm", { p_telegram_id: tgId, p_hours: 72 });
+  if (r.error) { await send(chat, r.error, [backRow]); return; }
+
+  const d = r.data!;
+  const link = claimUrl(d.token);
+  const body = [
+    "✅ <b>الوثيقة جاهزة</b>", "",
+    `🏷 ${esc(d.platform)} — ${esc(DOC.ar.duration(d.months, d.bonus_days))}`,
+    `🔖 ${esc(d.ref_code)}`, "",
+    "أرسل هذا الرابط للزبون. يكتب اسمه ورقمه ويوزره، فتصدر له",
+    "الوثيقة جاهزة للتحميل أو الطباعة.", "",
+    `<code>${esc(link)}</code>`, "",
+    `<i>صالح حتى ${dayAr(d.expires_at)} — 72 ساعة، ويُستعمل مرة واحدة.</i>`,
+  ].join("\n");
+  const kb: Button[][] = [
+    [{ text: "📋 نسخ الرابط", copy_text: { text: link } }],
+    [{ text: "🧾 وثيقة أخرى", callback_data: "wz:start" }],
+    backRow,
+  ];
+  if (msg) await edit(chat, msg, body, kb); else await send(chat, body, kb);
+}
+
 // ------------------------------------------------------------
 // الأوامر النصية
 // ------------------------------------------------------------
@@ -797,6 +976,67 @@ async function handleCommand(
       const r = await rpc<Expiring[]>(client, "bot_expiring",
         { p_telegram_id: tgId, p_days: d });
       await send(chat, r.error ?? expiringText(r.data!, d), [backRow]);
+      return;
+    }
+
+    case "/warranty": {
+      const r = await rpc<Wizard>(client, "bot_wizard_begin", { p_telegram_id: tgId });
+      if (r.error) { await send(chat, r.error); return; }
+      const w = await rpc<Wizard>(client, "bot_wizard_preview", { p_telegram_id: tgId });
+      if (w.error) { await send(chat, w.error); return; }
+      await wizardRender(client, chat, tgId, w.data!);
+      return;
+    }
+
+    case "/platforms": {
+      const r = await rpc<{ name: string }[]>(client, "bot_platforms_list",
+        { p_telegram_id: tgId });
+      if (r.error) { await send(chat, r.error); return; }
+      await send(chat, ["🏷 <b>المنصات</b>", "",
+        ...r.data!.map((p) => `• ${esc(p.name)}`), "",
+        "إضافة: <code>/addplatform Prime Video</code>",
+        "إخفاء: <code>/delplatform Prime Video</code>"].join("\n"), [backRow]);
+      return;
+    }
+
+    case "/addplatform": {
+      const name = text.slice(cmd.length).trim();
+      if (!name) { await send(chat, "الصيغة: <code>/addplatform Prime Video</code>"); return; }
+      const r = await rpc(client, "bot_add_platform",
+        { p_telegram_id: tgId, p_name: name });
+      await send(chat, r.error ?? `✅ أُضيفت «${esc(name)}» إلى أزرار المنصات.`, [backRow]);
+      return;
+    }
+
+    case "/delplatform": {
+      const name = text.slice(cmd.length).trim();
+      if (!name) { await send(chat, "الصيغة: <code>/delplatform Prime Video</code>"); return; }
+      const r = await rpc(client, "bot_remove_platform",
+        { p_telegram_id: tgId, p_name: name });
+      await send(chat, r.error ??
+        `✅ أُخفيت «${esc(name)}». الوثائق الصادرة بها لا تتأثر.`, [backRow]);
+      return;
+    }
+
+    case "/revoke": {
+      if (!args[0]) { await send(chat, "الصيغة: <code>/revoke JW-XXXXXXXXXX</code>"); return; }
+      const r = await rpc(client, "bot_engagement_revoke",
+        { p_telegram_id: tgId, p_code: args[0] });
+      await send(chat, r.error ?? `✅ أُبطلت <code>${esc(args[0].toUpperCase())}</code>.`,
+        [backRow]);
+      return;
+    }
+
+    case "/relink": {
+      if (!args[0]) { await send(chat, "الصيغة: <code>/relink JW-XXXXXXXXXX</code>"); return; }
+      const r = await rpc<{ code: string; token: string }>(client, "bot_engagement_relink",
+        { p_telegram_id: tgId, p_code: args[0], p_hours: 72 });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      const link = claimUrl(r.data!.token);
+      await send(chat, ["🔗 <b>رابط جديد</b>", "",
+        "<i>الرابط القديم أُبطل، فلا رابطان لوثيقة واحدة.</i>", "",
+        `<code>${esc(link)}</code>`].join("\n"),
+        [[{ text: "📋 نسخ الرابط", copy_text: { text: link } }], backRow]);
       return;
     }
 
@@ -1103,6 +1343,46 @@ async function handleCallback(
     return;
   }
 
+  // ---------- وثيقة التزام الخدمة ----------
+  if (verb === "wz") {
+    if (arg === "start") {
+      await answer(cbId);
+      const b = await rpc<Wizard>(client, "bot_wizard_begin", { p_telegram_id: tgId });
+      if (b.error) { await answer(cbId, b.error, true); return; }
+      const w = await rpc<Wizard>(client, "bot_wizard_preview", { p_telegram_id: tgId });
+      if (!w.error) await wizardRender(client, chat, tgId, w.data!);
+      return;
+    }
+    if (arg === "cancel") {
+      await answer(cbId, "أُلغي");
+      await rpc(client, "bot_wizard_cancel", { p_telegram_id: tgId });
+      await edit(chat, msg, "✖️ أُلغيت الوثيقة.", mainMenu(isOwner));
+      return;
+    }
+    if (arg === "ok") { await answer(cbId); await wizardConfirm(client, chat, tgId, msg); return; }
+
+    // الإدخال اليدوي: سؤال بردّ إجباري، والحالة في القاعدة لا في نصّه
+    if (arg === "bonus_manual" || arg === "platform_manual") {
+      await answer(cbId);
+      const r = await rpc<Wizard>(client, "bot_wizard_set",
+        { p_telegram_id: tgId, p_step: arg, p_value: "" });
+      if (r.error) { await answer(cbId, r.error, true); return; }
+      await ask(chat, arg === "bonus_manual"
+        ? `${WZ_BONUS_PROMPT}\n\nردّ على هذه الرسالة بعدد الأيام (0–90).`
+        : `${WZ_PLATFORM_PROMPT}\n\nردّ على هذه الرسالة باسم المنصة.`);
+      return;
+    }
+
+    // back_platform / back_months / back_bonus
+    await answer(cbId);
+    await wizardStep(client, chat, tgId, arg, "", msg);
+    return;
+  }
+
+  if (verb === "wp") { await answer(cbId); await wizardStep(client, chat, tgId, "platform", arg, msg); return; }
+  if (verb === "wm") { await answer(cbId); await wizardStep(client, chat, tgId, "months",   arg, msg); return; }
+  if (verb === "wb") { await answer(cbId); await wizardStep(client, chat, tgId, "bonus",    arg, msg); return; }
+
   // ---------- بيانات الزبون: من يعبّيها ----------
   if (verb === "cf") { await answer(cbId); await askCertificateFields(client, chat, tgId, arg); return; }
   if (verb === "cl") { await answer(cbId); await sendFillLink(client, chat, tgId, arg); return; }
@@ -1206,6 +1486,8 @@ async function handleCallback(
       `المتبقي في المخزون: ${d.remaining}`,
     ].join("\n"), [
       [{ text: "📋 نسخ الكود", copy_text: { text: d.card_code } }],
+      // «تمت العملية» يفتح الوثيقة كذلك، كما طُلب — لا /warranty وحده
+      [{ text: "🧾 وثيقة التزام", callback_data: "wz:start" }],
       [{ text: "🛒 بيع أخرى", callback_data: "m:sell" }],
       backRow,
     ]);
@@ -1420,6 +1702,15 @@ Deno.serve(async (req) => {
     const c = replied.match(CERT_RE);
     if (c) {
       await certificateFromReply(client, chat, src.id, c[1], text);
+      return new Response("ok");
+    }
+
+    if (WZ_BONUS_RE.test(replied)) {
+      await wizardStep(client, chat, src.id, "bonus", text);
+      return new Response("ok");
+    }
+    if (WZ_PLATFORM_RE.test(replied)) {
+      await wizardStep(client, chat, src.id, "platform", text);
       return new Response("ok");
     }
 
