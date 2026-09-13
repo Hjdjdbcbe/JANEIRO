@@ -123,5 +123,12 @@ node "$HERE/duration.test.js"
 bold "==> bot-e2e.test.js"
 node "$HERE/bot-e2e.test.js" "$DB"
 
+# ونفسها على نسخة اللصق: هي ما يُنشر على Supabase فعلاً. دمجٌ
+# يسقط منه ملف أو يكسر تصديراً يُقلع مرة ثم يفشل عند أول نداء،
+# ولا يكشفه اختبارُ المصدر.
+bold "==> bot-e2e.test.js (نسخة اللصق)"
+bash "$ROOT/tools/build-functions.sh" > /dev/null
+BOT_ENTRY=docs/bot-function.ts node "$HERE/bot-e2e.test.js" "$DB"
+
 echo
 green "ALL LOCAL TESTS PASSED"

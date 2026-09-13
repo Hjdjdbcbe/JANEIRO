@@ -158,8 +158,17 @@ supabase functions deploy telegram-bot --no-verify-jwt
 `Authorization`. ما يحرس الدالة هو الترويسة السرّية لا المفتاح.
 
 من اللوحة بدل الطرفية: **Edge Functions → Deploy a new function**،
-الاسم `telegram-bot` بالضبط، والصق `dist-functions/telegram-bot.ts`
-(يُولَّد بـ `bash tools/build-functions.sh`)، ثم أطفئ **Verify JWT**.
+الاسم `telegram-bot` بالضبط، والصق **`docs/bot-function.ts`** ثم
+أطفئ **Verify JWT**.
+
+`docs/bot-function.ts` ملف واحد قائم بذاته: `index.ts` وَ`i18n.ts`
+وَ`qr.ts` مدموجة فيه، لأن محرّر اللوحة يقبل ما تلصقه ولا يفهم
+استيراداً نسبياً — وملفان ناقصان يعنيان دالة لا تُقلع. يُولَّد
+بـ`bash tools/build-functions.sh`، وتُشغَّل عليه اختبارات e2e
+كاملةً كما تُشغَّل على المصدر، فلا يمرّ دمجٌ مكسور.
+
+**وكل تعديل في البوت يحتاج إعادة النشر.** تعديل القاعدة وحده لا
+يكفي، والعكس كذلك.
 
 ### 5.5 اربط الـwebhook
 

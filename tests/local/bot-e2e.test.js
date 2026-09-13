@@ -29,6 +29,14 @@ const BOT   = 8000;
 const TOKEN = "1111:TEST";
 const SECRET = "test-webhook-secret";
 
+/* ملف الدخول: المصدر افتراضاً، أو نسخة اللصق المولَّدة حين
+   يُمرَّر BOT_ENTRY. هي ما يُنشر فعلاً على Supabase، فتُشغَّل
+   عليها نفس الاختبارات — دمجٌ يسقط منه ملف يُقلع مرة ثم يفشل
+   عند أول نداء. */
+const ENTRY = process.env.BOT_ENTRY
+  ? path.resolve(ROOT, process.env.BOT_ENTRY)
+  : path.join(ROOT, "supabase/functions/telegram-bot/index.ts");
+
 const OWNER  = 970000001;
 const SELLER = 970000002;
 const OUTSIDER = 970000009;
@@ -202,7 +210,7 @@ async function main() {
   const proc = spawn("deno", [
     "run", "--quiet", "--allow-net", "--allow-env",
     `--import-map=${path.join(ROOT, "tests/local/bot-import-map.json")}`,
-    path.join(ROOT, "supabase/functions/telegram-bot/index.ts"),
+    ENTRY,
   ], {
     env: {
       ...process.env,
