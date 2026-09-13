@@ -186,10 +186,14 @@ begin
   -- الحالة الآن pending: رابط مولّد وما عُمِّرش
   assert (select bot_engagement_status(c) from bot_certificates c where c.code = v_code)
          = 'pending', 'a generated link is a pending certificate';
-  -- ولا تواريخ بعد: البداية هي لحظة التعبئة
-  assert (select starts_at is null and ends_at is null and holder_name is null
+  -- والتواريخ مثبّتة من لحظة الإصدار (029): البداية يوم البيع لا
+  -- يوم التعبئة، فتأخّر الزبون لا يمدّ اشتراكه. الناقص هو صاحبها.
+  assert (select starts_at is not null and ends_at is not null
             from bot_certificates where code = v_code),
-         'a pending certificate carries no dates and no holder at all';
+         'a pending certificate already carries its dates';
+  assert (select holder_name is null and whatsapp is null and filled_at is null
+            from bot_certificates where code = v_code),
+         'a pending certificate carries no holder at all';
   -- والفلو انمحى، فلا تأكيد ثانٍ من نفس الحالة
   begin
     perform bot_engagement_confirm(v_sell);

@@ -9,6 +9,7 @@
 #        -> backend.test.sql -> concurrency.test.sh
 #        -> bot.test.sql -> bot-concurrency.test.sh
 #        -> engagement.test.sql -> order-data.test.sql
+#        -> engagement-from-issue.test.sql
 #        -> forbidden-text.test.sh
 #        -> qr.test.js -> bot-e2e.test.js
 #
@@ -97,6 +98,15 @@ set -o pipefail
 if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/order-data.test.sql" 2>&1 \
      | grep -E 'PASS|FAIL|ERROR|=====' ; then
   red "FAIL: order-data.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> engagement-from-issue.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/engagement-from-issue.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: engagement-from-issue.test.sql did not run to completion (see the ERROR above)"
   exit 1
 fi
 set +o pipefail

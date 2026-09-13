@@ -711,13 +711,16 @@ async function run() {
   assert(!!copyLink && copyLink.copy_text.text.includes(claimTok),
          "وزر نسخ يحمل الرابط نفسه");
 
-  // الوثيقة في القاعدة: معلّقة بلا تواريخ
+  // الوثيقة في القاعدة: تواريخها مثبّتة من لحظة الإصدار (029)،
+  // ومعلّقة حتى يعبّئ صاحبها.
   const engCode = sql(`select code from bot_certificates
                         where platform='Snapchat Plus' and months=12 and bonus_days=7
                         order by created_at desc limit 1`);
   assert(/^JW-[0-9A-F]{10}$/.test(engCode), "والكود JW-, وجد " + engCode);
   assert(sql(`select coalesce(starts_at::text,'NULL') from bot_certificates where code='${engCode}'`)
-         === "NULL", "وهي معلّقة بلا تاريخ بداية");
+         !== "NULL", "ولها تاريخ بداية من أول لحظة");
+  assert(sql(`select bot_engagement_status(c) from bot_certificates c where c.code='${engCode}'`)
+         === "pending", "وهي معلّقة حتى يعبّئ صاحبها");
 
   // والفلو انمحى: تأكيد ثانٍ بلا فلو
   drain();
