@@ -12,6 +12,7 @@
 #        -> engagement-from-issue.test.sql -> terms.test.sql
 #        -> forbidden-text.test.sh
 #        -> qr.test.js -> duration.test.js -> bot-e2e.test.js
+#        -> vercel-proxy.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
 # role matching $PGUSER (default: the current OS user).
@@ -135,6 +136,9 @@ node "$HERE/bot-e2e.test.js" "$DB"
 # ونفسها على نسخة اللصق: هي ما يُنشر على Supabase فعلاً. دمجٌ
 # يسقط منه ملف أو يكسر تصديراً يُقلع مرة ثم يفشل عند أول نداء،
 # ولا يكشفه اختبارُ المصدر.
+bold "==> vercel-proxy.test.js"
+node "$HERE/vercel-proxy.test.js" "$DB"
+
 bold "==> bot-e2e.test.js (نسخة اللصق)"
 bash "$ROOT/tools/build-functions.sh" > /dev/null
 BOT_ENTRY=docs/bot-function.ts node "$HERE/bot-e2e.test.js" "$DB"
