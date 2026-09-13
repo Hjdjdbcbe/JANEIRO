@@ -104,47 +104,74 @@ begin
   -- منتج جديد يولد بلا منصة ولا مدة ولا سعر: هذا هو الثقب
   v_res := bot_variant_subject(v_year);
   assert (v_res->>'needs_platform')::boolean, 'منتج جديد بلا منصة';
+  assert v_res->'platforms' = '[]'::jsonb, 'وقائمة منصاته فارغة';
   assert (v_res->>'needs_duration')::boolean, 'صنف جديد بلا مدة';
   assert v_res->'prices'->'dz'->'price' = 'null'::jsonb, 'صنف جديد بلا سعر جزائري';
   assert v_res->'prices'->'jo'->'price' = 'null'::jsonb, 'ولا أردني';
 
-  -- ========== المنصة ==========
+  -- ========== المنصات: بطاقة واحدة، منصات عدّة ==========
   perform bot_set_product_platform(v_owner_tg, v_prod, 'Netflix');
   v_res := bot_variant_subject(v_year);
-  assert v_res->>'platform' = 'Netflix', 'المنصة حُفظت على المنتج';
+  assert v_res->'platforms' = '["Netflix"]'::jsonb, 'المنصة حُفظت على المنتج';
   assert not (v_res->>'needs_platform')::boolean, 'لم تعد ناقصة';
 
   -- وتُحفظ على المنتج لا على الصنف: الصنف الثاني ورثها بلا سؤال
-  assert bot_variant_subject(v_mo)->>'platform' = 'Netflix',
+  assert bot_variant_subject(v_mo)->'platforms' = '["Netflix"]'::jsonb,
          'الصنف الثاني ورث المنصة — لا يُسأل عنها مرتين';
 
+  -- والبطاقة الواحدة قد تعمل على أكثر من منصة، وتُزاد لها لاحقاً
+  perform bot_add_product_platform(v_owner_tg, v_prod, 'Spotify');
+  perform bot_add_product_platform(v_owner_tg, v_prod, 'Canva Pro');
+  assert jsonb_array_length(bot_variant_subject(v_year)->'platforms') = 3,
+         'ثلاث منصات لنفس البطاقة';
+
+  -- الإضافة مرّتين لا تُكرّر
+  perform bot_add_product_platform(v_owner_tg, v_prod, 'Spotify');
+  assert jsonb_array_length(bot_variant_subject(v_year)->'platforms') = 3,
+         'الإضافة المكرّرة تُتجاهل بهدوء';
+
+  -- والحذف من المنتج لا من القائمة العامة
+  perform bot_remove_product_platform(v_owner_tg, v_prod, 'Canva Pro');
+  assert jsonb_array_length(bot_variant_subject(v_year)->'platforms') = 2,
+         'حُذفت من المنتج';
+  assert exists (select 1 from bot_platforms where name = 'Canva Pro'),
+         'وبقيت في القائمة العامة';
+  begin
+    perform bot_remove_product_platform(v_owner_tg, v_prod, 'Canva Pro');
+    assert false, 'حُذفت منصة ليست له';
+  exception when others then
+    assert sqlerrm like 'PLATFORM_NOT_FOR_PRODUCT%', 'ما ليس له لا يُحذف، وردّ: ' || sqlerrm;
+  end;
+
   -- منصة غير موجودة في القائمة تُضاف بدل أن تُرفض
-  perform bot_set_product_platform(v_owner_tg, v_prod, 'Shahid VIP');
+  perform bot_add_product_platform(v_owner_tg, v_prod, 'Shahid VIP');
   select count(*) into v_n from bot_platforms where name = 'Shahid VIP';
   assert v_n = 1, 'منصة جديدة تُضاف إلى القائمة';
-  assert bot_variant_subject(v_year)->>'platform' = 'Shahid VIP', 'وتُسند للمنتج';
 
-  -- ومنصة معطّلة تعود للعمل حين يُسند إليها منتج
+  -- ومنصة معطّلة تعود للعمل حين تُسند لمنتج
+  perform bot_remove_product_platform(v_owner_tg, v_prod, 'Shahid VIP');
   perform bot_remove_platform(v_owner_tg, 'Shahid VIP');
   assert not (select is_active from bot_platforms where name = 'Shahid VIP'),
          'التعطيل تمّ';
-  perform bot_set_product_platform(v_owner_tg, v_prod, 'Shahid VIP');
+  perform bot_add_product_platform(v_owner_tg, v_prod, 'Shahid VIP');
   assert (select is_active from bot_platforms where name = 'Shahid VIP'),
          'الإسناد يُعيد التفعيل';
-  perform bot_set_product_platform(v_owner_tg, v_prod, 'Netflix');
 
-  -- الفراغ يمسح، ولا يُخزَّن كنصّ فارغ
+  -- set_product_platform تستبدل القائمة كلها، لا تضيف
+  perform bot_set_product_platform(v_owner_tg, v_prod, 'Netflix');
+  assert bot_variant_subject(v_year)->'platforms' = '["Netflix"]'::jsonb,
+         'الاستبدال يمسح ما قبله';
+  -- والفراغ يمسحها كلها
   perform bot_set_product_platform(v_owner_tg, v_prod, '   ');
-  assert (select platform from bot_products where id = v_prod) is null,
-         'الفراغ يمسح المنصة';
+  assert bot_variant_subject(v_year)->'platforms' = '[]'::jsonb, 'الفراغ يمسح الكل';
   perform bot_set_product_platform(v_owner_tg, v_prod, 'Netflix');
 
   -- البائع لا يعدّل الكتالوج
   begin
-    perform bot_set_product_platform(v_seller_tg, v_prod, 'Spotify');
-    assert false, 'بائع عدّل المنصة';
+    perform bot_add_product_platform(v_seller_tg, v_prod, 'Spotify');
+    assert false, 'بائع زاد منصة';
   exception when others then
-    assert sqlerrm like 'NOT_OWNER%', 'المنصة للمالك وحده، وردّ: ' || sqlerrm;
+    assert sqlerrm like 'NOT_OWNER%', 'المنصات للمالك وحده، وردّ: ' || sqlerrm;
   end;
 
   -- ========== المدة ==========
@@ -253,6 +280,10 @@ begin
   v_issue := (v_res->>'issue_id')::uuid;
   assert (v_res->>'price')::numeric = 3500, 'سعر صفحته هو';
   assert v_res->>'market' = 'dz' and v_res->>'currency' = 'DA', 'وسوقه وعملته';
+  -- منصة واحدة للمنتج = لا سؤال، وتُلقَّط على البيعة وحدها
+  assert v_res->>'platform' = 'Netflix', 'المنصة الوحيدة تُختار بلا سؤال';
+  assert (select platform from bot_issues where id = v_issue) = 'Netflix',
+         'ولُقّطت على البيعة';
   assert (select price from bot_issues where id = v_issue) = 3500, 'نُسخ إلى العملية';
   assert (select currency from bot_issues where id = v_issue) = 'DA',
          'والعملة لُقّطت معه';
@@ -299,6 +330,46 @@ begin
   assert (select price from bot_issues where id = (v_res->>'issue_id')::uuid) is null,
          'وفارغ في القاعدة كذلك';
   perform bot_cancel_issue(v_owner_tg, (v_res->>'issue_id')::uuid);
+
+  -- ========== منصتان فأكثر: البائع هو من يختار ==========
+  perform bot_add_product_platform(v_owner_tg, v_prod, 'Spotify');
+  v_res := bot_request_card(v_owner_tg, v_year, null, 'dz');
+  v_issue := (v_res->>'issue_id')::uuid;
+  -- لا يُخمَّن ولا يُرفع خطأ: البيع لا يتوقّف، والوثيقة هي من يسأل
+  assert v_res->'platform' = 'null'::jsonb, 'لا تُخمَّن منصة من بين اثنتين';
+  assert jsonb_array_length(v_res->'platforms') = 2, 'والخياران معروضان للبائع';
+
+  perform bot_issue_set_platform(v_owner_tg, v_issue, 'Spotify');
+  assert (select platform from bot_issues where id = v_issue) = 'Spotify',
+         'جواب البائع يُسجَّل على البيعة';
+  begin
+    perform bot_issue_set_platform(v_owner_tg, v_issue, 'Netflix Family');
+    assert false, 'منصة ليست للمنتج قُبلت';
+  exception when others then
+    assert sqlerrm like 'PLATFORM_NOT_FOR_PRODUCT%', 'ما ليس للمنتج يُرفض، وردّ: ' || sqlerrm;
+  end;
+
+  -- والاختيار الصريح عند الحجز يعمل كذلك
+  v_res := bot_request_card(v_owner_tg, v_year, null, 'dz', 'Netflix');
+  assert v_res->>'platform' = 'Netflix', 'الاختيار الصريح يُحترم';
+  perform bot_cancel_issue(v_owner_tg, (v_res->>'issue_id')::uuid);
+  begin
+    perform bot_request_card(v_owner_tg, v_year, null, 'dz', 'Gemini Pro');
+    assert false, 'منصة ليست للمنتج قُبلت عند الحجز';
+  exception when others then
+    assert sqlerrm like 'PLATFORM_NOT_FOR_PRODUCT%', 'وتُرفض عند الحجز، وردّ: ' || sqlerrm;
+  end;
+
+  -- ومنصة بيعة صدرت وثيقتها لا تُبدَّل: الوثيقة في يد الزبون
+  perform bot_confirm_issue(v_owner_tg, v_issue);
+  insert into bot_certificates (code, issue_id) values ('JW-PLAT000001', v_issue);
+  begin
+    perform bot_issue_set_platform(v_owner_tg, v_issue, 'Netflix');
+    assert false, 'بُدّلت منصة وثيقة صادرة';
+  exception when others then
+    assert sqlerrm like 'CERTIFICATE_EXISTS%', 'الوثيقة الصادرة تثبّت منصتها، وردّ: ' || sqlerrm;
+  end;
+  perform bot_remove_product_platform(v_owner_tg, v_prod, 'Spotify');
 
   -- ========== تعديل سعر عملية: للمالك وحده ==========
   perform bot_set_admin_market(v_owner_tg, v_seller_tg, 'dz');
@@ -372,6 +443,7 @@ begin
   assert (v_res->>'needs_platform')::boolean, 'التأكيد يبلّغ أن المنصة ناقصة';
   assert (v_res->>'needs_duration')::boolean, 'ويبلّغ أن المدة ناقصة';
   assert v_res->'platform' = 'null'::jsonb, 'ولا يخترع منصة';
+  assert v_res->'platforms' = '[]'::jsonb, 'ولا قائمة يختار منها';
   assert v_res->'months' = 'null'::jsonb and v_res->'days' = 'null'::jsonb, 'ولا يخترع مدة';
 
   -- بعد التعمير: كل ما تحتاجه الوثيقة حاضر في مُرجَع التأكيد وحده
@@ -421,7 +493,7 @@ begin
   -- الصفّ نفسه حاضر بتفاصيله، فيُراجَع بالعين قبل أي تعمير
   assert exists (
     select 1 from jsonb_array_elements(v_res->'products') p
-     where p->>'code' = 'aud26' and p->'platform' = 'null'::jsonb
+     where p->>'code' = 'aud26' and p->'platforms' = '[]'::jsonb
        and exists (select 1 from jsonb_array_elements(p->'variants') v
                     where v->>'code' = 'v' and v->'prices' = '{}'::jsonb
                       and v->'months' = 'null'::jsonb and v->'days' = 'null'::jsonb)
@@ -436,7 +508,7 @@ begin
   assert (v_res->>'missing_platform')::int = v_before, 'العدّ نقص بعد التعمير';
   assert exists (
     select 1 from jsonb_array_elements(v_res->'products') p
-     where p->>'code' = 'aud26' and p->>'platform' = 'Canva Pro'
+     where p->>'code' = 'aud26' and p->'platforms' = '["Canva Pro"]'::jsonb
        and exists (select 1 from jsonb_array_elements(p->'variants') v
                     where v->>'code' = 'v'
                       and (v->'prices'->>'dz')::numeric = 1800
@@ -559,7 +631,9 @@ begin
                        'bot_set_product_platform','bot_set_variant_duration',
                        'bot_variant_subject','bot_duration_to_engagement',
                        'bot_set_admin_market','bot_markets_list','bot_resolve_market',
-                       'bot_set_market_active')
+                       'bot_set_market_active','bot_add_product_platform',
+                       'bot_remove_product_platform','bot_product_platforms_list',
+                       'bot_issue_set_platform','bot_resolve_platform')
      and (has_function_privilege('anon', p.oid, 'execute')
        or has_function_privilege('authenticated', p.oid, 'execute'));
   assert v_bad is null, 'دوال مكشوفة لـ anon/authenticated: ' || coalesce(v_bad, '');
