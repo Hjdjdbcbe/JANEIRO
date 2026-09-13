@@ -57,7 +57,8 @@ type Doc = {
     ref: string; holder: string; account: string; service: string;
     coverage: string; activatedOn: string; coveredUntil: string; key: string;
   };
-  duration: (months: number, bonus: number) => string;
+  /** المدة: بالأشهر أو بالأيام، مع أيام الهدية إن وُجدت. */
+  duration: (months: number | null, bonus: number, days?: number | null) => string;
   commitmentHeading: string;
   commitment: string[];
   status: { active: string; expired: string; revoked: string; pending: string };
@@ -73,6 +74,19 @@ type Doc = {
   keep: string;
   contactsHeading: string;
 };
+
+/* ------------------------------------------------------------
+   العدد في العربية
+   ------------------------------------------------------------
+   ثلاث صيغ لا اثنتان: مفرد (شهر)، مثنّى (شهران)، جمع قلّة من
+   ثلاثة إلى عشرة (3 أشهر)، ثم تمييز مفرد منصوب من أحد عشر
+   فصاعداً (12 شهراً). القاعدة نفسها لليوم.
+   ------------------------------------------------------------ */
+const arMonths = (n: number) =>
+  n === 1 ? "شهر" : n === 2 ? "شهران" : n <= 10 ? `${n} أشهر` : `${n} شهراً`;
+
+const arDays = (n: number) =>
+  n === 1 ? "يوم" : n === 2 ? "يومان" : n <= 10 ? `${n} أيام` : `${n} يوماً`;
 
 export const DOC: Record<Lang, Doc> = {
   // ---------------------------------------------------------- AR
@@ -91,8 +105,13 @@ export const DOC: Record<Lang, Doc> = {
       coveredUntil: "مغطّى حتى",
       key: "كلمة التحقق",
     },
-    duration: (m, b) =>
-      b > 0 ? `${m} شهر + ${b} ${b === 1 ? "يوم" : "أيام"} هدية` : `${m} شهر`,
+    // العربية تعدّ على ثلاث صيغ لا اثنتين: مفرد، مثنّى، ثم جمع
+    // إلى العشرة، ثم تمييز مفرد منصوب من الأحد عشر فصاعداً.
+    // «2 شهر» و«12 أشهر» كلاهما خطأ.
+    duration: (m, b, d) => {
+      const base = m ? arMonths(m) : arDays(d ?? 0);
+      return b > 0 ? `${base} + ${arDays(b)} هدية` : base;
+    },
     commitmentHeading: "التزامنا",
     commitment: [
       "طيلة المدة المذكورة أعلاه، هذا الحساب يبقى تحت مسؤوليتنا.",
@@ -150,8 +169,13 @@ export const DOC: Record<Lang, Doc> = {
       coveredUntil: "Couvert jusqu'au",
       key: "Clé de vérification",
     },
-    duration: (m, b) =>
-      b > 0 ? `${m} mois + ${b} ${b === 1 ? "jour offert" : "jours offerts"}` : `${m} mois`,
+    // « mois » invariable au pluriel
+    duration: (m, b, d) => {
+      const base = m ? `${m} mois` : `${d} ${d === 1 ? "jour" : "jours"}`;
+      return b > 0
+        ? `${base} + ${b} ${b === 1 ? "jour offert" : "jours offerts"}`
+        : base;
+    },
     commitmentHeading: "NOTRE ENGAGEMENT",
     commitment: [
       "Pendant toute la durée indiquée ci-dessus, ce compte reste sous notre responsabilité.",
@@ -210,9 +234,11 @@ export const DOC: Record<Lang, Doc> = {
       coveredUntil: "Covered until",
       key: "Verification key",
     },
-    duration: (m, b) =>
-      b > 0 ? `${m} ${m === 1 ? "month" : "months"} + ${b} ${b === 1 ? "day" : "days"} free`
-            : `${m} ${m === 1 ? "month" : "months"}`,
+    duration: (m, b, d) => {
+      const base = m ? `${m} ${m === 1 ? "month" : "months"}`
+                     : `${d} ${d === 1 ? "day" : "days"}`;
+      return b > 0 ? `${base} + ${b} ${b === 1 ? "day" : "days"} free` : base;
+    },
     commitmentHeading: "OUR COMMITMENT",
     commitment: [
       "For the full period shown above, this account stays our responsibility.",

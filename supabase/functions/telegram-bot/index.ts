@@ -95,10 +95,10 @@ const edit = (chat: number, msg: number, text: string, rows: Button[][] = []) =>
   });
 
 /** سؤال يُجاب عليه بالردّ على الرسالة — بديل جدول حالة كامل. */
-const ask = (chat: number, text: string) =>
+const ask = (chat: number, text: string, placeholder = "الصق الأكواد هنا") =>
   tg("sendMessage", {
     chat_id: chat, text, parse_mode: "HTML",
-    reply_markup: { force_reply: true, input_field_placeholder: "الصق الأكواد هنا" },
+    reply_markup: { force_reply: true, input_field_placeholder: placeholder },
   });
 
 const answer = (id: string, text = "", alert = false) =>
@@ -647,7 +647,8 @@ function certPage(c: Certificate & { contacts?: Contact[] }): Response {
 // ============================================================
 type Engagement = {
   code: string; ref_code: string; holder_name: string; instagram: string | null;
-  platform: string; months: number; bonus_days: number;
+  platform: string; months: number | null; duration_days: number | null;
+  bonus_days: number;
   starts_at: string; ends_at: string | null;
   status: "active" | "expired" | "revoked" | "pending";
   days_left: number | null; contacts?: Contact[];
@@ -695,7 +696,8 @@ const ENG_CSS = `
 
 /** استمارة الزبون — الحقول الثلاثة، بلغته. */
 function engFormPage(token: string, d: {
-  platform: string; months: number; bonus_days: number;
+  platform: string; months: number | null; duration_days: number | null;
+  bonus_days: number;
 }, lang: Lang): Response {
   const t = DOC[lang];
   const f = t.form;
@@ -710,7 +712,7 @@ function engFormPage(token: string, d: {
       <span class="badge">${esc(t.subtitle(d.platform))}</span>
       <h1>${esc(f.heading)}</h1>
       <p class="sub">${esc(f.intro)}</p>
-      <p class="sub"><b>${esc(t.labels.coverage)}:</b> ${esc(t.duration(d.months, d.bonus_days))}</p>
+      <p class="sub"><b>${esc(t.labels.coverage)}:</b> ${esc(t.duration(d.months, d.bonus_days, d.duration_days))}</p>
       <form method="POST" action="/warranty/claim/${esc(token)}?lang=${lang}">
         ${field("full_name", f.fullName, "", true, 'maxlength="80"')}
         ${field("whatsapp", f.whatsapp, f.whatsappHint, true,
@@ -755,7 +757,7 @@ function engDocPage(d: Engagement, lang: Lang): Response {
         ${row(L.holder, d.holder_name)}
         ${d.instagram ? row(L.account, "@" + d.instagram) : ""}
         ${row(L.service, d.platform)}
-        ${row(L.coverage, t.duration(d.months, d.bonus_days))}
+        ${row(L.coverage, t.duration(d.months, d.bonus_days, d.duration_days))}
         ${row(L.activatedOn, formatDate(d.starts_at, lang))}
         ${d.ends_at ? row(L.coveredUntil, formatDate(d.ends_at, lang)) : ""}
         ${row(L.key, d.code)}
@@ -825,7 +827,17 @@ type IssueFields = {
   has_certificate: boolean;
 };
 
-/** يسأل عن الحقول، أو يصدر مباشرة إن لم يكن للمنتج حقول. */
+/* ------------------------------------------------------------
+   بعد التأكيد
+   ------------------------------------------------------------
+   المسار الافتراضي هو وثيقة الالتزام: كل ما كانت تسأل عنه صار
+   معروفاً في البيعة، فلا يبقى إلا أيام الهدية.
+
+   ومسار 023 (حقول يكتبها البائع) يبقى كما هو، لكن للمنتجات التي
+   عُرّفت لها حقول صراحةً. الاثنان لا يجتمعان على بيعة واحدة —
+   issue_id فريد في bot_certificates — فمن عرّف حقولاً لمنتج فقد
+   اختار لهذا المنتج ذاك المسار.
+   ------------------------------------------------------------ */
 async function afterConfirm(
   client: SupabaseClient, chat: number, tgId: number, issueId: string,
 ) {
@@ -849,9 +861,146 @@ async function afterConfirm(
     return;
   }
 
-  // بلا حقول: إن كانت للمدة مدّة محسوبة فالوثيقة تُصدر بتاريخيها.
-  if (d.duration_value === null) return;
-  await issueCertificate(client, chat, tgId, issueId, []);
+  await engagementStep(client, chat, tgId, issueId);
+}
+
+// ------------------------------------------------------------
+// وثيقة الالتزام من البيعة
+// ------------------------------------------------------------
+type IssueEngagement = {
+  issue_id: string;
+  status: string;
+  product_name: string;
+  variant_name: string;
+  platform: string | null;
+  platforms: string[];
+  months: number | null;
+  days: number | null;
+  needs_platform: boolean;
+  needs_duration: boolean;
+  has_certificate: boolean;
+  certificate_code: string | null;
+  projected_start: string | null;
+  projected_end: string | null;
+};
+
+const BONUS_PROMPT = "🎁 أيام الهدية";
+const BONUS_RE = new RegExp(`^${BONUS_PROMPT} — ([0-9a-f-]{36})`);
+
+/** الخطوة التالية للوثيقة: منصة، أم هدية، أم لا شيء لأن شيئاً ينقص. */
+async function engagementStep(
+  client: SupabaseClient, chat: number, tgId: number, issueId: string, msg?: number,
+) {
+  const r = await rpc<IssueEngagement>(client, "bot_issue_engagement",
+    { p_telegram_id: tgId, p_issue_id: issueId });
+  if (r.error) return;                       // البيعة مثبتة؛ الوثيقة إضافة
+  const d = r.data!;
+  if (d.has_certificate) return;
+
+  const head = `🎟 <b>${esc(d.product_name)} — ${esc(d.variant_name)}</b>`;
+
+  // المدة خاصية للصنف، والبائع لا يملك الكتالوج. فيُقال ما ينقص
+  // ولمن يُقال، بدل أن تُخترع مدة أو يُصمَت.
+  if (d.needs_duration) {
+    await send(chat, [
+      "🧾 <b>الوثيقة تحتاج مدّة</b>", "", head, "",
+      `لم تُحدَّد مدّة «${esc(d.variant_name)}» بعد، فلا تُعرف نهاية الاشتراك.`,
+      "على المالك أن يحدّدها مرة واحدة، ثم تُصدر الوثائق وحدها.", "",
+      "<i>البيعة مسجَّلة والبطاقة سُلّمت — الناقص هو الوثيقة وحدها.</i>",
+    ].join("\n"), [backRow]);
+    return;
+  }
+
+  if (d.needs_platform) {
+    if (!d.platforms.length) {
+      await send(chat, [
+        "🧾 <b>الوثيقة تحتاج منصّة</b>", "", head, "",
+        `لم تُربط «${esc(d.product_name)}» بأي منصّة، والوثيقة تقول للزبون`,
+        "على أي منصّة اشتراكه.",
+        "على المالك أن يربطها مرة واحدة.", "",
+        "<i>البيعة مسجَّلة والبطاقة سُلّمت — الناقص هو الوثيقة وحدها.</i>",
+      ].join("\n"), [backRow]);
+      return;
+    }
+    // الفهرس لا الاسم: حدّ callback_data 64 بايت، وأسماء المنصات
+    // تطول. والقائمة نفسها تُقرأ من جديد عند الضغط.
+    const rows: Button[][] = [];
+    for (let i = 0; i < d.platforms.length; i += 2) {
+      rows.push(d.platforms.slice(i, i + 2).map((p, j) => ({
+        text: p, callback_data: `ep:${issueId}:${i + j}`,
+      })));
+    }
+    rows.push(backRow);
+    const body = [
+      "🧾 <b>وثيقة الالتزام</b>", "", head, "",
+      "🎯 على أي منصّة هذا الاشتراك؟",
+    ].join("\n");
+    if (msg) await edit(chat, msg, body, rows); else await send(chat, body, rows);
+    return;
+  }
+
+  await askBonus(client, chat, tgId, d, msg);
+}
+
+/** السؤال الوحيد الباقي: أيام الهدية. */
+async function askBonus(
+  client: SupabaseClient, chat: number, tgId: number,
+  d: IssueEngagement, msg?: number,
+) {
+  const body = [
+    "🧾 <b>وثيقة الالتزام</b>", "",
+    `🎟 <b>${esc(d.product_name)} — ${esc(d.variant_name)}</b>`,
+    `🏷 ${esc(d.platform ?? "")}`,
+    `⏳ ${esc(DOC.ar.duration(d.months, 0, d.days))}`,
+    `📅 ${dayAr(d.projected_start)} ← ${dayAr(d.projected_end)}`,
+    "", "🎁 <b>أيام هدية من المزوّد؟</b>",
+    "<i>«لا» هو الأغلب — تُزاد فقط إن أعطاها المزوّد فعلاً.</i>",
+  ].join("\n");
+  const kb: Button[][] = [
+    [{ text: "لا",  callback_data: `eb:${d.issue_id}:0` },
+     { text: "7",   callback_data: `eb:${d.issue_id}:7` },
+     { text: "14",  callback_data: `eb:${d.issue_id}:14` },
+     { text: "✏️ يدوي", callback_data: `ebm:${d.issue_id}` }],
+    backRow,
+  ];
+  if (msg) await edit(chat, msg, body, kb); else await send(chat, body, kb);
+}
+
+/** الإصدار: رابط للزبون ومعاينة قصيرة لما سيقرأه. */
+async function engagementIssue(
+  client: SupabaseClient, chat: number, tgId: number,
+  issueId: string, bonus: number, msg?: number,
+) {
+  const r = await rpc<{
+    code: string; ref_code: string; token: string;
+    platform: string; product_name: string; variant_name: string;
+    months: number | null; duration_days: number | null; bonus_days: number;
+    starts_at: string; ends_at: string; expires_at: string;
+  }>(client, "bot_engagement_from_issue",
+     { p_telegram_id: tgId, p_issue_id: issueId, p_bonus_days: bonus, p_hours: 72 });
+  if (r.error) { await send(chat, r.error, [backRow]); return; }
+
+  const d = r.data!;
+  const link = claimUrl(d.token);
+  const body = [
+    "✅ <b>الوثيقة جاهزة</b>", "",
+    `🎟 ${esc(d.product_name)} — ${esc(d.variant_name)}`,
+    `🏷 ${esc(d.platform)}`,
+    `⏳ ${esc(DOC.ar.duration(d.months, d.bonus_days, d.duration_days))}`,
+    `📅 يبدأ: <b>${dayAr(d.starts_at)}</b>`,
+    `📅 ينتهي: <b>${dayAr(d.ends_at)}</b>`,
+    `🔖 ${esc(d.ref_code)}`, "",
+    "أرسل هذا الرابط للزبون. يكتب اسمه ورقمه ويوزره، فتصدر له",
+    "الوثيقة جاهزة للتحميل أو الطباعة.", "",
+    `<code>${esc(link)}</code>`, "",
+    `<i>صالح حتى ${dayAr(d.expires_at)} — 72 ساعة، ويُستعمل مرة واحدة.</i>`,
+  ].join("\n");
+  const kb: Button[][] = [
+    [{ text: "📋 نسخ الرابط", copy_text: { text: link } }],
+    [{ text: "🛒 بيع أخرى", callback_data: "m:sell" }],
+    backRow,
+  ];
+  if (msg) await edit(chat, msg, body, kb); else await send(chat, body, kb);
 }
 
 async function issueCertificate(
@@ -1569,6 +1718,45 @@ async function handleCallback(
   if (verb === "wb") { await answer(cbId); await wizardStep(client, chat, tgId, "bonus",    arg, msg); return; }
 
   // ---------- بيانات الزبون: من يعبّيها ----------
+  // ---------- وثيقة الالتزام من البيعة ----------
+  if (verb === "ep") {
+    // arg = "<issueId>:<index>" — الفهرس يُحلّ إلى اسم من القائمة
+    // الحيّة، فمنصة حُذفت بين العرض والضغط لا تمرّ.
+    const at = arg.lastIndexOf(":");
+    const issueId = arg.slice(0, at);
+    const idx = Number(arg.slice(at + 1));
+    const st = await rpc<IssueEngagement>(client, "bot_issue_engagement",
+      { p_telegram_id: tgId, p_issue_id: issueId });
+    if (st.error) { await answer(cbId, st.error, true); return; }
+    const name = st.data!.platforms[idx];
+    if (!name) { await answer(cbId, "المنصّة لم تعد متاحة", true); return; }
+    const r = await rpc(client, "bot_issue_set_platform",
+      { p_telegram_id: tgId, p_issue_id: issueId, p_platform: name });
+    if (r.error) { await answer(cbId, r.error, true); return; }
+    await answer(cbId, name);
+    await engagementStep(client, chat, tgId, issueId, msg);
+    return;
+  }
+
+  if (verb === "eb") {
+    const at = arg.lastIndexOf(":");
+    await answer(cbId);
+    await engagementIssue(client, chat, tgId,
+      arg.slice(0, at), Number(arg.slice(at + 1)), msg);
+    return;
+  }
+
+  if (verb === "ebm") {
+    await answer(cbId);
+    await ask(chat, [
+      `${BONUS_PROMPT} — ${arg}`, "",
+      "ردّ على هذه الرسالة بعدد أيام الهدية (0 إلى 90).",
+    ].join("\n"), "عدد الأيام");
+    return;
+  }
+
+  if (verb === "eng") { await answer(cbId); await engagementStep(client, chat, tgId, arg, msg); return; }
+
   if (verb === "cf") { await answer(cbId); await askCertificateFields(client, chat, tgId, arg); return; }
   if (verb === "cl") { await answer(cbId); await sendFillLink(client, chat, tgId, arg); return; }
 
@@ -1671,8 +1859,8 @@ async function handleCallback(
       `المتبقي في المخزون: ${d.remaining}`,
     ].join("\n"), [
       [{ text: "📋 نسخ الكود", copy_text: { text: d.card_code } }],
-      // «تمت العملية» يفتح الوثيقة كذلك، كما طُلب — لا /warranty وحده
-      [{ text: "🧾 وثيقة التزام", callback_data: "wz:start" }],
+      // وثيقة هذه البيعة، لا فلو جديد من الصفر: الزرّ يحمل رقمها
+      [{ text: "🧾 وثيقة التزام", callback_data: `eng:${arg}` }],
       [{ text: "🛒 بيع أخرى", callback_data: "m:sell" }],
       backRow,
     ]);
@@ -1787,7 +1975,8 @@ async function customerRoute(req: Request, url: URL): Promise<Response | null> {
 
     if (req.method === "GET") {
       return engFormPage(claim, shape.data as {
-        platform: string; months: number; bonus_days: number;
+        platform: string; months: number | null; duration_days: number | null;
+  bonus_days: number;
       }, lang);
     }
 
@@ -1811,7 +2000,8 @@ async function customerRoute(req: Request, url: URL): Promise<Response | null> {
     if (error) {
       // الخطأ يُعاد داخل الاستمارة نفسها لا في صفحة ميتة
       const body = (engFormPage(claim, shape.data as {
-        platform: string; months: number; bonus_days: number;
+        platform: string; months: number | null; duration_days: number | null;
+  bonus_days: number;
       }, lang) as Response);
       const html = await body.text();
       return new Response(html.replace("<form",
@@ -1975,6 +2165,17 @@ Deno.serve(async (req) => {
     const c = replied.match(CERT_RE);
     if (c) {
       await certificateFromReply(client, chat, src.id, c[1], text);
+      return new Response("ok");
+    }
+
+    const eb = replied.match(BONUS_RE);
+    if (eb) {
+      const n = Number(text.trim().replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c))));
+      if (!Number.isInteger(n) || n < 0 || n > 90) {
+        await send(chat, "🎁 عدد صحيح من 0 إلى 90 — أعد الضغط على «يدوي».");
+      } else {
+        await engagementIssue(client, chat, src.id, eb[1], n);
+      }
       return new Response("ok");
     }
 

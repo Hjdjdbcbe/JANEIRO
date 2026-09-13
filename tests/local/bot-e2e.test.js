@@ -664,7 +664,9 @@ async function run() {
   // المعاينة كاملة
   assert(wz.payload.text.includes("يبدأ:") && wz.payload.text.includes("ينتهي:"),
          "المعاينة تعرض التاريخين");
-  assert(/التغطية: 12 شهر \+ 10 أيام هدية/.test(wz.payload.text),
+  // «12 شهر» كان خطأً نحوياً يقرأه الزبون في وثيقته: التمييز
+  // بعد أحد عشر مفرد منصوب.
+  assert(/التغطية: 12 شهراً \+ 10 أيام هدية/.test(wz.payload.text),
          "وصيغة التغطية بالعربية مع الهدية");
   assert(wz.payload.text.includes("لحظة تعبئة الزبون"),
          "وتقول صراحةً أن البداية تُثبَّت عند التعبئة لا الآن");
@@ -683,14 +685,14 @@ async function run() {
   await update(tap(SELLER, "wm:12"));
   await update(tap(SELLER, "wb:7"));
   wz = last("editMessageText");
-  assert(/التغطية: 12 شهر \+ 7 أيام هدية/.test(wz.payload.text), "7 أيام هدية");
+  assert(/التغطية: 12 شهراً \+ 7 أيام هدية/.test(wz.payload.text), "7 أيام هدية");
 
   // بلا هدية: لا إشارة إليها إطلاقاً
   drain();
   await update(tap(SELLER, "wz:back_bonus"));
   await update(tap(SELLER, "wb:0"));
   wz = last("editMessageText");
-  assert(/التغطية: 12 شهر</.test(wz.payload.text),
+  assert(/التغطية: 12 شهراً</.test(wz.payload.text),
          "بلا هدية تظهر المدة وحدها");
   assert(!wz.payload.text.includes("هدية</b>") && !/\+ 0/.test(wz.payload.text),
          "ولا إشارة للهدية ولا صفر معلّق");
@@ -788,7 +790,7 @@ async function run() {
   assert(formAr.includes("الاسم الكامل") && formAr.includes("رقم واتساب")
          && formAr.includes("يوزر الانستغرام"), "وفيها الحقول الثلاثة");
   assert(formAr.includes("noindex"), "وممنوعة الفهرسة");
-  assert(/6 شهر \+ 14 (يوم|أيام) هدية/.test(formAr), "وتقول التغطية مع الهدية");
+  assert(/6 أشهر \+ 14 يوماً هدية/.test(formAr), "وتقول التغطية مع الهدية");
 
   const formFr = await wweb(`/warranty/claim/${wTok}?lang=fr`).then((r) => r.text());
   assert(formFr.includes('lang="fr"') && formFr.includes('dir="ltr"'), "والفرنسية من اليسار");
@@ -870,6 +872,145 @@ async function run() {
   // الرابط لا يُعمَّر مرتين
   const wAgain = await wweb(`/warranty/claim/${wTok}`).then((r) => r.text());
   assert(wAgain.includes("مسبقاً"), "ورابط التعبئة لا يُفتح بعد استعماله");
+
+  /* ==========================================================
+     الوثيقة من البيعة — المسار الافتراضي
+     ==========================================================
+     البائع يبيع، يضغط تأكيد، ولا يُسأل إلا عن الهدية. المنصة
+     والمدة والتاريخ تُقرأ من البيعة نفسها.
+     ========================================================== */
+  // حقول 023 كانت قد عُرّفت للمنتج في القسم السابق؛ تُزال ليعود
+  // المنتج إلى المسار الافتراضي.
+  sql(`delete from bot_fields where product_id in (select id from bot_products where code='e2e')`);
+  sql(`insert into bot_cards (variant_id, code, added_by)
+       select v.id, 'E2E-ENG-'||g, (select id from bot_admins where telegram_id=${OWNER})
+         from bot_variants v join bot_products p on p.id=v.product_id,
+              generate_series(1,6) g
+        where p.code='e2e' and v.code='year'`);
+  // نقطة بداية معلومة: بلا مدّة وبلا منصّة، مهما تركت الأقسام
+  // السابقة على هذا المنتج.
+  sql(`update bot_variants set duration_value=null, duration_unit=null
+        where id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id
+                      where p.code='e2e')`);
+  sql(`delete from bot_product_platforms
+        where product_id in (select id from bot_products where code='e2e')`);
+
+  const engSell = async () => {
+    drain();
+    await update(tap(SELLER, yearBtn.callback_data));
+    const b = last("sendMessage").payload.reply_markup.inline_keyboard.flat();
+    drain();
+    await update(tap(SELLER, b.find((x) => x.text.includes("تأكيد")).callback_data));
+  };
+
+  // ---- ما ينقص يُقال، ولا تُخترع وثيقة ----
+  await engSell();
+  assert(lastText("sendMessage").includes("تحتاج مدّة"),
+         "بلا مدّة للصنف: يُقال ذلك ولا تُخترع نهاية");
+  assert(lastText("sendMessage").includes("البيعة مسجَّلة"),
+         "ويُطمأن البائع أن بيعته لم تضع");
+
+  sql(`select bot_set_variant_duration(${OWNER},
+         (select v.id from bot_variants v join bot_products p on p.id=v.product_id
+           where p.code='e2e' and v.code='year'), 1, 'year')`);
+  await engSell();
+  assert(lastText("sendMessage").includes("تحتاج منصّة"),
+         "وبلا منصّة للمنتج: يُقال ذلك كذلك");
+
+  // ---- منصّة واحدة: لا سؤال عنها ----
+  sql(`select bot_set_product_platform(${OWNER},
+         (select id from bot_products where code='e2e'), 'Spotify')`);
+  await engSell();
+  let eng = last("sendMessage");
+  assert(eng.payload.text.includes("Spotify"), "منصّة واحدة تُختار بلا سؤال");
+  assert(eng.payload.text.includes("أيام هدية"), "ويُسأل عن الهدية وحدها");
+  assert(eng.payload.text.includes("شهر") && !eng.payload.text.includes("12 شهر<"),
+         "والمدة معروضة بصيغتها");
+  let bonusKb = eng.payload.reply_markup.inline_keyboard.flat();
+  assert(["لا","7","14"].every((t) => bonusKb.some((b) => b.text === t)),
+         "وأزرار الهدية: لا / 7 / 14");
+  assert(bonusKb.some((b) => b.text.includes("يدوي")), "وإدخال يدوي");
+
+  // ---- الهدية ثم الرابط والمعاينة ----
+  drain();
+  await update(tap(SELLER, bonusKb.find((b) => b.text === "7").callback_data));
+  const engDone = last("editMessageText") ?? last("sendMessage");
+  assert(engDone.payload.text.includes("الوثيقة جاهزة"), "الضغطة الواحدة تُصدر الوثيقة");
+  assert(/12 شهراً \+ 7 أيام هدية/.test(engDone.payload.text), "والمعاينة تقول المدة والهدية");
+  assert(engDone.payload.text.includes("يبدأ:") && engDone.payload.text.includes("ينتهي:"),
+         "والتاريخين");
+  assert(/JS-[0-9A-F]{8}/.test(engDone.payload.text), "ورمزها المرجعي");
+  // المسار الجميل حين يُضبط PUBLIC_SITE_URL، والمعامل حين لا يُضبط
+  const engTok = (engDone.payload.text.match(/(?:claim\/|claim=)([0-9a-f]{64})/) || [])[1];
+  assert(!!engTok, "ورابطاً فيه رمز 64 خانة");
+  const engCopy = engDone.payload.reply_markup.inline_keyboard.flat()
+    .find((b) => b.copy_text);
+  assert(!!engCopy && engCopy.copy_text.text.includes(engTok),
+         "وزر نسخ يحمل الرابط نفسه");
+
+  // البداية = لحظة إتمام البيعة، لا لحظة إصدار الوثيقة
+  const engRow = sql(`select (c.starts_at = i.settled_at)::text
+                        from bot_certificates c join bot_issues i on i.id = c.issue_id
+                       where c.bonus_days = 7 and i.platform = 'Spotify'
+                       order by c.created_at desc limit 1`);
+  assert(engRow === "true", "وبدايتها لحظة إتمام البيعة لا لحظة إصدارها");
+
+  // ---- منصّتان: يُسأل أيّهما ----
+  sql(`select bot_add_product_platform(${OWNER},
+         (select id from bot_products where code='e2e'), 'Netflix')`);
+  await engSell();
+  const pick2 = last("sendMessage");
+  assert(pick2.payload.text.includes("على أي منصّة"), "منصّتان: يُسأل أيّهما");
+  const pKb = pick2.payload.reply_markup.inline_keyboard.flat();
+  const nfBtn = pKb.find((b) => b.text === "Netflix");
+  assert(!!nfBtn && !!pKb.find((b) => b.text === "Spotify"), "والاثنتان معروضتان");
+  drain();
+  await update(tap(SELLER, nfBtn.callback_data));
+  const afterPick = last("editMessageText") ?? last("sendMessage");
+  assert(afterPick.payload.text.includes("Netflix"), "والمختارة تُثبَّت");
+  assert(afterPick.payload.text.includes("أيام هدية"), "ثم يُسأل عن الهدية");
+
+  // ---- «لا» هي الافتراضي الأغلب ----
+  drain();
+  const noBonus = afterPick.payload.reply_markup.inline_keyboard.flat()
+    .find((b) => b.text === "لا");
+  await update(tap(SELLER, noBonus.callback_data));
+  const noneDone = last("editMessageText") ?? last("sendMessage");
+  assert(noneDone.payload.text.includes("الوثيقة جاهزة"), "«لا» تُصدر كذلك");
+  assert(!noneDone.payload.text.includes("هدية"), "وبلا ذكر للهدية");
+  assert(sql(`select bonus_days::text from bot_certificates
+               where platform='Netflix' order by created_at desc limit 1`) === "0",
+         "وصفر في القاعدة");
+
+  // ---- الإدخال اليدوي ----
+  await engSell();
+  const mPick = last("sendMessage").payload.reply_markup.inline_keyboard.flat();
+  drain();
+  await update(tap(SELLER, mPick.find((b) => b.text === "Netflix").callback_data));
+  const mAsk = (last("editMessageText") ?? last("sendMessage")).payload
+    .reply_markup.inline_keyboard.flat();
+  drain();
+  await update(tap(SELLER, mAsk.find((b) => b.text.includes("يدوي")).callback_data));
+  const manualAsk = last("sendMessage");
+  assert(manualAsk.payload.reply_markup.force_reply === true,
+         "«يدوي» يسأل بردّ إجباري");
+  drain();
+  await update(message(SELLER, "200", manualAsk.payload.text.replace(/<[^>]+>/g, "")));
+  assert(lastText("sendMessage").includes("0 إلى 90"), "و200 تُرفض بحدّها");
+  drain();
+  await update(message(SELLER, "21", manualAsk.payload.text.replace(/<[^>]+>/g, "")));
+  assert(lastText("sendMessage").includes("الوثيقة جاهزة"), "و21 تُقبل");
+  assert(/21 يوماً هدية/.test(lastText("sendMessage")),
+         "وبصيغتها العربية الصحيحة: «21 يوماً» لا «21 أيام»");
+
+  // ---- وثيقة واحدة لكل بيعة ----
+  const dupIssue = sql(`select i.id from bot_issues i join bot_certificates c on c.issue_id=i.id
+                         order by c.created_at desc limit 1`);
+  drain();
+  await update(tap(SELLER, `eng:${dupIssue}`));
+  assert(!last("sendMessage") ||
+         !lastText("sendMessage").includes("أيام هدية"),
+         "وبيعة لها وثيقة لا تُسأل من جديد");
 
   // ========== نفاد المخزون ==========
   sql(`update bot_cards set status='sold' where variant_id in (select v.id from bot_variants v join bot_products p on p.id=v.product_id where p.code='e2e' and v.code='year')`);

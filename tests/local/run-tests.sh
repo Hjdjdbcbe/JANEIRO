@@ -11,7 +11,7 @@
 #        -> engagement.test.sql -> order-data.test.sql
 #        -> engagement-from-issue.test.sql
 #        -> forbidden-text.test.sh
-#        -> qr.test.js -> bot-e2e.test.js
+#        -> qr.test.js -> duration.test.js -> bot-e2e.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
 # role matching $PGUSER (default: the current OS user).
@@ -116,6 +116,9 @@ bash "$HERE/forbidden-text.test.sh"
 
 bold "==> qr.test.js"
 node "$HERE/qr.test.js"
+
+bold "==> duration.test.js"
+node "$HERE/duration.test.js"
 
 bold "==> bot-e2e.test.js"
 node "$HERE/bot-e2e.test.js" "$DB"
