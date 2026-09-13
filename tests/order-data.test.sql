@@ -191,10 +191,10 @@ begin
   -- ========== السعر: صفحتان بعملتين ==========
   v_res := bot_set_price(v_owner_tg, v_year, 'dz', 3500);
   assert (v_res->>'price')::numeric = 3500, 'السعر الجزائري حُفظ';
-  assert v_res->>'currency' = 'دج', 'بعملته';
+  assert v_res->>'currency' = 'DA', 'بعملته';
   v_res := bot_set_price(v_owner_tg, v_year, 'jo', 12.750);
   assert (v_res->>'price')::numeric = 12.750, 'والأردني بثلاث خانات';
-  assert v_res->>'currency' = 'د.أ', 'بعملته هو';
+  assert v_res->>'currency' = 'JOD', 'بعملته هو';
 
   -- الفلس الأردني لا يُقصّ: هذا ما كان يكسره numeric(10,2)
   perform bot_set_price(v_owner_tg, v_mo, 'jo', 1.755);
@@ -252,9 +252,9 @@ begin
   v_res := bot_request_card(v_seller_tg, v_year);
   v_issue := (v_res->>'issue_id')::uuid;
   assert (v_res->>'price')::numeric = 3500, 'سعر صفحته هو';
-  assert v_res->>'market' = 'dz' and v_res->>'currency' = 'دج', 'وسوقه وعملته';
+  assert v_res->>'market' = 'dz' and v_res->>'currency' = 'DA', 'وسوقه وعملته';
   assert (select price from bot_issues where id = v_issue) = 3500, 'نُسخ إلى العملية';
-  assert (select currency from bot_issues where id = v_issue) = 'دج',
+  assert (select currency from bot_issues where id = v_issue) = 'DA',
          'والعملة لُقّطت معه';
 
   -- تبديل سعر الصنف لا يمسّ عملية سابقة: هذا سبب وجود اللقطة
@@ -263,13 +263,13 @@ begin
          'اللقطة صامدة أمام تغيير السعر';
   v_res := bot_confirm_issue(v_seller_tg, v_issue);
   assert (v_res->>'price')::numeric = 3500, 'والتأكيد يرجّع اللقطة لا السعر الجديد';
-  assert v_res->>'currency' = 'دج', 'وعملتها';
+  assert v_res->>'currency' = 'DA', 'وعملتها';
 
   -- ونفس الصنف على الصفحة الأردنية: سعر آخر بعملة أخرى، نفس المخزون
   perform bot_set_admin_market(v_owner_tg, v_seller_tg, 'jo');
   v_res := bot_request_card(v_seller_tg, v_year);
   assert (v_res->>'price')::numeric = 12.750, 'سعر الصفحة الأردنية';
-  assert v_res->>'currency' = 'د.أ', 'بعملتها';
+  assert v_res->>'currency' = 'JOD', 'بعملتها';
   perform bot_cancel_issue(v_seller_tg, (v_res->>'issue_id')::uuid);
 
   -- ========== المالك يبيع في الصفحتين ==========
@@ -384,7 +384,7 @@ begin
   assert v_res->>'platform' = 'Snapchat Plus', 'المنصة في مُرجَع التأكيد';
   assert (v_res->>'months')::int = 12, 'والمدة';
   assert (v_res->>'price')::numeric = 2500, 'والسعر';
-  assert v_res->>'market' = 'dz' and v_res->>'currency' = 'دج', 'وصفحته وعملتها';
+  assert v_res->>'market' = 'dz' and v_res->>'currency' = 'DA', 'وصفحته وعملتها';
   assert not (v_res->>'needs_platform')::boolean
      and not (v_res->>'needs_duration')::boolean, 'ولا ينقص شيء';
 

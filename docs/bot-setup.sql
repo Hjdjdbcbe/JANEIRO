@@ -3095,9 +3095,15 @@ create table if not exists bot_markets (
 -- تغيير في السلوك الحالي. تُفعَّل بـbot_set_market_active يوم
 -- تصير أزرارها جاهزة.
 insert into bot_markets (code, name, currency, decimals, is_active, sort_order) values
-  ('dz', 'الجزائر', 'دج',   2, true,  10),
-  ('jo', 'الأردن',  'د.أ',  3, false, 20)
+  ('dz', 'الجزائر', 'DA',  2, true,  10),
+  ('jo', 'الأردن',  'JOD', 3, false, 20)
 on conflict (code) do nothing;
+
+-- تصحيح الرمزين لمن طبّق نسخة أولى من هذه الهجرة. مقصور على
+-- القيمة القديمة بعينها: لو سمّى المالك عملته بغير ذلك لاحقاً
+-- فتسميته تبقى، ولا يُعاد كتابتها في كل تشغيل.
+update bot_markets set currency = 'DA'  where code = 'dz' and currency = 'دج';
+update bot_markets set currency = 'JOD' where code = 'jo' and currency = 'د.أ';
 
 alter table bot_markets enable row level security;
 revoke all on bot_markets from anon, authenticated;
