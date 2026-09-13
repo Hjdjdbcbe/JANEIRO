@@ -35,12 +35,16 @@ BOT_OUT="$OUT/telegram-bot.ts"
 {
   echo "// ============================================================"
   echo "// telegram-bot — نسخة قائمة بذاتها، وُلِّدت آلياً من"
-  echo "// supabase/functions/telegram-bot/ (index.ts + i18n.ts + qr.ts)."
+  echo "// supabase/functions/telegram-bot/ (index.ts + durations.ts + i18n.ts + qr.ts)."
   echo "// لا تُعدّلها هنا؛ عدّل المصدر ثم أعد التوليد بـ"
   echo "//     bash tools/build-functions.sh"
   echo "// ============================================================"
   echo
   echo 'import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";'
+  echo
+  echo "// ── durations.ts ──────────────────────────────────────────"
+  sed -E 's/^export (type|const|function|interface) /\1 /' \
+    supabase/functions/telegram-bot/durations.ts
   echo
   echo "// ── i18n.ts ───────────────────────────────────────────────"
   # export يسقط: كل شيء صار في وحدة واحدة، وexport داخلها بلا معنى
@@ -52,9 +56,9 @@ BOT_OUT="$OUT/telegram-bot.ts"
     supabase/functions/telegram-bot/qr.ts
   echo
   echo "// ── index.ts ──────────────────────────────────────────────"
-  grep -vE '^import .* from "\./(i18n|qr)\.ts";$' \
+  grep -vE '^import .* from "\./(i18n|qr|durations)\.ts";$' \
     supabase/functions/telegram-bot/index.ts \
-    | grep -vE '^import type .* from "\./(i18n|qr)\.ts";$' \
+    | grep -vE '^import type .* from "\./(i18n|qr|durations)\.ts";$' \
     | grep -vE '^import \{ createClient, SupabaseClient \} from "https://esm\.sh/@supabase/supabase-js@2\.45\.0";$'
 } > "$BOT_OUT"
 

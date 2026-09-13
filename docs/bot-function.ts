@@ -1,11 +1,51 @@
 // ============================================================
 // telegram-bot — نسخة قائمة بذاتها، وُلِّدت آلياً من
-// supabase/functions/telegram-bot/ (index.ts + i18n.ts + qr.ts).
+// supabase/functions/telegram-bot/ (index.ts + durations.ts + i18n.ts + qr.ts).
 // لا تُعدّلها هنا؛ عدّل المصدر ثم أعد التوليد بـ
 //     bash tools/build-functions.sh
 // ============================================================
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+// ── durations.ts ──────────────────────────────────────────
+/* ============================================================
+   المدد — مصدر واحد
+   ============================================================
+   الأزرار المعروضة في أي مكان يُسأل فيه عن مدة، وحدودُ الإدخال
+   اليدوي. القاعدة تتحقّق من المجالات نفسها (bot_set_variant_duration
+   وقيود bot_certificates)، ولا تعيد القائمة: لو أعادتها لصار
+   تبديلُ زرٍّ هجرةً.
+   ============================================================ */
+
+/** أزرار الأشهر. الشهران مثنّى في العربية — انظر i18n. */
+const MONTH_CHOICES = [1, 2, 3, 6, 12];
+
+/** أيام الهدية المعروضة. «لا» هو الأغلب، فهو أوّلها. */
+const BONUS_CHOICES = [0, 7, 14];
+
+/** المدة المخصّصة: أعداد صحيحة، بلا كسور. */
+const CUSTOM = {
+  months: { min: 1, max: 60 },
+  days:   { min: 1, max: 999 },
+  bonus:  { min: 0, max: 90 },
+} as const;
+
+/** يقبل الأرقام العربية الشرقية كما يقبل اللاتينية. */
+function parseCount(raw: string): number | null {
+  const s = raw.trim().replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c)));
+  if (!/^\d+$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+/** داخل المجال أم لا — وبالرسالة التي تُقال للمستخدم. */
+function checkRange(
+  n: number | null, range: { min: number; max: number },
+): string | null {
+  if (n === null) return "عدد صحيح فقط، بلا كسور.";
+  if (n < range.min || n > range.max) return `من ${range.min} إلى ${range.max}.`;
+  return null;
+}
 
 // ── i18n.ts ───────────────────────────────────────────────
 // ============================================================
@@ -1120,6 +1160,16 @@ const HELP = [
   "<code>/addcards giftcard year\nCODE-1\nCODE-2</code>",
   "/allstats — مبيعات الجميع",
   "/breakdown — المبيعات حسب المنتج",
+  "", "<b>الكتالوج</b> — ما تحتاجه الوثيقة", "",
+  "/catalog — جرد: منصّة ومدّة وسعر كل صنف، وما ينقص",
+  "/platform &lt;رمز المنتج&gt; &lt;المنصّة&gt;   ·   /unplatform …",
+  "   مثال: <code>/platform giftcard Netflix</code>",
+  "/duration &lt;رمز المنتج&gt; &lt;رمز المدة&gt; &lt;عدد&gt; &lt;يوم|أسبوع|شهر|سنة&gt;",
+  "   مثال: <code>/duration giftcard year 1 سنة</code>",
+  "/price &lt;رمز المنتج&gt; &lt;رمز المدة&gt; &lt;dz|jo&gt; &lt;المبلغ&gt;",
+  "   مثال: <code>/price giftcard year dz 3500</code>",
+  "/market &lt;dz|jo&gt; &lt;on|off&gt; — فتح صفحة أو غلقها",
+  "/seller &lt;رقم تليجرام&gt; &lt;dz|jo|-&gt; — صفحة البائع",
   "/contacts — قنوات التواصل أسفل وثيقة الزبون",
   "/addcontact &lt;التسمية&gt; | &lt;القيمة&gt; | [رابط]",
   "/delcontact &lt;التسمية&gt;",
@@ -1772,17 +1822,18 @@ async function certificateFromReply(
 // ============================================================
 const WZ_BONUS_PROMPT    = "🎁 أيام الهدية";
 const WZ_PLATFORM_PROMPT = "🏷 اسم المنصة";
+const WZ_MONTHS_PROMPT   = "⏳ المدة بالأشهر";
+const WZ_DAYS_PROMPT     = "⏳ المدة بالأيام";
 const WZ_BONUS_RE    = new RegExp(`^${WZ_BONUS_PROMPT}`);
 const WZ_PLATFORM_RE = new RegExp(`^${WZ_PLATFORM_PROMPT}`);
-
-/** المدد المعروضة. القائمة هنا لأنها شكل أزرار لا بيانات عمل. */
-const MONTH_CHOICES = [1, 3, 6, 12];
-const BONUS_CHOICES = [0, 7, 14];
+const WZ_MONTHS_RE   = new RegExp(`^${WZ_MONTHS_PROMPT}`);
+const WZ_DAYS_RE     = new RegExp(`^${WZ_DAYS_PROMPT}`);
 
 type Wizard = {
   awaiting: string | null;
   platform: string | null;
   months: number | null;
+  duration_days: number | null;
   bonus_days: number | null;
   ready: boolean;
   projected_start: string;
@@ -1798,22 +1849,27 @@ function wizardText(w: Wizard): string {
 
   const out = ["🧾 <b>وثيقة التزام خدمة</b>", ""];
   out.push(line("المنصة", w.platform));
-  out.push(line("المدة", w.months ? `${w.months} شهر` : null));
+  out.push(line("المدة",
+    w.months || w.duration_days
+      ? DOC.ar.duration(w.months, 0, w.duration_days)
+      : null));
   out.push(line("أيام الهدية",
     w.bonus_days === null ? null : w.bonus_days === 0 ? "لا" : `${w.bonus_days}`));
 
   if (w.ready) {
     out.push("", `📅 يبدأ: <b>${dayAr(w.projected_start)}</b>`);
     out.push(`📅 ينتهي: <b>${dayAr(w.projected_end)}</b>`);
-    out.push("", `<i>التغطية: ${esc(DOC.ar.duration(w.months!, w.bonus_days!))}</i>`);
-    out.push("", "<i>البداية الحقيقية تُثبَّت لحظة تعبئة الزبون، لا الآن.</i>");
+    out.push("", `<i>التغطية: ${
+      esc(DOC.ar.duration(w.months, w.bonus_days!, w.duration_days))}</i>`);
   } else {
     out.push("", ({
       platform:        "اختر المنصة:",
       months:          "اختر المدة:",
       bonus:           "أيام هدية؟",
-      bonus_manual:    "أرسل عدد الأيام (0–90).",
+      bonus_manual:    `أرسل عدد أيام الهدية (${CUSTOM.bonus.min}–${CUSTOM.bonus.max}).`,
       platform_manual: "أرسل اسم المنصة.",
+      months_manual:   `أرسل عدد الأشهر (${CUSTOM.months.min}–${CUSTOM.months.max}).`,
+      days_manual:     `أرسل عدد الأيام (${CUSTOM.days.min}–${CUSTOM.days.max}).`,
     } as Record<string, string>)[w.awaiting ?? ""] ?? "");
   }
   return out.join("\n").trim();
@@ -1846,11 +1902,15 @@ async function wizardKeyboard(
     rows.push([{ text: "✏️ أخرى…", callback_data: "wz:platform_manual" }]);
   } else if (w.awaiting === "months") {
     rows.push(MONTH_CHOICES.map((m) => ({
-      text: `${m} شهر`, callback_data: `wm:${m}`,
+      text: DOC.ar.duration(m, 0, null), callback_data: `wm:${m}`,
     })));
+    rows.push([
+      { text: "✏️ أشهر أخرى", callback_data: "wz:months_manual" },
+      { text: "✏️ بالأيام",   callback_data: "wz:days_manual" },
+    ]);
   } else if (w.awaiting === "bonus") {
     rows.push(BONUS_CHOICES.map((b) => ({
-      text: b === 0 ? "لا" : `${b} أيام`, callback_data: `wb:${b}`,
+      text: b === 0 ? "لا" : String(b), callback_data: `wb:${b}`,
     })));
     rows.push([{ text: "✏️ إدخال يدوي", callback_data: "wz:bonus_manual" }]);
   }
@@ -1884,7 +1944,8 @@ async function wizardConfirm(
 ) {
   const r = await rpc<{
     code: string; ref_code: string; token: string;
-    platform: string; months: number; bonus_days: number; expires_at: string;
+    platform: string; months: number | null; duration_days: number | null;
+    bonus_days: number; starts_at: string; ends_at: string; expires_at: string;
   }>(client, "bot_engagement_confirm", { p_telegram_id: tgId, p_hours: 72 });
   if (r.error) { await send(chat, r.error, [backRow]); return; }
 
@@ -1892,7 +1953,10 @@ async function wizardConfirm(
   const link = claimUrl(d.token);
   const body = [
     "✅ <b>الوثيقة جاهزة</b>", "",
-    `🏷 ${esc(d.platform)} — ${esc(DOC.ar.duration(d.months, d.bonus_days))}`,
+    `🏷 ${esc(d.platform)}`,
+    `⏳ ${esc(DOC.ar.duration(d.months, d.bonus_days, d.duration_days))}`,
+    `📅 يبدأ: <b>${dayAr(d.starts_at)}</b>`,
+    `📅 ينتهي: <b>${dayAr(d.ends_at)}</b>`,
     `🔖 ${esc(d.ref_code)}`, "",
     "أرسل هذا الرابط للزبون. يكتب اسمه ورقمه ويوزره، فتصدر له",
     "الوثيقة جاهزة للتحميل أو الطباعة.", "",
@@ -1905,6 +1969,75 @@ async function wizardConfirm(
     backRow,
   ];
   if (msg) await edit(chat, msg, body, kb); else await send(chat, body, kb);
+}
+
+/* وحدات المخزون الأربع إلى وحدتي الوثيقة، كما في
+   bot_duration_to_engagement — والترجمة هناك هي المرجع، وهذه
+   للعرض وحده. */
+function durationText(value: number | null, unit: string | null): string {
+  if (!value || !unit) return "<i>بلا مدّة</i>";
+  if (unit === "year")  return DOC.ar.duration(value * 12, 0, null);
+  if (unit === "month") return DOC.ar.duration(value, 0, null);
+  if (unit === "week")  return DOC.ar.duration(null, 0, value * 7);
+  return DOC.ar.duration(null, 0, value);
+}
+
+/** جرد الكتالوج: ما هو معمَّر وما ينقص، وأمر تصحيحه بجنبه. */
+async function catalogReport(
+  client: SupabaseClient, chat: number, tgId: number,
+) {
+  type Cat = {
+    products: {
+      code: string; name: string; is_active: boolean; platforms: string[];
+      variants: {
+        code: string; name: string; is_active: boolean;
+        value: number | null; unit: string | null; stock: number;
+        prices: Record<string, number>;
+      }[];
+    }[];
+    markets: { code: string; name: string; currency: string }[];
+    sellers: { telegram_id: number; name: string; role: string; market: string | null }[];
+  };
+  const r = await rpc<Cat>(client, "bot_catalog_report", { p_telegram_id: tgId });
+  if (r.error) { await send(chat, r.error, [backRow]); return; }
+  const d = r.data!;
+  const cur = Object.fromEntries(d.markets.map((m) => [m.code, m.currency]));
+
+  const out: string[] = ["🗂 <b>الكتالوج</b>"];
+  for (const p of d.products) {
+    out.push("", `<b>${esc(p.name)}</b> <code>${esc(p.code)}</code>` +
+      (p.is_active ? "" : " <i>(مخفيّ)</i>"));
+    out.push(p.platforms.length
+      ? "🏷 " + p.platforms.map(esc).join(" · ")
+      : `🏷 <i>بلا منصّة</i> — <code>/platform ${esc(p.code)} Netflix</code>`);
+
+    for (const v of p.variants) {
+      const dur = durationText(v.value, v.unit);
+      const price = d.markets.map((m) =>
+        v.prices[m.code] === undefined
+          ? `${m.code}: —`
+          : `${m.code}: ${v.prices[m.code]} ${cur[m.code]}`).join(" · ");
+      out.push(`  • <b>${esc(v.name)}</b> <code>${esc(v.code)}</code> — ` +
+        `${dur} — مخزون ${v.stock}`);
+      out.push(`    💰 ${esc(price)}`);
+      if (!v.value) out.push(`    <code>/duration ${esc(p.code)} ${esc(v.code)} 1 سنة</code>`);
+      if (d.markets.some((m) => v.prices[m.code] === undefined)) {
+        out.push(`    <code>/price ${esc(p.code)} ${esc(v.code)} ` +
+          `${esc(d.markets[0].code)} 3500</code>`);
+      }
+    }
+  }
+
+  out.push("", "📄 <b>الصفحات</b>: " +
+    d.markets.map((m) => `${esc(m.name)} (${esc(m.currency)})`).join(" · "));
+  out.push("👥 <b>البائعون</b>");
+  for (const sl of d.sellers) {
+    const mk = d.markets.find((m) => m.code === sl.market);
+    out.push(`  • ${esc(sl.name)} <code>${sl.telegram_id}</code> — ` +
+      (mk ? esc(mk.name) : "<i>الصفحتان</i>"));
+  }
+
+  await send(chat, out.join("\n"), [backRow]);
 }
 
 // ------------------------------------------------------------
@@ -2224,6 +2357,122 @@ async function handleCommand(
       return;
     }
 
+    // ---------- الكتالوج: منصات ومدد وأسعار ----------
+    case "/platform":
+    case "/unplatform": {
+      const rm = cmd === "/unplatform";
+      if (args.length < 2) {
+        await send(chat, `الصيغة: <code>${cmd} giftcard Netflix</code>` +
+          (rm ? "" : "\n\nاسم غير موجود في القائمة يُضاف إليها."));
+        return;
+      }
+      const r = await rpc<{ product: string; platforms: string[] }>(
+        client, "bot_cmd_platform", {
+          p_telegram_id: tgId, p_product_code: args[0],
+          p_platform: args.slice(1).join(" "), p_remove: rm,
+        });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      const list = r.data!.platforms;
+      await send(chat, [
+        `✅ <b>${esc(r.data!.product)}</b>`, "",
+        list.length
+          ? "منصّاته الآن: " + list.map((x) => `<b>${esc(x)}</b>`).join(" · ")
+          : "<i>بلا منصّات — الوثيقة لن تعرف ما تكتب.</i>",
+      ].join("\n"), [backRow]);
+      return;
+    }
+
+    case "/duration": {
+      if (args.length < 4) {
+        await send(chat, [
+          "الصيغة: <code>/duration giftcard year 1 سنة</code>", "",
+          "الوحدات: يوم · أسبوع · شهر · سنة",
+          "<i>تُحسب منها نهاية الاشتراك في وثيقة الزبون.</i>",
+        ].join("\n"));
+        return;
+      }
+      const r = await rpc<{ variant: string; months: number | null; days: number | null }>(
+        client, "bot_cmd_duration", {
+          p_telegram_id: tgId, p_product_code: args[0], p_variant_code: args[1],
+          p_value: Number(args[2]), p_unit: args.slice(3).join(" "),
+        });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      await send(chat,
+        `✅ <b>${esc(r.data!.variant)}</b> — ` +
+        esc(DOC.ar.duration(r.data!.months, 0, r.data!.days)), [backRow]);
+      return;
+    }
+
+    case "/price": {
+      if (args.length < 4) {
+        const mk = await rpc<{ code: string; name: string; currency: string }[]>(
+          client, "bot_markets_list", { p_telegram_id: tgId });
+        await send(chat, [
+          "الصيغة: <code>/price giftcard year dz 3500</code>", "",
+          "الصفحات: " + (mk.data ?? []).map((m) =>
+            `<code>${esc(m.code)}</code> ${esc(m.name)} (${esc(m.currency)})`).join(" · "),
+          "", "<i>سعر لكل صفحة. و<code>-</code> بدل المبلغ يمسحه.</i>",
+        ].join("\n"));
+        return;
+      }
+      const raw = args[3];
+      const r = await rpc<{ product: string; variant: string; market_name: string;
+                            price: number | null; currency: string }>(
+        client, "bot_cmd_price", {
+          p_telegram_id: tgId, p_product_code: args[0], p_variant_code: args[1],
+          p_market: args[2], p_price: raw === "-" ? null : Number(raw),
+        });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      const d = r.data!;
+      await send(chat, d.price === null
+        ? `✅ مُسح سعر <b>${esc(d.variant)}</b> في ${esc(d.market_name)}`
+        : `✅ <b>${esc(d.product)} — ${esc(d.variant)}</b>\n` +
+          `${esc(d.market_name)}: <b>${d.price} ${esc(d.currency)}</b>`, [backRow]);
+      return;
+    }
+
+    case "/market": {
+      if (args.length < 2) {
+        await send(chat, "الصيغة: <code>/market jo on</code> — أو <code>off</code>");
+        return;
+      }
+      const on = ["on", "1", "نعم", "فتح"].includes(args[1].toLowerCase());
+      const r = await rpc<{ name: string; currency: string; is_active: boolean }>(
+        client, "bot_set_market_active",
+        { p_telegram_id: tgId, p_market: args[0], p_active: on });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      await send(chat, `✅ صفحة <b>${esc(r.data!.name)}</b> (${esc(r.data!.currency)}) — ` +
+        (r.data!.is_active ? "مفتوحة" : "مغلقة"), [backRow]);
+      return;
+    }
+
+    case "/seller": {
+      if (args.length < 2) {
+        await send(chat, [
+          "الصيغة: <code>/seller 123456789 dz</code>", "",
+          "<i>يربط البائع بصفحته فلا يُسأل عنها. و<code>-</code> يفكّ",
+          "الربط: يبيع في الصفحتين ويُسأل عند كل بيعة.</i>",
+        ].join("\n"));
+        return;
+      }
+      const r = await rpc<{ name: string; market: string | null; market_name: string | null }>(
+        client, "bot_set_admin_market", {
+          p_telegram_id: tgId, p_target_telegram_id: Number(args[0]),
+          p_market: args[1] === "-" ? null : args[1],
+        });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      const d = r.data!;
+      await send(chat, d.market
+        ? `✅ <b>${esc(d.name)}</b> → صفحة ${esc(d.market_name ?? d.market)}`
+        : `✅ <b>${esc(d.name)}</b> → الصفحتان، ويُسأل عند كل بيعة`, [backRow]);
+      return;
+    }
+
+    case "/catalog": {
+      await catalogReport(client, chat, tgId);
+      return;
+    }
+
     case "/addcards": {
       if (args.length < 2) {
         await send(chat, "الصيغة — الأمر في سطر والأكواد بعده سطراً سطراً:\n" +
@@ -2382,14 +2631,23 @@ async function handleCallback(
     if (arg === "ok") { await answer(cbId); await wizardConfirm(client, chat, tgId, msg); return; }
 
     // الإدخال اليدوي: سؤال بردّ إجباري، والحالة في القاعدة لا في نصّه
-    if (arg === "bonus_manual" || arg === "platform_manual") {
+    if (["bonus_manual", "platform_manual", "months_manual", "days_manual"]
+          .includes(arg)) {
       await answer(cbId);
       const r = await rpc<Wizard>(client, "bot_wizard_set",
         { p_telegram_id: tgId, p_step: arg, p_value: "" });
       if (r.error) { await answer(cbId, r.error, true); return; }
-      await ask(chat, arg === "bonus_manual"
-        ? `${WZ_BONUS_PROMPT}\n\nردّ على هذه الرسالة بعدد الأيام (0–90).`
-        : `${WZ_PLATFORM_PROMPT}\n\nردّ على هذه الرسالة باسم المنصة.`);
+      const prompts: Record<string, [string, string, string]> = {
+        bonus_manual:   [WZ_BONUS_PROMPT,
+          `بعدد أيام الهدية (${CUSTOM.bonus.min}–${CUSTOM.bonus.max}).`, "عدد الأيام"],
+        months_manual:  [WZ_MONTHS_PROMPT,
+          `بعدد الأشهر (${CUSTOM.months.min}–${CUSTOM.months.max}).`, "عدد الأشهر"],
+        days_manual:    [WZ_DAYS_PROMPT,
+          `بعدد الأيام (${CUSTOM.days.min}–${CUSTOM.days.max}).`, "عدد الأيام"],
+        platform_manual: [WZ_PLATFORM_PROMPT, "باسم المنصة.", "اسم المنصة"],
+      };
+      const [head, tail, ph] = prompts[arg];
+      await ask(chat, `${head}\n\nردّ على هذه الرسالة ${tail}`, ph);
       return;
     }
 
@@ -2862,6 +3120,18 @@ Deno.serve(async (req) => {
       } else {
         await engagementIssue(client, chat, src.id, eb[1], n);
       }
+      return new Response("ok");
+    }
+
+    for (const [re, step, range] of [
+      [WZ_MONTHS_RE, "months", CUSTOM.months],
+      [WZ_DAYS_RE,   "days",   CUSTOM.days],
+    ] as const) {
+      if (!re.test(replied)) continue;
+      const n = parseCount(text);
+      const bad = checkRange(n, range);
+      if (bad) { await send(chat, `⏳ ${bad}`); return new Response("ok"); }
+      await wizardStep(client, chat, src.id, step, String(n));
       return new Response("ok");
     }
 

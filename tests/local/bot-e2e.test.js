@@ -642,15 +642,21 @@ async function run() {
   assert(wz.payload.text.includes("Snapchat Plus"), "اختيار المنصة يُثبّتها في المعاينة");
   assert(wz.payload.text.includes("اختر المدة"), "ثم يسأل عن المدة");
   const mBtns = kb(wz).filter((b) => (b.callback_data || "").startsWith("wm:"));
-  assert(mBtns.map((b) => b.callback_data).join(",") === "wm:1,wm:3,wm:6,wm:12",
-         "المدد 1/3/6/12 بهذا الترتيب");
+  assert(mBtns.map((b) => b.callback_data).join(",") === "wm:1,wm:2,wm:3,wm:6,wm:12",
+         "المدد 1/2/3/6/12 بهذا الترتيب");
+  // ونصوصها بالعربية الصحيحة: «شهران» لا «2 شهر»
+  assert(mBtns.map((b) => b.text).join(",") === "شهر,شهران,3 أشهر,6 أشهر,12 شهراً",
+         "وبصيغها العربية");
+  assert(kb(wz).some((b) => b.callback_data === "wz:months_manual")
+      && kb(wz).some((b) => b.callback_data === "wz:days_manual"),
+         "ومدّة مخصّصة: بالأشهر أو بالأيام");
 
   drain();
   await update(tap(SELLER, "wm:12"));
   wz = last("editMessageText");
   assert(wz.payload.text.includes("أيام هدية؟"), "ثم أيام الهدية");
   const bBtns = kb(wz).filter((b) => (b.callback_data || "").startsWith("wb:"));
-  assert(bBtns.map((b) => b.text).join("|") === "لا|7 أيام|14 أيام",
+  assert(bBtns.map((b) => b.text).join("|") === "لا|7|14",
          "أزرار [لا] [7] [14], وجد " + bBtns.map((b) => b.text).join("|"));
   assert(!!kb(wz).find((b) => b.callback_data === "wz:bonus_manual"),
          "وزر الإدخال اليدوي");
@@ -676,8 +682,10 @@ async function run() {
   // بعد أحد عشر مفرد منصوب.
   assert(/التغطية: 12 شهراً \+ 10 أيام هدية/.test(wz.payload.text),
          "وصيغة التغطية بالعربية مع الهدية");
-  assert(wz.payload.text.includes("لحظة تعبئة الزبون"),
-         "وتقول صراحةً أن البداية تُثبَّت عند التعبئة لا الآن");
+  // كانت تَعِد بأن البداية تُثبَّت عند تعبئة الزبون؛ صار ذلك غير
+  // صحيح منذ 029 (البداية لحظة الإصدار)، فالوعد الكاذب سقط.
+  assert(!wz.payload.text.includes("لحظة تعبئة الزبون"),
+         "ولا تَعِد بأن البداية تُثبَّت عند التعبئة — لم تعد كذلك");
   assert(!!kb(wz).find((b) => b.callback_data === "wz:ok"), "وزر التأكيد");
 
   // «تعديل» يعود ويمحو
