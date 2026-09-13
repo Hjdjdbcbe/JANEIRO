@@ -59,6 +59,12 @@ type Doc = {
   };
   /** المدة: بالأشهر أو بالأيام، مع أيام الهدية إن وُجدت. */
   duration: (months: number | null, bonus: number, days?: number | null) => string;
+  /** أيام الهدية وحدها — تُعرض شارةً بجنب المدة في الوثيقة. */
+  bonusPill: (n: number) => string;
+  /** ثلاثة أسطر في الشريط الجانبي: ما هو المتجر، بإيجاز. */
+  sideLines: string[];
+  detailsHeading: string;
+  verifiableRef: string;
   commitmentHeading: string;
   commitment: string[];
   status: { active: string; expired: string; revoked: string; pending: string };
@@ -112,6 +118,10 @@ export const DOC: Record<Lang, Doc> = {
       const base = m ? arMonths(m) : arDays(d ?? 0);
       return b > 0 ? `${base} + ${arDays(b)} هدية` : base;
     },
+    bonusPill: (n) => `+ ${arDays(n)} هدية`,
+    sideLines: ["اشتراكات رقمية", "خدمات أونلاين", "وصولك أبسط"],
+    detailsHeading: "تفاصيل اشتراكك",
+    verifiableRef: "مرجع قابل للتحقّق",
     commitmentHeading: "التزامنا",
     commitment: [
       "طيلة المدة المذكورة أعلاه، هذا الحساب يبقى تحت مسؤوليتنا.",
@@ -176,6 +186,10 @@ export const DOC: Record<Lang, Doc> = {
         ? `${base} + ${b} ${b === 1 ? "jour offert" : "jours offerts"}`
         : base;
     },
+    bonusPill: (n) => `+ ${n} ${n === 1 ? "jour offert" : "jours offerts"}`,
+    sideLines: ["Abonnements digitaux", "Services en ligne", "Votre accès simplifié"],
+    detailsHeading: "Détails de votre abonnement",
+    verifiableRef: "Référence vérifiable",
     commitmentHeading: "NOTRE ENGAGEMENT",
     commitment: [
       "Pendant toute la durée indiquée ci-dessus, ce compte reste sous notre responsabilité.",
@@ -239,6 +253,10 @@ export const DOC: Record<Lang, Doc> = {
                      : `${d} ${d === 1 ? "day" : "days"}`;
       return b > 0 ? `${base} + ${b} ${b === 1 ? "day" : "days"} free` : base;
     },
+    bonusPill: (n) => `+ ${n} ${n === 1 ? "day" : "days"} free`,
+    sideLines: ["Digital subscriptions", "Online services", "Your access, simplified"],
+    detailsHeading: "Your subscription details",
+    verifiableRef: "Verifiable reference",
     commitmentHeading: "OUR COMMITMENT",
     commitment: [
       "For the full period shown above, this account stays our responsibility.",

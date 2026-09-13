@@ -844,7 +844,9 @@ async function run() {
   assert(docFr.includes("Plus de services. Plus de possibilités."), "والـtagline");
   assert(docFr.includes("Janeiro Store — abonnement Netflix"), "والسطر الفرعي");
   assert(docFr.includes("NOTRE ENGAGEMENT"), "وعنوان الالتزام");
-  assert(docFr.includes("01 ·") && docFr.includes("05 ·"), "والنقاط مرقّمة 01· لا bullets");
+  // الترقيم عنصر مستقل عن النصّ: يُلوَّن ويُحاذى في التصميم
+  assert(/class="n">01</.test(docFr) && /class="n">05</.test(docFr),
+         "والنقاط مرقّمة 01…05 لا bullets");
   assert(docFr.includes("Réf. Janeiro") && docFr.includes("Titulaire")
          && docFr.includes("Clé de vérification"), "والتسميات الفرنسية");
   assert(/Couvert jusqu'au[\s\S]{0,90}\d{1,2} \w+ 20\d\d/.test(docFr),
@@ -863,6 +865,16 @@ async function run() {
   assert(docAr.includes("مرجع Janeiro") && docAr.includes("كلمة التحقق"),
          "وتسمياتها");
   const docEn = await wweb(`/warranty/${wCode}?lang=en`).then((r) => r.text());
+
+  /* نسخة على القرص للمعاينة بالعين: DUMP_DIR=… node …
+     الوثيقة تُطبع وتُرسل صورةً، وما يُقرأ منها لا يثبته assert. */
+  if (process.env.DUMP_DIR) {
+    const fs = require("fs");
+    fs.mkdirSync(process.env.DUMP_DIR, { recursive: true });
+    for (const [l, html] of [["ar", docAr], ["fr", docFr], ["en", docEn]]) {
+      fs.writeFileSync(path.join(process.env.DUMP_DIR, `doc-${l}.html`), html);
+    }
+  }
   assert(docEn.includes("SERVICE COMMITMENT") && docEn.includes("OUR COMMITMENT"),
          "والإنجليزية");
   assert(/Covered until[\s\S]{0,90}\w+ \d{1,2}, 20\d\d/.test(docEn),

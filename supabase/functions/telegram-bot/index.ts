@@ -545,7 +545,7 @@ type Contact = { label: string; value: string; url: string | null; icon: string 
 
 function page(
   title: string, body: string, extraHead = "",
-  opts: { lang?: Lang; noindex?: boolean } = {},
+  opts: { lang?: Lang; noindex?: boolean; wide?: boolean } = {},
 ): Response {
   const lang = opts.lang ?? "ar";
   const dir  = DOC[lang].dir;
@@ -592,7 +592,7 @@ button:active{transform:translateY(1px)}
 .brand{text-align:center;color:var(--muted);font-size:13px;margin-top:22px}
 @media print{body{background:#fff;padding:0}.noprint{display:none!important}
  .card{border:0;box-shadow:none}}
-</style>${extraHead}</head><body><div class="wrap">${body}</div></body></html>`,
+</style>${opts.wide ? "<style>.wrap{max-width:860px}</style>" : ""}${extraHead}</head><body><div class="wrap">${body}</div></body></html>`,
     { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }
@@ -736,12 +736,106 @@ function engFormPage(token: string, d: {
     { lang, noindex: true });
 }
 
-/** الوثيقة نفسها. */
+/* ------------------------------------------------------------
+   الوثيقة نفسها
+   ------------------------------------------------------------
+   ورقة بشريط جانبي بنفسجي ومتن كريمي، على نسبة A4 — لأنها
+   تُطبع وتُحفظ وتُرسل صورةً، لا تُقرأ في تبويب وتُنسى.
+
+   وعلى الهاتف ينقلب الشريط إلى شارة علوية: نفس المحتوى بلا
+   تمرير أفقي. والألوان تُطبع كما تُعرض (print-color-adjust)،
+   وإلا خرج الشريط أبيض وضاعت الهوية.
+   ------------------------------------------------------------ */
+const DOC_CSS = `
+.sheet{display:flex;background:#F8F6F1;color:#14121F;border-radius:16px;overflow:hidden;
+ box-shadow:0 1px 2px rgba(20,18,31,.06),0 12px 40px rgba(20,18,31,.10)}
+.side{flex:none;width:190px;background:#6C35FF;color:#fff;padding:26px 22px;
+ display:flex;flex-direction:column;gap:18px}
+.side .logo{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.side .logo small{display:block;font-size:11px;font-weight:600;letter-spacing:.34em;
+ margin-top:4px;opacity:.9}
+.side hr{width:52px;height:3px;background:#fff;border:0;margin:4px 0;opacity:.9}
+.side ul{list-style:none;margin:0;padding:0;font-size:14px;line-height:1.5;opacity:.95}
+.side li{margin-bottom:9px}
+.side .foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.side .lbl{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+ opacity:.85;line-height:1.4}
+.side .qrbox{background:#fff;padding:7px;border-radius:8px;width:max-content}
+.side .qrbox svg{display:block}
+.main{flex:1;min-width:0;padding:26px 30px 22px}
+.tag{text-align:end;font-size:12px;font-weight:700;color:#6C35FF;line-height:1.5;
+ margin:0 0 14px}
+.doc-h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin:0;line-height:1.1;
+ text-transform:uppercase}
+.doc-sub{font-size:16px;font-weight:700;margin:6px 0 0}
+.win{display:flex;gap:0;background:#EFE9FF;border-radius:12px;padding:14px 16px;margin:18px 0}
+.win>div{flex:1;display:flex;gap:11px;align-items:center;min-width:0}
+.win>div+div{border-inline-start:1px solid #D6C9FF;padding-inline-start:16px}
+.win .ic{flex:none;color:#6C35FF}
+.win .k{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+ color:#6C35FF;margin:0 0 2px}
+.win .v{font-size:17px;font-weight:700;margin:0;line-height:1.25}
+.det{border:1px solid #E2DDD2;border-radius:12px;padding:16px 18px;background:#FDFCFA}
+.det h2{font-size:16px;font-weight:700;margin:0 0 10px}
+.det .r{display:flex;justify-content:space-between;align-items:center;gap:14px;
+ padding:9px 0;border-top:1px solid #EDE8DE;font-size:14px}
+.det .r:first-of-type{border-top:0}
+.det .r span{color:#6B6880}
+.det .r b{text-align:end;word-break:break-word;font-weight:700}
+.pill{display:inline-block;background:#6C35FF;color:#fff;border-radius:999px;
+ padding:3px 11px;font-size:12px;font-weight:700;margin-inline-start:8px;white-space:nowrap}
+.st{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:700}
+.st.active{background:#E7F7EE;color:#11794A}
+.st.pending{background:#FFF3DC;color:#8A5A00}
+.st.expired,.st.revoked{background:#FBE9E9;color:#B42318}
+.commit{margin-top:20px}
+.commit h2{font-size:19px;font-weight:800;margin:0 0 6px;text-transform:uppercase}
+.commit ol{list-style:none;margin:0;padding:0}
+.commit li{display:flex;gap:13px;align-items:flex-start;padding:11px 0;
+ border-top:1px solid #E7E2D8;font-size:14px;line-height:1.55}
+.commit li:first-child{border-top:0}
+.commit .n{flex:none;font-size:18px;font-weight:800;color:#6C35FF;
+ font-variant-numeric:tabular-nums;min-width:2.1em}
+.commit .d{flex:none;color:#6C35FF;font-weight:800;margin-inline-end:2px}
+.dfoot{display:flex;align-items:center;gap:16px;margin-top:20px;padding-top:16px;
+ border-top:1px solid #E2DDD2}
+.dfoot .b{font-size:19px;font-weight:800;color:#6C35FF;line-height:1.2}
+.dfoot .t{flex:1;font-size:12px;color:#6B6880;line-height:1.45;
+ border-inline-start:1px solid #E2DDD2;padding-inline-start:16px}
+.dfoot .u{display:block;margin-top:3px;font-size:10px;word-break:break-all;opacity:.8;
+ font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.dfoot .q{flex:none;border:1px solid #E2DDD2;border-radius:9px;padding:6px;background:#fff}
+.dfoot .q svg{display:block}
+@media(max-width:620px){
+ .sheet{flex-direction:column}
+ .side{width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:14px;padding:18px}
+ .side ul,.side hr{display:none}
+ .side .foot{margin:0 0 0 auto;flex-direction:row;align-items:center}
+ .main{padding:20px 18px}
+ .doc-h1{font-size:23px}
+ .win{flex-direction:column;gap:12px}
+ .win>div+div{border-inline-start:0;border-top:1px solid #D6C9FF;
+  padding-inline-start:0;padding-top:12px}
+}
+@media print{
+ body{background:#fff;padding:0}
+ .sheet{border-radius:0;box-shadow:none;min-height:100vh}
+ .side,.pill,.win{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+`;
+
 function engDocPage(d: Engagement, lang: Lang): Response {
   const t = DOC[lang];
   const L = t.labels;
-  const row = (label: string, value: string) =>
-    `<div><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+  const row = (label: string, value: string, extra = "") =>
+    `<div class="r"><span>${esc(label)}</span><b>${esc(value)}${extra}</b></div>`;
+
+  const cal = `<svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`;
+
+  const when = (label: string, value: string) =>
+    `<div>${cal}<div><p class="k">${esc(label)}</p><p class="v">${esc(value)}</p></div></div>`;
 
   const contacts = (d.contacts ?? []).map((k) => {
     const inner = `<span>${k.icon ? esc(k.icon) + " " : ""}${esc(k.label)}</span><b>${esc(k.value)}</b>`;
@@ -749,57 +843,75 @@ function engDocPage(d: Engagement, lang: Lang): Response {
                  : `<div class="c">${inner}</div>`;
   }).join("");
 
+  // الشعار بالعربية كذلك: هو اسم المتجر لا يُترجم، لكن سطر
+  // الوسم يُعرض بلغة الصفحة والعربية معاً كما في النموذج.
+  const tagline = lang === "ar" ? esc(t.tagline)
+    : `${esc(t.tagline)}<br>${esc(DOC.ar.tagline)}`;
+
   return page(`${t.title} — Janeiro Store`, `
     ${langSwitch(`/warranty/${d.code}`, lang)}
-    <div class="card">
-      <div class="head">
-        <div class="brand">Janeiro Store</div>
-        <h1>${esc(t.title)}</h1>
-        <p class="sub">${esc(t.subtitle(d.platform))}</p>
-        <p class="tag">${esc(t.tagline)}</p>
-      </div>
+    <div class="sheet">
+      <aside class="side">
+        <div class="logo">janeiro<small>STORE</small></div>
+        <hr>
+        <ul>${t.sideLines.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        <div class="foot">
+          <p class="lbl">${esc(t.verifiableRef)}</p>
+          <div class="qrbox">${qrSvg(verifyUrl(d.code), 92)}</div>
+        </div>
+      </aside>
 
-      <p class="sub"><span class="st ${d.status}">${esc(t.status[d.status])}</span>
-        ${d.status === "active" && d.days_left !== null
-          ? ` &nbsp;${esc(t.daysLeft(d.days_left))}` : ""}</p>
+      <main class="main">
+        <p class="tag">${tagline}</p>
+        <h1 class="doc-h1">${esc(t.title)}</h1>
+        <p class="doc-sub">${esc(t.subtitle(d.platform))}</p>
 
-      <div class="dl">
-        ${row(L.ref, d.ref_code)}
-        ${row(L.holder, d.holder_name)}
-        ${d.instagram ? row(L.account, "@" + d.instagram) : ""}
-        ${row(L.service, d.platform)}
-        ${row(L.coverage, t.duration(d.months, d.bonus_days, d.duration_days))}
-        ${row(L.activatedOn, formatDate(d.starts_at, lang))}
-        ${d.ends_at ? row(L.coveredUntil, formatDate(d.ends_at, lang)) : ""}
-        ${row(L.key, d.code)}
-      </div>
+        <div class="win">
+          ${when(L.activatedOn, formatDate(d.starts_at, lang))}
+          ${d.ends_at ? when(L.coveredUntil, formatDate(d.ends_at, lang)) : ""}
+        </div>
 
-      <div class="eng">
-        <h2>${esc(t.commitmentHeading)}</h2>
-        <ol>${commitmentLines(lang).map((line) => {
-          const n = line.slice(0, 4);
-          return `<li><span class="n">${esc(n)}</span><span>${esc(line.slice(5))}</span></li>`;
-        }).join("")}</ol>
-      </div>
+        <section class="det">
+          <h2>${esc(t.detailsHeading)}
+            <span class="st ${d.status}">${esc(t.status[d.status])}</span>${
+              d.status === "active" && d.days_left !== null
+                ? ` <span class="st active">${esc(t.daysLeft(d.days_left))}</span>` : ""}</h2>
+          ${row(L.ref, d.ref_code)}
+          ${row(L.holder, d.holder_name)}
+          ${d.instagram ? row(L.account, "@" + d.instagram) : ""}
+          ${row(L.service, d.platform)}
+          ${row(L.coverage, t.duration(d.months, 0, d.duration_days),
+                d.bonus_days > 0 ? `<span class="pill">${esc(t.bonusPill(d.bonus_days))}</span>` : "")}
+          ${row(L.key, d.code)}
+        </section>
 
-      <div class="qr">
-        <div>${qrSvg(verifyUrl(d.code), 74)}</div>
-        <div>${esc(t.verifyHint)}<br><small>${esc(verifyUrl(d.code))}</small></div>
-      </div>
+        <section class="commit">
+          <h2>${esc(t.commitmentHeading)}</h2>
+          <ol>${commitmentLines(lang).map((line) =>
+            `<li><span class="n">${esc(line.slice(0, 2))}</span>` +
+            `<span class="d">·</span><span>${esc(line.slice(5))}</span></li>`).join("")}</ol>
+        </section>
 
-      <div class="acts noprint">
-        <a class="primary" href="/warranty/${esc(d.code)}/image?lang=${lang}"
-           download="janeiro-${esc(d.code)}.png">${esc(t.actions.png)}</a>
-        <a href="/warranty/${esc(d.code)}/pdf?lang=${lang}">${esc(t.actions.pdf)}</a>
-        <button onclick="window.print()">${esc(t.actions.print)}</button>
-      </div>
-      <p class="note noprint">${esc(t.keep)}</p>
-      ${contacts ? `<div class="contacts"><h2>${esc(t.contactsHeading)}</h2>${contacts}</div>` : ""}
-    </div><p class="brand">Janeiro Store</p>`,
-    `<style>${ENG_CSS}</style>`, { lang, noindex: true });
+        <footer class="dfoot">
+          <div class="b">Janeiro Store</div>
+          <div class="t">${esc(t.verifyHint)}
+            <span class="u">${esc(verifyUrl(d.code))}</span></div>
+          <div class="q">${qrSvg(verifyUrl(d.code), 64)}</div>
+        </footer>
+      </main>
+    </div>
+
+    <div class="acts noprint">
+      <a class="primary" href="/warranty/${esc(d.code)}/image?lang=${lang}"
+         download="janeiro-${esc(d.code)}.png">${esc(t.actions.png)}</a>
+      <a href="/warranty/${esc(d.code)}/pdf?lang=${lang}">${esc(t.actions.pdf)}</a>
+      <button onclick="window.print()">${esc(t.actions.print)}</button>
+    </div>
+    <p class="note noprint">${esc(t.keep)}</p>
+    ${contacts ? `<div class="card contacts noprint"><h2>${esc(t.contactsHeading)}</h2>${contacts}</div>` : ""}`,
+    `<style>${ENG_CSS}${DOC_CSS}</style>`, { lang, noindex: true, wide: true });
 }
 
-/** صفحة التحقق التي يقصدها الـQR. */
 function engVerifyPage(v: {
   found: boolean; code?: string; platform?: string; ends_at?: string | null;
   status?: Engagement["status"]; holder_hint?: string | null;
