@@ -8,7 +8,8 @@
 # Steps: shim -> migrations -> migrations again (re-run check)
 #        -> backend.test.sql -> concurrency.test.sh
 #        -> bot.test.sql -> bot-concurrency.test.sh
-#        -> engagement.test.sql -> forbidden-text.test.sh
+#        -> engagement.test.sql -> order-data.test.sql
+#        -> forbidden-text.test.sh
 #        -> qr.test.js -> bot-e2e.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
@@ -87,6 +88,15 @@ set -o pipefail
 if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/engagement.test.sql" 2>&1 \
      | grep -E 'PASS|FAIL|ERROR|=====' ; then
   red "FAIL: engagement.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> order-data.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/order-data.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: order-data.test.sql did not run to completion (see the ERROR above)"
   exit 1
 fi
 set +o pipefail
