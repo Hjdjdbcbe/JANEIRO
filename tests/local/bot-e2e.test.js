@@ -788,6 +788,21 @@ async function run() {
   // نفس الدالة تخدمها؛ تُفتح هنا كما يفتحها الزبون تماماً
   const wweb = (p, init) => fetch(`http://127.0.0.1:${BOT}${p}`, init);
 
+  /* ---------- الترويسة، لا النصّ وحده ----------
+     صفحة سليمة بترويسة خاطئة تُعرض عند الزبون كوداً خاماً بأحرف
+     مشوّهة بدل وثيقته. ولا يكشفه فحصُ نصٍّ: النصّ صحيح تماماً.
+     وقع فعلاً على Supabase — في عين الزبون لا في اختبار. */
+  for (const [p, what] of [
+    ["/warranty/verify/JW-0000000000", "صفحة التحقق"],
+    ["/?verify=JW-0000000000", "والشكل بالمعامل"],
+  ]) {
+    const head = await wweb(p);
+    assert((head.headers.get("content-type") || "").replace(/\s/g, "")
+           === "text/html;charset=utf-8",
+           `${what} تُرسَل text/html بترميز utf-8، وجد: ` +
+           head.headers.get("content-type"));
+  }
+
   // وثيقة جديدة لأجل الصفحات
   drain();
   await update(message(SELLER, "/warranty"));

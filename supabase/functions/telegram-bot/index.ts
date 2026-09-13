@@ -546,13 +546,36 @@ async function loadCards(
 // ============================================================
 type Contact = { label: string; value: string; url: string | null; icon: string | null };
 
+/* ------------------------------------------------------------
+   صفحة HTML
+   ------------------------------------------------------------
+   الجسم بايتات لا نصّ، والترويسة كائن Headers لا كائناً عادياً.
+
+   الرَنتايم يضع Content-Type من عنده حين يكون الجسم نصّاً، وقد
+   يطغى على ما نضعه — فتُعرَض الصفحة عند الزبون كوداً خاماً
+   بأحرف مشوّهة بدل وثيقته. والبايتات لا تُخمَّن: TextEncoder
+   يعطي UTF-8، والترويسة تقولها صراحةً، فلا مجال للتخمين.
+
+   لا يُكشف محلياً: Deno العادي يحترم ما نضعه. كُشف على Supabase
+   وحدها، في عين الزبون.
+   ------------------------------------------------------------ */
+const HTML_ENC = new TextEncoder();
+
+function html(markup: string, status = 200): Response {
+  const h = new Headers();
+  h.set("content-type", "text/html; charset=utf-8");
+  // وسيط لا يخمّن نوعاً أعلن عن نفسه
+  h.set("x-content-type-options", "nosniff");
+  return new Response(HTML_ENC.encode(markup), { status, headers: h });
+}
+
 function page(
   title: string, body: string, extraHead = "",
   opts: { lang?: Lang; noindex?: boolean; wide?: boolean } = {},
 ): Response {
   const lang = opts.lang ?? "ar";
   const dir  = DOC[lang].dir;
-  return new Response(
+  return html(
     `<!doctype html><html lang="${lang}" dir="${dir}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${opts.noindex ? '<meta name="robots" content="noindex, nofollow">' : ""}
@@ -595,9 +618,7 @@ button:active{transform:translateY(1px)}
 .brand{text-align:center;color:var(--muted);font-size:13px;margin-top:22px}
 @media print{body{background:#fff;padding:0}.noprint{display:none!important}
  .card{border:0;box-shadow:none}}
-</style>${opts.wide ? "<style>.wrap{max-width:860px}</style>" : ""}${extraHead}</head><body><div class="wrap">${body}</div></body></html>`,
-    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
+</style>${opts.wide ? "<style>.wrap{max-width:860px}</style>" : ""}${extraHead}</head><body><div class="wrap">${body}</div></body></html>`);
 }
 
 const errPage = (msg: string) =>
@@ -2415,10 +2436,9 @@ async function customerRoute(req: Request, url: URL): Promise<Response | null> {
         platform: string; months: number | null; duration_days: number | null;
   bonus_days: number;
       }, lang) as Response);
-      const html = await body.text();
-      return new Response(html.replace("<form",
-        `<div class="note err">${esc(docError(String(error.message ?? ""), lang))}</div><form`),
-        { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+      const markup = await body.text();
+      return html(markup.replace("<form",
+        `<div class="note err">${esc(docError(String(error.message ?? ""), lang))}</div><form`));
     }
 
     const out = data as { code: string; issued_by_telegram_id: number };
