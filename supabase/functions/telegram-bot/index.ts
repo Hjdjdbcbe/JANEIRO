@@ -444,6 +444,9 @@ const HELP = [
   "/price &lt;رمز المنتج&gt; &lt;رمز المدة&gt; &lt;dz|jo&gt; &lt;المبلغ&gt;",
   "   مثال: <code>/price giftcard year dz 3500</code>",
   "/market &lt;dz|jo&gt; &lt;on|off&gt; — فتح صفحة أو غلقها",
+  "/terms [الخدمة] — شروط التغطية في وثيقة الزبون",
+  "/setterms &lt;- أو الخدمة&gt; &lt;ar|fr|en&gt; ثم النقاط سطراً سطراً:",
+  "<code>/setterms - ar\nالنقطة الأولى\nالنقطة الثانية</code>",
   "/seller &lt;رقم تليجرام&gt; &lt;dz|jo|-&gt; — صفحة البائع",
   "/contacts — قنوات التواصل أسفل وثيقة الزبون",
   "/addcontact &lt;التسمية&gt; | &lt;القيمة&gt; | [رابط]",
@@ -663,6 +666,16 @@ type Engagement = {
   starts_at: string; ends_at: string | null;
   status: "active" | "expired" | "revoked" | "pending";
   days_left: number | null; contacts?: Contact[];
+  /** لقطة شروط التغطية يوم الإصدار، بلغاتها. */
+  terms?: Partial<Record<Lang, string[]>> | null;
+};
+
+/* شروط هذه الوثيقة: لقطتها أولاً، وإلّا المدمج في الكود.
+   الوثائق الصادرة قبل أن تصير الشروط تُحرَّر لا لقطة لها،
+   فتُعرض بما كان يُعرض لها يومها. */
+const docTerms = (d: Engagement, lang: Lang): string[] => {
+  const own = d.terms?.[lang];
+  return own && own.length ? own : DOC[lang].commitment;
 };
 
 /** مبدّل اللغة: نفس المسار، بمعامل lang. */
@@ -887,9 +900,9 @@ function engDocPage(d: Engagement, lang: Lang): Response {
 
         <section class="commit">
           <h2>${esc(t.commitmentHeading)}</h2>
-          <ol>${commitmentLines(lang).map((line) =>
-            `<li><span class="n">${esc(line.slice(0, 2))}</span>` +
-            `<span class="d">·</span><span>${esc(line.slice(5))}</span></li>`).join("")}</ol>
+          <ol>${docTerms(d, lang).map((body, i) =>
+            `<li><span class="n">${String(i + 1).padStart(2, "0")}</span>` +
+            `<span class="d">·</span><span>${esc(body)}</span></li>`).join("")}</ol>
         </section>
 
         <footer class="dfoot">
@@ -1852,6 +1865,74 @@ async function handleCommand(
       await send(chat, d.market
         ? `✅ <b>${esc(d.name)}</b> → صفحة ${esc(d.market_name ?? d.market)}`
         : `✅ <b>${esc(d.name)}</b> → الصفحتان، ويُسأل عند كل بيعة`, [backRow]);
+      return;
+    }
+
+    // ---------- شروط التغطية ----------
+    case "/terms": {
+      const r = await rpc<{
+        platform: string | null;
+        own: Partial<Record<Lang, string[]>>;
+        effective: Partial<Record<Lang, string[]>>;
+        overridden: string[];
+      }>(client, "bot_terms_list",
+         { p_telegram_id: tgId, p_platform: args.join(" ") || null });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      const d = r.data!;
+      const names: Record<Lang, string> = { ar: "العربية", fr: "Français", en: "English" };
+
+      const out = ["📜 <b>شروط التغطية</b> — " +
+        (d.platform ? `<b>${esc(d.platform)}</b>` : "<i>العامة</i>")];
+      for (const l of LANGS) {
+        const own = d.own[l] ?? [];
+        const eff = d.effective[l] ?? [];
+        out.push("", `<b>${names[l]}</b>` + (own.length
+          ? ""
+          : eff.length ? " <i>(موروثة من العامة)</i>" : " <i>(المدمجة في الكود)</i>"));
+        (own.length ? own : eff.length ? eff : DOC[l].commitment)
+          .forEach((x, i) => out.push(`${String(i + 1).padStart(2, "0")} · ${esc(x)}`));
+      }
+      if (d.overridden.length) {
+        out.push("", "🏷 <b>خدمات لها شروطها</b>: " +
+          d.overridden.map((x) => esc(x)).join(" · "));
+      }
+      out.push("", "<b>للتبديل</b> — الأمر في سطر والنقاط بعده سطراً سطراً:",
+        `<code>/setterms - ar\nالنقطة الأولى\nالنقطة الثانية</code>`, "",
+        "<i>«-» = الشروط العامة. أو اسم خدمة لتُفرَد بشروطها.</i>",
+        "<i>واللقطة تُؤخذ يوم الإصدار: الوثائق الصادرة لا تتغيّر.</i>");
+      await send(chat, out.join("\n"), [backRow]);
+      return;
+    }
+
+    case "/setterms": {
+      const lines = bodyLines.filter((x) => x.trim());
+      if (args.length < 2 || !lines.length) {
+        await send(chat, [
+          "الصيغة — الأمر في سطر والنقاط بعده سطراً سطراً:", "",
+          "<code>/setterms - ar",
+          "طيلة المدة المذكورة، هذا الحساب تحت مسؤوليتنا.",
+          "توقّفت الخدمة؟ راسلنا.</code>", "",
+          "«-» = الشروط العامة لكل الخدمات.",
+          "أو اسم خدمة: <code>/setterms Netflix ar</code>",
+          "اللغات: <code>ar</code> · <code>fr</code> · <code>en</code>",
+        ].join("\n"));
+        return;
+      }
+      const lang2 = args[args.length - 1].toLowerCase();
+      const plat = args.slice(0, -1).join(" ");
+      const r = await rpc<{ platform: string | null; lang: string; count: number }>(
+        client, "bot_cmd_terms", {
+          p_telegram_id: tgId, p_platform: plat, p_lang: lang2, p_lines: lines,
+        });
+      if (r.error) { await send(chat, r.error, [backRow]); return; }
+      const d = r.data!;
+      await send(chat, [
+        `✅ <b>${d.count}</b> نقطة — ` +
+          (d.platform ? `<b>${esc(d.platform)}</b>` : "<i>الشروط العامة</i>") +
+          ` · ${esc(d.lang)}`,
+        "", "<i>تُطبَّق على الوثائق الجديدة. الصادرة تبقى على شروطها.</i>",
+      ].join("\n") + "\n\n<code>/terms" +
+        (d.platform ? ` ${esc(d.platform)}` : "") + "</code> لمراجعتها.", [backRow]);
       return;
     }
 

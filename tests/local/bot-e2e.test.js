@@ -889,6 +889,24 @@ async function run() {
     }
   }
 
+  /* ---------- شروط التغطية على الوثيقة ----------
+     اللقطة على الوثيقة هي ما يُعرض، لا الحيّ: زبون التُزم له
+     بشروط يجدها كما هي مهما بدّل المالك بعدها. */
+  sql(`update bot_certificates set terms = '{"fr":["Clause A du test","Clause B du test"]}'
+        where code = '${wCode}'`);
+  const docTerms = await wweb(`/warranty/${wCode}?lang=fr`).then((r) => r.text());
+  assert(docTerms.includes("Clause A du test") && docTerms.includes("Clause B du test"),
+         "الوثيقة تعرض لقطة شروطها");
+  assert(!docTerms.includes("Pendant toute la durée indiquée"),
+         "ولا تعرض المدمجة في الكود حين تكون لها لقطة");
+  assert(/class="n">02</.test(docTerms) && !/class="n">03</.test(docTerms),
+         "والترقيم يتبع عددها لا خمسةً دائماً");
+  // ولغة بلا لقطة تسقط إلى المدمج، فلا تخرج الوثيقة بلا شروط
+  const docTermsAr = await wweb(`/warranty/${wCode}`).then((r) => r.text());
+  assert(docTermsAr.includes("تحت مسؤوليتنا"),
+         "ولغة بلا لقطة تسقط إلى المدمج");
+  sql(`update bot_certificates set terms = null where code = '${wCode}'`);
+
   // صفحة التحقق: تثبت بلا كشف
   const wVer = await wweb(`/warranty/verify/${wCode}?lang=fr`).then((r) => r.text());
   assert(wVer.includes("Netflix"), "التحقق يقول الخدمة");
