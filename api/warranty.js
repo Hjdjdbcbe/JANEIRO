@@ -26,7 +26,13 @@
    إلى وثيقتها، فيُنقل التحويل كما هو ليراه المتصفّح ولا يُبتلع.
    ============================================================ */
 
-const BASE = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+/* SUPABASE_FUNCTIONS_URL أوّلاً: SUPABASE_URL قد يكون مضبوطاً
+   لبناء المتجر ويشير إلى مشروع آخر — وتبديله يخسّر المتجر.
+   فمتغيّر خاصّ بالوسيط يفصل الاثنين، ويبقى SUPABASE_URL
+   احتياطاً لمن ضبط واحداً فقط. */
+const SRC = process.env.SUPABASE_FUNCTIONS_URL
+  ? "SUPABASE_FUNCTIONS_URL" : "SUPABASE_URL";
+const BASE = (process.env[SRC] || "").replace(/\/+$/, "");
 const FN = process.env.TELEGRAM_FUNCTION_NAME || "telegram-bot";
 
 /** المسار والمعاملات من الطلب، أياً كان شكله قبل إعادة الكتابة. */
@@ -34,9 +40,11 @@ function target(req) {
   const u = new URL(req.url || "/", "http://x");
   const q = u.searchParams;
 
-  // `p` من إعادة الكتابة؛ وإن غاب فالمسار كما جاء (نداء مباشر)
-  let path = q.get("p");
+  /* `p` الذي نضعه في vercel.json، و`path` الذي تضيفه Vercel من
+     مجموعة إعادة الكتابة نفسها. كلاهما يُنزع: لا شأن للدالة بهما. */
+  let path = q.get("p") ?? q.get("path");
   q.delete("p");
+  q.delete("path");
   if (path === null) {
     path = u.pathname.replace(/^\/api\/warranty/, "").replace(/^\/warranty/, "");
   } else {
@@ -75,7 +83,7 @@ const escapeHtml = (s) =>
 module.exports = async function handler(req, res) {
   if (!BASE) {
     res.status(503).setHeader("content-type", "text/plain; charset=utf-8");
-    return res.end("SUPABASE_URL غير مضبوط في إعدادات Vercel.");
+    return res.end("SUPABASE_FUNCTIONS_URL غير مضبوط في إعدادات Vercel.");
   }
 
   const called = `/functions/v1/${FN}${asQuery(target(req))}`;
@@ -131,7 +139,8 @@ module.exports = async function handler(req, res) {
       `<div class="c"><h1>تعذّر فتح الصفحة</h1>` +
       `<p>تواصل مع البائع الذي أرسل لك الرابط.</p>` +
       `<p style="color:#6B6880;font-size:13px">للمالك — الحالة ` +
-      `<code>${up.status}</code>، ونودي: <code>${escapeHtml(called)}</code></p>` +
+      `<code>${up.status}</code>، من <code>${SRC}</code>، ونودي: ` +
+      `<code>${escapeHtml(called)}</code></p>` +
       `<p style="color:#6B6880;font-size:13px"><code>${escapeHtml(detail.slice(0, 300))}</code></p>` +
       `</div></html>`);
   }
