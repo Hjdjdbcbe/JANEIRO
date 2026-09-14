@@ -996,6 +996,66 @@ async function run() {
   assert(nDoc.includes("وثيقة التزام الخدمة"), "وثيقة كاملة لا صفحة ناقصة");
 
   /* ==========================================================
+     034: داشبورد المالك
+     ==========================================================
+     رابط من البوت، صفحة على الموقع، بحث وفلاتر. ولا رقم واتساب
+     فيها إطلاقاً — لقطة شاشة عابرة لا تفضح أرقام زبائنه.
+     ========================================================== */
+  drain();
+  await update(message(SELLER, "/dashboard"));
+  assert(/OWNER_ONLY|للمالك/.test(lastText("sendMessage")),
+         "البائع لا يفتح الداشبورد");
+
+  drain();
+  await update(message(OWNER, "/dashboard"));
+  const dMsg = lastText("sendMessage");
+  const dTok = (dMsg.match(/(?:admin\/|admin=)([0-9a-f]{64})/) || [])[1];
+  assert(!!dTok, "والمالك يأخذ رابطاً برمز 64 خانة");
+  assert(/24 ساعة/.test(dMsg), "ويُقال له كم يعيش");
+  assert(/لا ترسله لأحد/.test(dMsg), "ويُقال صراحةً إنّ من يملكه يفتح");
+  const dCopy = (last("sendMessage").payload.reply_markup?.inline_keyboard ?? [])
+    .flat().find((b) => b.copy_text);
+  assert(dCopy && dCopy.copy_text.text.includes(dTok), "وزر نسخ يحمل الرابط نفسه");
+
+  const dash = await wweb(`/warranty/admin/${dTok}`).then((r) => r.text());
+  assert(dash.includes("الزبائن") && dash.includes("<table"), "الصفحة تفتح بجدولها");
+  assert(dash.includes("noindex"), "وممنوعة الفهرسة");
+  assert(dash.includes("سعاد بلحاج") && dash.includes("@souad.b"),
+         "وفيها زبائن البوت");
+  assert(dash.includes("Ahmed Benyoucef"), "وزبائن كل البائعين — المالك يرى الجميع");
+  // الشرط الأصرح: الرقم لا يخرج، لا في خانة ولا في ترميز صفحة
+  assert(!dash.includes("213550998877") && !dash.includes("0550 99 88 77"),
+         "ولا رقم واتساب واحد في كامل الصفحة");
+  assert(!/anon|eyJhbGciOi|SUPABASE_URL/.test(dash),
+         "ولا مفتاح Supabase في المتصفّح — الصفحة تُبنى على السيرفر");
+
+  // البحث
+  const dFind = await wweb(`/warranty/admin/${dTok}?q=${encodeURIComponent("سعاد")}`)
+    .then((r) => r.text());
+  assert(dFind.includes("سعاد بلحاج") && !dFind.includes("Ahmed Benyoucef"),
+         "والبحث يرشّح فعلاً");
+  const dNone = await wweb(`/warranty/admin/${dTok}?q=nobodyatall`).then((r) => r.text());
+  assert(dNone.includes("ما كان حتى زبون"), "وبحث بلا نتيجة يقولها بلا جدول فارغ");
+
+  // الفلاتر تحافظ على البحث في روابطها
+  assert(/href="[^"]*q=[^"]*status=active/.test(dFind)
+      || /href="[^"]*status=active[^"]*q=/.test(dFind),
+         "وأزرار الحالة تحمل البحث معها فلا يُمحى بضغطة");
+
+  // رمز مخترَع ومنتهٍ
+  const dBad = await wweb(`/warranty/admin/${"c".repeat(64)}`).then((r) => r.text());
+  assert(dBad.includes("غير صحيح"), "ورمز مخترَع لا يفتح");
+  assert(!dBad.includes("<table"), "ولا يسرّب جدولاً مع رسالة الخطأ");
+
+  // الإبطال من البوت يقتل الصفحة فوراً
+  drain();
+  await update(message(OWNER, "/dashclose"));
+  assert(/أُبطل/.test(lastText("sendMessage")), "والإبطال من البوت يُؤكَّد");
+  const dDead = await wweb(`/warranty/admin/${dTok}`).then((r) => r.text());
+  assert(dDead.includes("أُبطل") && !dDead.includes("<table"),
+         "والرابط يموت في نفس اللحظة");
+
+  /* ==========================================================
      الوثيقة من البيعة — المسار الافتراضي
      ==========================================================
      البائع يبيع، يضغط تأكيد، ولا يُسأل إلا عن الهدية. المنصة
