@@ -7029,3 +7029,2971 @@ begin
   end loop;
 end $$;
 
+-- ── 026_bot_order_data.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 026 معطيات الطلب: المنصة، المدة، السعر
+--
+-- المرحلة 1 من تصحيح الفلو.
+--
+-- الوثيقة صار المفروض تُولَد من البيعة نفسها بلا ما تُعاد الأسئلة
+-- على الأدمن. وذاك مستحيل اليوم: bot_issues تعرف البطاقة والبائع
+-- ولا تعرف لا منصة ولا مدة ولا سعر. المنصة (bot_products) منفصلة
+-- كلياً عن قائمة منصات الوثيقة (bot_platforms)، والمدة على
+-- bot_variants فارغة في كل صنف أُضيف باليد، والسعر غير موجود في
+-- أي جدول.
+--
+-- فهذه الهجرة تسدّ الثقوب الثلاثة في طبقة الداتا وحدها. لا تلمس
+-- البوت ولا الصفحات — ذاك في 027 وما بعدها.
+--
+-- العملة: دينار جزائري، ثابتة. لا عمود لها: متجر واحد ببلد واحد،
+-- وعمود عملة بقيمة واحدة كذبة تُصدَّق لاحقاً.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. المنصة على المنتج
+-- ------------------------------------------------------------
+-- نصّ بمفتاح أجنبي على bot_platforms(name): المنصة تُعطَّل ولا
+-- تُحذف (bot_remove_platform)، فالمفتاح لا ينكسر، ويمنع في نفس
+-- الوقت كتابة «سناب شات» مرة و«Snapchat Plus» مرة فتتشتّت
+-- الإحصاءات حسب المنصة.
+alter table bot_products
+  add column if not exists platform text;
+
+do $$ begin
+  alter table bot_products add constraint bot_products_platform_fk
+    foreign key (platform) references bot_platforms(name)
+    on update cascade on delete set null;
+exception when duplicate_object then null; end $$;
+
+create index if not exists idx_bot_products_platform on bot_products(platform);
+
+-- ------------------------------------------------------------
+-- 2. السعر: افتراضي على الصنف، ولقطة على العملية
+-- ------------------------------------------------------------
+-- عمودان لا عمود واحد. bot_variants.price هو السعر المعتاد،
+-- يُبدَّل متى شاء المالك. bot_issues.price لقطة تُنسخ لحظة حجز
+-- البطاقة وتبقى كما هي إلى الأبد: رفع السعر اليوم يجب ألّا يغيّر
+-- مداخيل الشهر الماضي في التقارير.
+alter table bot_variants add column if not exists price numeric(10,2);
+alter table bot_issues   add column if not exists price numeric(10,2);
+
+do $$ begin
+  alter table bot_variants add constraint bot_variants_price_ok
+    check (price is null or (price >= 0 and price < 100000000));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  alter table bot_issues add constraint bot_issues_price_ok
+    check (price is null or (price >= 0 and price < 100000000));
+exception when duplicate_object then null; end $$;
+
+-- التقارير تسأل «كم بيع بين تاريخين» — فهرس على لحظة الإتمام
+-- وحدها، والمؤكَّد فقط: الملغى ليس بيعاً.
+create index if not exists idx_bot_issues_settled
+  on bot_issues (settled_at) where status = 'confirmed';
+
+-- ------------------------------------------------------------
+-- 3. المدة بالأيام على الوثيقة
+-- ------------------------------------------------------------
+-- 025 عرفت الأشهر وحدها. المدة المخصّصة بالأيام (1–999) تحتاج
+-- عمودها: خلطها مع bonus_days يخسر التفرقة بين ما بِيع وما أُهدي،
+-- وهي التفرقة التي بُني عليها الجدول من أوّله.
+alter table bot_certificates
+  add column if not exists duration_days integer;
+
+do $$ begin
+  alter table bot_certificates add constraint bot_cert_duration_days_ok
+    check (duration_days is null or duration_days between 1 and 999);
+exception when duplicate_object then null; end $$;
+
+-- إمّا بالأشهر وإمّا بالأيام، لا الاثنان: «3 أشهر و40 يوماً» مدة
+-- لا تُعرض في أي لغة من الثلاث بشكل مفهوم.
+do $$ begin
+  alter table bot_certificates add constraint bot_cert_duration_one_ok
+    check (months is null or duration_days is null);
+exception when duplicate_object then null; end $$;
+
+-- والوثيقة بلا بيعة صار يكفيها أن تحمل منصة ومدة بأي من
+-- الوحدتين. القيد القديم كان يشترط الأشهر تحديداً.
+alter table bot_certificates drop constraint if exists bot_cert_subject_ok;
+alter table bot_certificates add constraint bot_cert_subject_ok
+  check (issue_id is not null
+         or (platform is not null
+             and (months is not null or duration_days is not null)));
+
+-- ملاحظة: «وثيقة واحدة لكل بيعة» مضمون أصلاً. issue_id عليه قيد
+-- unique من 023، وPostgreSQL يعتبر NULL مميّزاً عن NULL، فالمسار
+-- اليدوي (issue_id فارغ) يبقى مفتوحاً بلا تعارض. لا فهرس جديد.
+
+-- ------------------------------------------------------------
+-- 4. حساب النهاية: نسخة رابعة الوسائط
+-- ------------------------------------------------------------
+-- الأشهر قبل الأيام داخل interval واحد، كما في 025. والمدة
+-- بالأيام تُجمع مع الهدية في وسيط الأيام: 30 يوماً + 7 هدية = 37،
+-- وهو نفس ما يعطيه التنفيذ على خطوتين.
+--
+-- النسخة ثلاثية الوسائط تبقى كما كانت — ينادونها bot_engagement_claim
+-- وbot_wizard_preview — لكنها صارت تفوّض للجديدة، فالمنطق في مكان
+-- واحد.
+create or replace function bot_engagement_expiry(
+  p_start timestamptz, p_months int, p_bonus_days int, p_duration_days int
+) returns timestamptz
+language sql immutable set search_path = public as $$
+  select (((p_start at time zone 'Africa/Algiers')
+           + make_interval(months => coalesce(p_months, 0),
+                           days   => coalesce(p_duration_days, 0)
+                                   + coalesce(p_bonus_days, 0)))
+          at time zone 'Africa/Algiers');
+$$;
+
+create or replace function bot_engagement_expiry(
+  p_start timestamptz, p_months int, p_bonus_days int
+) returns timestamptz
+language sql immutable set search_path = public as $$
+  select bot_engagement_expiry(p_start, p_months, p_bonus_days, 0);
+$$;
+
+-- ------------------------------------------------------------
+-- 5. المدة: من وحدات المخزون إلى وحدات الوثيقة
+-- ------------------------------------------------------------
+-- bot_variants تخزّن (value, unit) بأربع وحدات. الوثيقة تعرف
+-- اثنتين: أشهر أو أيام. هذه هي الترجمة، في مكان واحد، تُنادى من
+-- الهجرة ومن البوت على السواء.
+--
+--   سنة  → أشهر × 12      شهر → أشهر
+--   أسبوع → أيام × 7       يوم → أيام
+create or replace function bot_duration_to_engagement(
+  p_value int, p_unit text
+) returns jsonb
+language sql immutable set search_path = public as $$
+  select case
+    when p_value is null or p_unit is null then
+      jsonb_build_object('months', null, 'days', null)
+    when p_unit = 'year'  then jsonb_build_object('months', p_value * 12, 'days', null)
+    when p_unit = 'month' then jsonb_build_object('months', p_value,      'days', null)
+    when p_unit = 'week'  then jsonb_build_object('months', null, 'days', p_value * 7)
+    when p_unit = 'day'   then jsonb_build_object('months', null, 'days', p_value)
+    else jsonb_build_object('months', null, 'days', null)
+  end;
+$$;
+
+-- ما تحتاجه الوثيقة من صنف بعينه: المنصة والمدة مترجمة والسعر.
+create or replace function bot_variant_subject(p_variant_id uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+begin
+  select * into v_variant from bot_variants where id = p_variant_id;
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+  select * into v_product from bot_products where id = v_variant.product_id;
+
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+
+  return jsonb_build_object(
+    'variant_id',   v_variant.id,
+    'variant_name', v_variant.name,
+    'product_id',   v_product.id,
+    'product_name', v_product.name,
+    'platform',     v_product.platform,
+    'months',       v_dur->'months',
+    'days',         v_dur->'days',
+    'price',        v_variant.price,
+    -- ما ينقص قبل أن تُولَد وثيقة من بيعة هذا الصنف
+    'needs_platform', v_product.platform is null,
+    'needs_duration', v_variant.duration_value is null or v_variant.duration_unit is null
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 6. تعمير الناقص — أوامر المالك
+-- ------------------------------------------------------------
+-- المنصة تُحفظ على المنتج لا على العملية: يُسأل عنها مرة واحدة في
+-- عمر المنتج، ولا يُسأل بعدها أي أدمن مرة أخرى. وإن كان الاسم
+-- جديداً يُضاف إلى قائمة المنصات بدل أن يُرفض — المالك يعرف
+-- بضاعته، والقائمة وُضعت للتوحيد لا للمنع.
+create or replace function bot_set_product_platform(
+  p_telegram_id bigint, p_product_id uuid, p_platform text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_prod bot_products; v_name text; v_next int;
+begin
+  perform bot_owner(p_telegram_id);
+  v_name := btrim(coalesce(p_platform, ''));
+
+  select * into v_prod from bot_products where id = p_product_id;
+  if not found then raise exception 'PRODUCT_NOT_FOUND'; end if;
+
+  if v_name = '' then
+    update bot_products set platform = null where id = p_product_id;
+    return jsonb_build_object('product', v_prod.name, 'platform', null);
+  end if;
+
+  if char_length(v_name) > 60 then raise exception 'INVALID_PLATFORM'; end if;
+
+  if not exists (select 1 from bot_platforms where name = v_name) then
+    select coalesce(max(sort_order), 0) + 10 into v_next from bot_platforms;
+    insert into bot_platforms (name, sort_order) values (v_name, v_next)
+      on conflict (name) do nothing;
+  else
+    -- منصة معطّلة سابقاً تعود للعمل بمجرّد أن يُسند إليها منتج
+    update bot_platforms set is_active = true where name = v_name and not is_active;
+  end if;
+
+  update bot_products set platform = v_name where id = p_product_id;
+  return jsonb_build_object('product', v_prod.name, 'platform', v_name);
+end $$;
+
+-- المدة تُحفظ على الصنف، للسبب نفسه. والحدود هي حدود الوثيقة:
+-- 1–60 شهراً أو 1–999 يوماً بعد الترجمة، فلا يُقبل اليوم ما
+-- سيُرفض عند الإصدار.
+create or replace function bot_set_variant_duration(
+  p_telegram_id bigint, p_variant_id uuid, p_value int, p_unit text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_var bot_variants; v_dur jsonb; v_m int; v_d int;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select * into v_var from bot_variants where id = p_variant_id;
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  if p_value is null or p_unit is null then
+    update bot_variants set duration_value = null, duration_unit = null
+     where id = p_variant_id;
+    return jsonb_build_object('variant', v_var.name, 'months', null, 'days', null);
+  end if;
+
+  if p_unit not in ('day','week','month','year') then raise exception 'INVALID_UNIT'; end if;
+  if p_value <= 0 then raise exception 'INVALID_DURATION'; end if;
+
+  v_dur := bot_duration_to_engagement(p_value, p_unit);
+  v_m := nullif(v_dur->>'months', '')::int;
+  v_d := nullif(v_dur->>'days',   '')::int;
+
+  if v_m is not null and v_m not between 1 and 60  then raise exception 'DURATION_RANGE'; end if;
+  if v_d is not null and v_d not between 1 and 999 then raise exception 'DURATION_RANGE'; end if;
+
+  update bot_variants set duration_value = p_value, duration_unit = p_unit
+   where id = p_variant_id;
+
+  return jsonb_build_object(
+    'variant', v_var.name, 'value', p_value, 'unit', p_unit,
+    'months', v_m, 'days', v_d
+  );
+end $$;
+
+-- السعر المعتاد للصنف. NULL يمسحه — ولا يعني صفراً: صنف بلا سعر
+-- يُعدّ «غير مسعّر» في التقارير، وصنف بسعر صفر بيع مجاناً فعلاً.
+create or replace function bot_set_price(
+  p_telegram_id bigint, p_variant_id uuid, p_price numeric
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_var bot_variants; v_prod bot_products;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select * into v_var from bot_variants where id = p_variant_id;
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+  select * into v_prod from bot_products where id = v_var.product_id;
+
+  if p_price is not null and (p_price < 0 or p_price >= 100000000) then
+    raise exception 'INVALID_PRICE';
+  end if;
+
+  update bot_variants set price = round(p_price, 2) where id = p_variant_id;
+
+  return jsonb_build_object(
+    'product', v_prod.name, 'variant', v_var.name,
+    'price', round(p_price, 2), 'currency', 'DZD'
+  );
+end $$;
+
+-- تعديل سعر عملية بعينها: تخفيض، صفقة، خطأ مطبعي. الملغاة لا
+-- تُسعَّر — ليست بيعاً. وغير صاحب العملية لا يمسّها إلا المالك.
+create or replace function bot_issue_set_price(
+  p_telegram_id bigint, p_issue_id uuid, p_price numeric
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_admin bot_admins; v_issue bot_issues;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if v_issue.status = 'cancelled' then raise exception 'ISSUE_CANCELLED'; end if;
+
+  if p_price is not null and (p_price < 0 or p_price >= 100000000) then
+    raise exception 'INVALID_PRICE';
+  end if;
+
+  update bot_issues set price = round(p_price, 2) where id = p_issue_id;
+
+  return jsonb_build_object(
+    'issue_id', p_issue_id, 'price', round(p_price, 2), 'currency', 'DZD'
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 7. جرد: ما هو معمّر وما هو ناقص
+-- ------------------------------------------------------------
+-- تُقرأ قبل أي تعمير، ليراجع المالك بعينه أيّ منتج على أيّ منصة
+-- وأيّ صنف بأيّ مدة وسعر. لا تخمين ولا تعمير تلقائي في أي مكان
+-- من هذه الهجرة.
+create or replace function bot_data_audit(p_telegram_id bigint)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_rows jsonb; v_np int; v_nd int; v_nr int;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select coalesce(jsonb_agg(x.j order by x.so, x.nm), '[]'::jsonb) into v_rows
+  from (
+    select pr.sort_order as so, pr.name as nm,
+      jsonb_build_object(
+        'product_id', pr.id,
+        'code',       pr.code,
+        'name',       pr.name,
+        'is_active',  pr.is_active,
+        'platform',   pr.platform,
+        'variants', coalesce((
+          select jsonb_agg(v.j order by v.so, v.nm)
+            from (
+              select va.sort_order as so, va.name as nm,
+                jsonb_build_object(
+                  'variant_id',     va.id,
+                  'code',           va.code,
+                  'name',           va.name,
+                  'is_active',      va.is_active,
+                  'duration_value', va.duration_value,
+                  'duration_unit',  va.duration_unit,
+                  'months',         bot_duration_to_engagement(
+                                      va.duration_value, va.duration_unit)->'months',
+                  'days',           bot_duration_to_engagement(
+                                      va.duration_value, va.duration_unit)->'days',
+                  'price',          va.price
+                ) as j
+              from bot_variants va where va.product_id = pr.id
+            ) v
+        ), '[]'::jsonb)
+      ) as j
+    from bot_products pr
+  ) x;
+
+  select count(*) into v_np from bot_products where platform is null;
+  select count(*) into v_nd from bot_variants
+   where duration_value is null or duration_unit is null;
+  select count(*) into v_nr from bot_variants where price is null;
+
+  return jsonb_build_object(
+    'products', v_rows,
+    'missing_platform', v_np,
+    'missing_duration', v_nd,
+    'missing_price',    v_nr,
+    'currency',         'DZD'
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 8. اللقطة عند الحجز
+-- ------------------------------------------------------------
+-- bot_request_card كما هي في 021 حرفاً بحرف، بزيادة واحدة: السعر
+-- يُنسخ من الصنف إلى العملية لحظة الحجز، ويُرجَع ليُعرض على
+-- البائع فيصحّحه قبل التأكيد إن لزم.
+create or replace function bot_request_card(
+  p_telegram_id bigint,
+  p_variant_id  uuid,
+  p_customer_ref text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_card    bot_cards;
+  v_issue   bot_issues;
+  v_pending int;
+  v_limit   int;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_variant from bot_variants where id = p_variant_id;
+  if not found or not v_variant.is_active then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  select * into v_product from bot_products where id = v_variant.product_id;
+  if not v_product.is_active then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  select coalesce(nullif(value,'')::int, 5) into v_limit
+    from store_settings where key = 'bot_pending_limit';
+  v_limit := coalesce(v_limit, 5);
+
+  select count(*) into v_pending
+    from bot_issues where admin_id = v_admin.id and status = 'pending';
+  if v_pending >= v_limit then
+    raise exception 'PENDING_LIMIT:%', v_limit;
+  end if;
+
+  -- أقدم بطاقة أولاً (طابور)، وتخطّي أي صف يمسكه طلب متزامن آخر.
+  select * into v_card
+    from bot_cards
+   where variant_id = p_variant_id and status = 'available'
+   order by seq
+   for update skip locked
+   limit 1;
+  if not found then raise exception 'OUT_OF_STOCK'; end if;
+
+  update bot_cards set status = 'reserved' where id = v_card.id;
+
+  insert into bot_issues (card_id, variant_id, admin_id, card_code, customer_ref, price)
+  values (v_card.id, p_variant_id, v_admin.id, v_card.code,
+          nullif(btrim(coalesce(p_customer_ref,'')), ''), v_variant.price)
+  returning * into v_issue;
+
+  return jsonb_build_object(
+    'issue_id',     v_issue.id,
+    'card_code',    v_card.code,
+    'card_note',    v_card.note,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'price',        v_issue.price,
+    'currency',     'DZD',
+    'remaining',    (select count(*) from bot_cards
+                      where variant_id = p_variant_id and status = 'available'),
+    'pending',      v_pending + 1
+  );
+end $$;
+
+-- ونفس الشيء عند التأكيد: 022 حرفاً بحرف، بزيادة السعر والمنصة
+-- والمدة في المُرجَع — هي ما ستبني عليه المرحلة 2 رابط الوثيقة
+-- بلا سؤال إضافي.
+create or replace function bot_confirm_issue(p_telegram_id bigint, p_issue_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_issue   bot_issues;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_sales   int;
+  v_of_kind int;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if v_issue.status <> 'pending' then
+    raise exception 'ISSUE_ALREADY_SETTLED:%', v_issue.status;
+  end if;
+
+  update bot_issues
+     set status = 'confirmed', settled_at = now(), settled_by = v_admin.id
+   where id = p_issue_id
+  returning * into v_issue;
+
+  update bot_cards set status = 'sold', sold_at = now() where id = v_issue.card_id;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  select * into v_product from bot_products where id = v_variant.product_id;
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+
+  select count(*) into v_sales
+    from bot_issues where admin_id = v_issue.admin_id and status = 'confirmed';
+  -- وكم باع من هذه المدة تحديداً: الرقم الذي يسأل عنه البائع فعلاً
+  select count(*) into v_of_kind
+    from bot_issues
+   where admin_id = v_issue.admin_id and status = 'confirmed'
+     and variant_id = v_issue.variant_id;
+
+  return jsonb_build_object(
+    'issue_id', v_issue.id, 'status', 'confirmed',
+    'card_code', v_issue.card_code,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'customer_ref', v_issue.customer_ref,
+    'price',    v_issue.price,
+    'currency', 'DZD',
+    'platform', v_product.platform,
+    'months',   v_dur->'months',
+    'days',     v_dur->'days',
+    'needs_platform', v_product.platform is null,
+    'needs_duration', v_variant.duration_value is null or v_variant.duration_unit is null,
+    'seller_sales', v_sales,
+    'seller_sales_of_variant', v_of_kind,
+    'remaining', (select count(*) from bot_cards
+                   where variant_id = v_issue.variant_id and status = 'available')
+  );
+end $$;
+
+-- ============================================================
+-- 9. الصلاحيات — service_role وحده، كما في 021.
+-- ============================================================
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and (p.proname like 'bot\_%' or p.proname = 'bot_duration_to_engagement')
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 027_bot_markets.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 027 صفحتان بعملتين
+--
+-- تصحيح لـ026. بُني السعر هناك على فرضية «متجر واحد بعملة
+-- واحدة»: عمود سعر واحد على الصنف، والعملة دج مكتوبة في الكود.
+-- والواقع صفحتان — جزائرية بالدينار الجزائري وأردنية بالدينار
+-- الأردني — لنفس البضاعة ونفس المخزون.
+--
+-- ثلاثة أشياء تنكسر بذلك، وهذه الهجرة تصلحها:
+--
+--  1. سعر واحد لا يكفي صفحتين. الأسعار تنتقل إلى جدول مفتاحه
+--     (الصنف، السوق).
+--  2. العملة ليست ثابتة، فلا تُكتب في الكود. تُقرأ من السوق
+--     وتُلقَّط على البيعة مع السعر.
+--  3. الدينار الأردني ثلاث خانات عشرية (1.750 د.أ) والجزائري
+--     خانتان. numeric(10,2) يقصّ الفلس الأردني صمتاً. توسيع
+--     إلى numeric(12,3)، وعدد الخانات خاصية للسوق لا للكود.
+--
+-- والقاعدة التي تحكم التقارير لاحقاً: مبلغان بعملتين مختلفتين
+-- لا يُجمعان. أبداً. لا بمتوسّط ولا بـ«تقريباً».
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. الأسواق
+-- ------------------------------------------------------------
+create table if not exists bot_markets (
+  code       text primary key check (code ~ '^[a-z]{2,8}$'),
+  name       text not null unique check (char_length(name) between 1 and 40),
+  currency   text not null check (char_length(currency) between 1 and 8),
+  -- خانات العرض: دج خانتان، د.أ ثلاث. للعرض وللتقريب عند الحفظ.
+  decimals   smallint not null default 2 check (decimals between 0 and 3),
+  is_active  boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- الأردنية تُزرع معطّلة عمداً. البوت يخدم اليوم، وكل بيعة فيه
+-- جزائرية فعلاً، ولا أزرار اختيار صفحة فيه بعد. سوقان نشطان
+-- الآن يعني إمّا أن يقف البيع (يُسأل بلا زرّ يُضغط) وإمّا أن
+-- يُخمَّن السوق. فتبقى معطّلة: سوق نشط واحد = صفر أسئلة وصفر
+-- تغيير في السلوك الحالي. تُفعَّل بـbot_set_market_active يوم
+-- تصير أزرارها جاهزة.
+insert into bot_markets (code, name, currency, decimals, is_active, sort_order) values
+  ('dz', 'الجزائر', 'DA',  2, true,  10),
+  ('jo', 'الأردن',  'JOD', 3, false, 20)
+on conflict (code) do nothing;
+
+-- تصحيح الرمزين لمن طبّق نسخة أولى من هذه الهجرة. مقصور على
+-- القيمة القديمة بعينها: لو سمّى المالك عملته بغير ذلك لاحقاً
+-- فتسميته تبقى، ولا يُعاد كتابتها في كل تشغيل.
+update bot_markets set currency = 'DA'  where code = 'dz' and currency = 'دج';
+update bot_markets set currency = 'JOD' where code = 'jo' and currency = 'د.أ';
+
+alter table bot_markets enable row level security;
+revoke all on bot_markets from anon, authenticated;
+
+-- ------------------------------------------------------------
+-- 2. الأدمن وصفحته
+-- ------------------------------------------------------------
+-- بائع الصفحة الأردنية لا يُسأل عن السوق أبداً: سوقه معروف.
+-- والمالك يخدم الصفحتين، فسوقه يبقى فارغاً ويُسأل بضغطة واحدة
+-- عند البيع. الفراغ هنا ليس نقصاً يُعمَّر، بل «هذا يبيع في
+-- الاثنتين».
+alter table bot_admins
+  add column if not exists market text;
+
+do $$ begin
+  alter table bot_admins add constraint bot_admins_market_fk
+    foreign key (market) references bot_markets(code)
+    on update cascade on delete set null;
+exception when duplicate_object then null; end $$;
+
+-- ------------------------------------------------------------
+-- 3. الأسعار: صفّ لكل (صنف، سوق)
+-- ------------------------------------------------------------
+create table if not exists bot_prices (
+  variant_id uuid not null references bot_variants(id) on delete cascade,
+  market     text not null references bot_markets(code) on update cascade on delete cascade,
+  price      numeric(12,3) not null check (price >= 0 and price < 1000000000),
+  updated_at timestamptz not null default now(),
+  primary key (variant_id, market)
+);
+create index if not exists idx_bot_prices_market on bot_prices(market);
+
+alter table bot_prices enable row level security;
+revoke all on bot_prices from anon, authenticated;
+
+drop trigger if exists trg_bot_prices_updated on bot_prices;
+create trigger trg_bot_prices_updated before update on bot_prices
+  for each row execute function set_updated_at();
+
+-- نقل ما قد يكون كُتب في عمود 026 قبل هذا التصحيح. عملة المتجر
+-- في store_settings هي دج، فالسوق الجزائري هو وجهته الطبيعية.
+-- ثم يسقط العمود: عمود سعر بلا سوق صار يعني شيئين، والغموض في
+-- سعر أسوأ من غيابه.
+-- داخل DO لأن الاستعلام يذكر عموداً سيسقط بعد سطر منه: تشغيل
+-- 027 وحدها مرتين يجعل الإشارة إليه خطأ تحليلٍ لا خطأ تنفيذ،
+-- فلا يكفي «if exists».
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'bot_variants'
+                and column_name = 'price') then
+    execute $q$
+      insert into bot_prices (variant_id, market, price)
+        select id, 'dz', price from bot_variants where price is not null
+      on conflict (variant_id, market) do nothing
+    $q$;
+    execute 'alter table bot_variants drop column price';
+  end if;
+end $$;
+
+-- ------------------------------------------------------------
+-- 4. اللقطة على البيعة
+-- ------------------------------------------------------------
+-- السوق والعملة يُلقَّطان مع السعر. العملة خصوصاً: لو بدّل
+-- المالك عملة سوق يوماً، البيعات القديمة تبقى تقول بأي عملة
+-- بِيعت فعلاً.
+alter table bot_issues
+  add column if not exists market   text,
+  add column if not exists currency text;
+
+do $$ begin
+  alter table bot_issues add constraint bot_issues_market_fk
+    foreign key (market) references bot_markets(code) on update cascade;
+exception when duplicate_object then null; end $$;
+
+-- توسيع الخانات العشرية: الفلس الأردني كان يُقصّ صمتاً.
+alter table bot_issues alter column price type numeric(12,3);
+alter table bot_issues drop constraint if exists bot_issues_price_ok;
+alter table bot_issues add constraint bot_issues_price_ok
+  check (price is null or (price >= 0 and price < 1000000000));
+
+create index if not exists idx_bot_issues_market on bot_issues(market);
+
+-- ------------------------------------------------------------
+-- 5. قراءة الأسواق
+-- ------------------------------------------------------------
+create or replace function bot_markets_list(p_telegram_id bigint)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_out jsonb;
+begin
+  perform bot_actor(p_telegram_id);
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'code', code, 'name', name, 'currency', currency,
+           'decimals', decimals, 'is_active', is_active
+         ) order by sort_order, name), '[]'::jsonb)
+    into v_out from bot_markets where is_active;
+  return v_out;
+end $$;
+
+-- السوق الذي تنتمي إليه بيعة هذا الأدمن، بلا أن يُسأل إن أمكن:
+--   ما اختاره صراحةً  →  سوقه المربوط  →  السوق الوحيد إن كان
+--   واحداً  →  وإلّا يُسأل.
+-- لا تخمين: سوقان نشطان وأدمن غير مربوط = سؤال، لا افتراض.
+create or replace function bot_resolve_market(p_admin bot_admins, p_market text)
+returns text
+language plpgsql stable set search_path = public as $$
+declare v text; v_n int;
+begin
+  v := nullif(btrim(coalesce(p_market, '')), '');
+  if v is not null then
+    if not exists (select 1 from bot_markets where code = v and is_active) then
+      raise exception 'MARKET_NOT_FOUND';
+    end if;
+    return v;
+  end if;
+
+  if p_admin.market is not null
+     and exists (select 1 from bot_markets where code = p_admin.market and is_active) then
+    return p_admin.market;
+  end if;
+
+  select count(*) into v_n from bot_markets where is_active;
+  if v_n = 1 then
+    select code into v from bot_markets where is_active;
+    return v;
+  end if;
+
+  raise exception 'MARKET_REQUIRED';
+end $$;
+
+create or replace function bot_set_market_active(
+  p_telegram_id bigint, p_market text, p_active boolean
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_mk bot_markets; v_n int;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select * into v_mk from bot_markets
+   where code = nullif(btrim(coalesce(p_market, '')), '');
+  if not found then raise exception 'MARKET_NOT_FOUND'; end if;
+
+  -- لا تُطفأ آخر صفحة: بلا سوق نشط لا يُباع شيء.
+  if not p_active then
+    select count(*) into v_n from bot_markets where is_active and code <> v_mk.code;
+    if v_n = 0 then raise exception 'LAST_MARKET'; end if;
+  end if;
+
+  update bot_markets set is_active = p_active where code = v_mk.code;
+
+  return jsonb_build_object(
+    'code', v_mk.code, 'name', v_mk.name,
+    'currency', v_mk.currency, 'is_active', p_active
+  );
+end $$;
+
+create or replace function bot_set_admin_market(
+  p_telegram_id bigint, p_target_telegram_id bigint, p_market text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_t bot_admins; v_m text;
+begin
+  perform bot_owner(p_telegram_id);
+  v_m := nullif(btrim(coalesce(p_market, '')), '');
+
+  select * into v_t from bot_admins where telegram_id = p_target_telegram_id;
+  if not found then raise exception 'ADMIN_NOT_FOUND'; end if;
+
+  if v_m is not null
+     and not exists (select 1 from bot_markets where code = v_m and is_active) then
+    raise exception 'MARKET_NOT_FOUND';
+  end if;
+
+  update bot_admins set market = v_m where id = v_t.id;
+
+  return jsonb_build_object(
+    'telegram_id', v_t.telegram_id,
+    'name', coalesce(v_t.display_name, v_t.tg_name),
+    'market', v_m,
+    'market_name', (select name from bot_markets where code = v_m)
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 6. التسعير — للمالك وحده، في كل شيء
+-- ------------------------------------------------------------
+-- نسخة 026 ثلاثية الوسائط (بلا سوق) تسقط: إبقاؤها يجعل
+-- bot_set_price(x, y, 100) تعني «في أي سوق؟» ولا جواب.
+drop function if exists bot_set_price(bigint, uuid, numeric);
+
+create or replace function bot_set_price(
+  p_telegram_id bigint, p_variant_id uuid, p_market text, p_price numeric
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_var bot_variants; v_prod bot_products; v_mk bot_markets; v_p numeric;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select * into v_var from bot_variants where id = p_variant_id;
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+  select * into v_prod from bot_products where id = v_var.product_id;
+
+  select * into v_mk from bot_markets
+   where code = nullif(btrim(coalesce(p_market, '')), '');
+  if not found then raise exception 'MARKET_NOT_FOUND'; end if;
+
+  -- NULL يمسح السعر في هذا السوق وحده، ولا يمسّ السوق الآخر.
+  if p_price is null then
+    delete from bot_prices where variant_id = p_variant_id and market = v_mk.code;
+    return jsonb_build_object(
+      'product', v_prod.name, 'variant', v_var.name,
+      'market', v_mk.code, 'market_name', v_mk.name,
+      'price', null, 'currency', v_mk.currency
+    );
+  end if;
+
+  if p_price < 0 or p_price >= 1000000000 then raise exception 'INVALID_PRICE'; end if;
+  v_p := round(p_price, v_mk.decimals);
+
+  insert into bot_prices (variant_id, market, price)
+  values (p_variant_id, v_mk.code, v_p)
+  on conflict (variant_id, market) do update set price = excluded.price;
+
+  return jsonb_build_object(
+    'product', v_prod.name, 'variant', v_var.name,
+    'market', v_mk.code, 'market_name', v_mk.name,
+    'price', v_p, 'currency', v_mk.currency, 'decimals', v_mk.decimals
+  );
+end $$;
+
+-- تصحيح سعر بيعة بعينها: للمالك وحده كذلك. البائع يبيع
+-- بالسعر المحدَّد ولا يمسّه — وهذا ما طُلب صراحةً.
+create or replace function bot_issue_set_price(
+  p_telegram_id bigint, p_issue_id uuid, p_price numeric
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_issue bot_issues; v_mk bot_markets; v_p numeric;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.status = 'cancelled' then raise exception 'ISSUE_CANCELLED'; end if;
+
+  select * into v_mk from bot_markets where code = v_issue.market;
+
+  if p_price is not null then
+    if p_price < 0 or p_price >= 1000000000 then raise exception 'INVALID_PRICE'; end if;
+    v_p := round(p_price, coalesce(v_mk.decimals, 2));
+  end if;
+
+  update bot_issues set price = v_p where id = p_issue_id;
+
+  return jsonb_build_object(
+    'issue_id', p_issue_id, 'price', v_p,
+    'market', v_issue.market, 'currency', v_issue.currency
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 7. ما تحتاجه الوثيقة والبيعة من الصنف
+-- ------------------------------------------------------------
+create or replace function bot_variant_subject(p_variant_id uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_prices  jsonb;
+begin
+  select * into v_variant from bot_variants where id = p_variant_id;
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+  select * into v_product from bot_products where id = v_variant.product_id;
+
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+
+  select coalesce(jsonb_object_agg(m.code, jsonb_build_object(
+           'price', pp.price, 'currency', m.currency, 'name', m.name
+         )), '{}'::jsonb)
+    into v_prices
+    from bot_markets m
+    left join bot_prices pp on pp.variant_id = p_variant_id and pp.market = m.code
+   where m.is_active;
+
+  return jsonb_build_object(
+    'variant_id',   v_variant.id,
+    'variant_name', v_variant.name,
+    'product_id',   v_product.id,
+    'product_name', v_product.name,
+    'platform',     v_product.platform,
+    'months',       v_dur->'months',
+    'days',         v_dur->'days',
+    'prices',       v_prices,
+    'needs_platform', v_product.platform is null,
+    'needs_duration', v_variant.duration_value is null or v_variant.duration_unit is null
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 8. الحجز: السوق ثم السعر
+-- ------------------------------------------------------------
+-- النسخة ثلاثية الوسائط (021 و026) تسقط، ولا تبقى إلى جانب
+-- الرباعية: النداء بوسيطين يصير غامضاً بينهما فيفشل.
+drop function if exists bot_request_card(bigint, uuid, text);
+
+create or replace function bot_request_card(
+  p_telegram_id bigint,
+  p_variant_id  uuid,
+  p_customer_ref text default null,
+  p_market text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_card    bot_cards;
+  v_issue   bot_issues;
+  v_mk      bot_markets;
+  v_price   numeric;
+  v_pending int;
+  v_limit   int;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_variant from bot_variants where id = p_variant_id;
+  if not found or not v_variant.is_active then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  select * into v_product from bot_products where id = v_variant.product_id;
+  if not v_product.is_active then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  -- السوق قبل البطاقة: لو رُفع MARKET_REQUIRED بعد الحجز لبقيت
+  -- بطاقة محجوزة لبيعة لم تبدأ.
+  select * into v_mk from bot_markets
+   where code = bot_resolve_market(v_admin, p_market);
+
+  select coalesce(nullif(value,'')::int, 5) into v_limit
+    from store_settings where key = 'bot_pending_limit';
+  v_limit := coalesce(v_limit, 5);
+
+  select count(*) into v_pending
+    from bot_issues where admin_id = v_admin.id and status = 'pending';
+  if v_pending >= v_limit then
+    raise exception 'PENDING_LIMIT:%', v_limit;
+  end if;
+
+  -- أقدم بطاقة أولاً (طابور)، وتخطّي أي صف يمسكه طلب متزامن آخر.
+  select * into v_card
+    from bot_cards
+   where variant_id = p_variant_id and status = 'available'
+   order by seq
+   for update skip locked
+   limit 1;
+  if not found then raise exception 'OUT_OF_STOCK'; end if;
+
+  update bot_cards set status = 'reserved' where id = v_card.id;
+
+  select price into v_price from bot_prices
+   where variant_id = p_variant_id and market = v_mk.code;
+
+  insert into bot_issues (card_id, variant_id, admin_id, card_code, customer_ref,
+                          price, market, currency)
+  values (v_card.id, p_variant_id, v_admin.id, v_card.code,
+          nullif(btrim(coalesce(p_customer_ref,'')), ''),
+          v_price, v_mk.code, v_mk.currency)
+  returning * into v_issue;
+
+  return jsonb_build_object(
+    'issue_id',     v_issue.id,
+    'card_code',    v_card.code,
+    'card_note',    v_card.note,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'price',        v_issue.price,
+    'market',       v_mk.code,
+    'market_name',  v_mk.name,
+    'currency',     v_mk.currency,
+    'decimals',     v_mk.decimals,
+    'remaining',    (select count(*) from bot_cards
+                      where variant_id = p_variant_id and status = 'available'),
+    'pending',      v_pending + 1
+  );
+end $$;
+
+create or replace function bot_confirm_issue(p_telegram_id bigint, p_issue_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_issue   bot_issues;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_sales   int;
+  v_of_kind int;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if v_issue.status <> 'pending' then
+    raise exception 'ISSUE_ALREADY_SETTLED:%', v_issue.status;
+  end if;
+
+  update bot_issues
+     set status = 'confirmed', settled_at = now(), settled_by = v_admin.id
+   where id = p_issue_id
+  returning * into v_issue;
+
+  update bot_cards set status = 'sold', sold_at = now() where id = v_issue.card_id;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  select * into v_product from bot_products where id = v_variant.product_id;
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+
+  select count(*) into v_sales
+    from bot_issues where admin_id = v_issue.admin_id and status = 'confirmed';
+  -- وكم باع من هذه المدة تحديداً: الرقم الذي يسأل عنه البائع فعلاً
+  select count(*) into v_of_kind
+    from bot_issues
+   where admin_id = v_issue.admin_id and status = 'confirmed'
+     and variant_id = v_issue.variant_id;
+
+  return jsonb_build_object(
+    'issue_id', v_issue.id, 'status', 'confirmed',
+    'card_code', v_issue.card_code,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'customer_ref', v_issue.customer_ref,
+    'price',    v_issue.price,
+    'market',   v_issue.market,
+    'market_name', (select name from bot_markets where code = v_issue.market),
+    'currency', v_issue.currency,
+    'platform', v_product.platform,
+    'months',   v_dur->'months',
+    'days',     v_dur->'days',
+    'needs_platform', v_product.platform is null,
+    'needs_duration', v_variant.duration_value is null or v_variant.duration_unit is null,
+    'seller_sales', v_sales,
+    'seller_sales_of_variant', v_of_kind,
+    'remaining', (select count(*) from bot_cards
+                   where variant_id = v_issue.variant_id and status = 'available')
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 9. الجرد — بسعر لكل صفحة
+-- ------------------------------------------------------------
+create or replace function bot_data_audit(p_telegram_id bigint)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_rows jsonb; v_admins jsonb; v_np int; v_nd int; v_nr int; v_mk int;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select count(*) into v_mk from bot_markets where is_active;
+
+  select coalesce(jsonb_agg(x.j order by x.so, x.nm), '[]'::jsonb) into v_rows
+  from (
+    select pr.sort_order as so, pr.name as nm,
+      jsonb_build_object(
+        'product_id', pr.id,
+        'code',       pr.code,
+        'name',       pr.name,
+        'is_active',  pr.is_active,
+        'platform',   pr.platform,
+        'variants', coalesce((
+          select jsonb_agg(v.j order by v.so, v.nm)
+            from (
+              select va.sort_order as so, va.name as nm,
+                jsonb_build_object(
+                  'variant_id',     va.id,
+                  'code',           va.code,
+                  'name',           va.name,
+                  'is_active',      va.is_active,
+                  'duration_value', va.duration_value,
+                  'duration_unit',  va.duration_unit,
+                  'months',         bot_duration_to_engagement(
+                                      va.duration_value, va.duration_unit)->'months',
+                  'days',           bot_duration_to_engagement(
+                                      va.duration_value, va.duration_unit)->'days',
+                  'prices', coalesce((
+                    select jsonb_object_agg(m.code, pp.price)
+                      from bot_markets m
+                      join bot_prices pp
+                        on pp.variant_id = va.id and pp.market = m.code
+                     where m.is_active), '{}'::jsonb)
+                ) as j
+              from bot_variants va where va.product_id = pr.id
+            ) v
+        ), '[]'::jsonb)
+      ) as j
+    from bot_products pr
+  ) x;
+
+  -- ومن يبيع في أي صفحة. الفارغ هنا يعني «في الاثنتين، ويُسأل».
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'telegram_id', a.telegram_id,
+           'name', coalesce(a.display_name, a.tg_name),
+           'role', a.role::text,
+           'market', a.market
+         ) order by a.role, a.created_at), '[]'::jsonb)
+    into v_admins from bot_admins a where a.is_active;
+
+  select count(*) into v_np from bot_products where platform is null;
+  select count(*) into v_nd from bot_variants
+   where duration_value is null or duration_unit is null;
+  -- ناقص السعر = صنف فعّال ينقصه سعر في سوق فعّال واحد على الأقل
+  select count(*) into v_nr from bot_variants va
+   where exists (select 1 from bot_markets m where m.is_active
+                  and not exists (select 1 from bot_prices pp
+                                   where pp.variant_id = va.id and pp.market = m.code));
+
+  return jsonb_build_object(
+    'products', v_rows,
+    'admins',   v_admins,
+    'markets',  (select coalesce(jsonb_agg(jsonb_build_object(
+                          'code', code, 'name', name, 'currency', currency)
+                        order by sort_order), '[]'::jsonb)
+                   from bot_markets where is_active),
+    'missing_platform', v_np,
+    'missing_duration', v_nd,
+    'missing_price',    v_nr
+  );
+end $$;
+
+-- ============================================================
+-- 10. الصلاحيات — service_role وحده، كما في 021.
+-- ============================================================
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 028_bot_product_platforms.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 028 البطاقة الواحدة تعمل على منصات عدّة
+--
+-- تصحيح لـ026/027. كان bot_products.platform عموداً واحداً:
+-- منتج = منصة. والواقع أن البطاقة الواحدة قد تُفعَّل على أكثر من
+-- منصة، وتُزاد لها منصات جديدة مع الوقت. فالمنصة ليست خاصية
+-- للمنتج بل قائمة مربوطة به، والبائع يختار منها عند البيع.
+--
+-- والاختيار يُلقَّط على البيعة: الوثيقة تقول للزبون منصةً بعينها،
+-- فلا بدّ أن تكون منصة هذه البيعة لا قائمةَ ما يحتمله المنتج.
+--
+-- ونفس قاعدة 027: واحدة في القائمة = لا سؤال. وهذا يبقي البوت
+-- الحيّ يخدم كما هو، فالبطاقات الحالية على Snapchat Plus وحدها.
+--
+-- ولا يُرفَع خطأ إن غابت المنصة: البيع لا يحتاجها، الوثيقة هي
+-- التي تحتاجها. فتُطلب عند إصدار الوثيقة لا عند تسليم البطاقة.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. منصات المنتج
+-- ------------------------------------------------------------
+create table if not exists bot_product_platforms (
+  product_id uuid not null references bot_products(id) on delete cascade,
+  platform   text not null references bot_platforms(name)
+                  on update cascade on delete cascade,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  primary key (product_id, platform)
+);
+create index if not exists idx_bot_pp_platform on bot_product_platforms(platform);
+
+alter table bot_product_platforms enable row level security;
+revoke all on bot_product_platforms from anon, authenticated;
+
+-- نقل ما كُتب في عمود 027 ثم إسقاطه: عمود يحمل واحدة وجدول
+-- يحمل البقية يجعل السؤال «أين منصات هذا المنتج؟» بجوابين.
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'bot_products'
+                and column_name = 'platform') then
+    execute $q$
+      insert into bot_product_platforms (product_id, platform)
+        select id, platform from bot_products where platform is not null
+      on conflict (product_id, platform) do nothing
+    $q$;
+    execute 'alter table bot_products drop column platform';
+  end if;
+end $$;
+
+-- ------------------------------------------------------------
+-- 2. اللقطة على البيعة
+-- ------------------------------------------------------------
+alter table bot_issues
+  add column if not exists platform text;
+
+do $$ begin
+  alter table bot_issues add constraint bot_issues_platform_fk
+    foreign key (platform) references bot_platforms(name) on update cascade;
+exception when duplicate_object then null; end $$;
+
+create index if not exists idx_bot_issues_platform on bot_issues(platform);
+
+-- ------------------------------------------------------------
+-- 3. أي منصة لهذه البيعة
+-- ------------------------------------------------------------
+-- ما اختير صراحةً ← الوحيدة إن كانت وحيدة ← وإلّا NULL.
+--
+-- NULL لا خطأ: تسليم البطاقة لا يتوقّف على المنصة. من يحتاجها
+-- هو إصدار الوثيقة، وهناك تُطلب. ولو رُفع خطأ هنا لتوقّف البيع
+-- في البوت الحيّ لحظةَ يُضاف لمنتجٍ منصةٌ ثانية.
+create or replace function bot_resolve_platform(p_product_id uuid, p_platform text)
+returns text
+language plpgsql stable set search_path = public as $$
+declare v text; v_n int;
+begin
+  v := nullif(btrim(coalesce(p_platform, '')), '');
+  if v is not null then
+    if not exists (select 1 from bot_product_platforms
+                    where product_id = p_product_id and platform = v) then
+      raise exception 'PLATFORM_NOT_FOR_PRODUCT';
+    end if;
+    return v;
+  end if;
+
+  select count(*) into v_n from bot_product_platforms where product_id = p_product_id;
+  if v_n = 1 then
+    select platform into v from bot_product_platforms where product_id = p_product_id;
+    return v;
+  end if;
+
+  return null;
+end $$;
+
+create or replace function bot_product_platforms_list(
+  p_telegram_id bigint, p_product_id uuid
+) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_out jsonb;
+begin
+  perform bot_actor(p_telegram_id);
+  select coalesce(jsonb_agg(pp.platform order by pp.sort_order, pp.platform), '[]'::jsonb)
+    into v_out
+    from bot_product_platforms pp
+    join bot_platforms pl on pl.name = pp.platform
+   where pp.product_id = p_product_id and pl.is_active;
+  return v_out;
+end $$;
+
+-- ------------------------------------------------------------
+-- 4. إضافة منصة لمنتج وحذفها
+-- ------------------------------------------------------------
+-- واسم غير موجود في قائمة المنصات يُضاف إليها بدل أن يُرفض:
+-- المالك يعرف بضاعته، والقائمة للتوحيد لا للمنع.
+create or replace function bot_add_product_platform(
+  p_telegram_id bigint, p_product_id uuid, p_platform text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_prod bot_products; v_name text; v_next int;
+begin
+  perform bot_owner(p_telegram_id);
+  v_name := btrim(coalesce(p_platform, ''));
+  if v_name = '' or char_length(v_name) > 60 then raise exception 'INVALID_PLATFORM'; end if;
+
+  select * into v_prod from bot_products where id = p_product_id;
+  if not found then raise exception 'PRODUCT_NOT_FOUND'; end if;
+
+  if not exists (select 1 from bot_platforms where name = v_name) then
+    select coalesce(max(sort_order), 0) + 10 into v_next from bot_platforms;
+    insert into bot_platforms (name, sort_order) values (v_name, v_next)
+      on conflict (name) do nothing;
+  else
+    update bot_platforms set is_active = true where name = v_name and not is_active;
+  end if;
+
+  select coalesce(max(sort_order), 0) + 10 into v_next
+    from bot_product_platforms where product_id = p_product_id;
+  insert into bot_product_platforms (product_id, platform, sort_order)
+  values (p_product_id, v_name, v_next)
+  on conflict (product_id, platform) do nothing;
+
+  return jsonb_build_object(
+    'product', v_prod.name, 'platform', v_name,
+    'platforms', bot_product_platforms_list(p_telegram_id, p_product_id)
+  );
+end $$;
+
+-- الحذف من المنتج لا من القائمة العامة، والبيعات السابقة تحمل
+-- اسم منصتها نصّاً فلا تتأثّر.
+create or replace function bot_remove_product_platform(
+  p_telegram_id bigint, p_product_id uuid, p_platform text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_prod bot_products; v_n int;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select * into v_prod from bot_products where id = p_product_id;
+  if not found then raise exception 'PRODUCT_NOT_FOUND'; end if;
+
+  delete from bot_product_platforms
+   where product_id = p_product_id
+     and platform = btrim(coalesce(p_platform, ''));
+  get diagnostics v_n = row_count;
+  if v_n = 0 then raise exception 'PLATFORM_NOT_FOR_PRODUCT'; end if;
+
+  return jsonb_build_object(
+    'product', v_prod.name,
+    'platforms', bot_product_platforms_list(p_telegram_id, p_product_id)
+  );
+end $$;
+
+-- نسخة 027 تبقى تعمل بمعنى «اجعل منصاته هذه وحدها»: من نادى بها
+-- من قبل لا ينكسر أمره، ومن ينادي بها الآن يفهم منها ما تفعله.
+create or replace function bot_set_product_platform(
+  p_telegram_id bigint, p_product_id uuid, p_platform text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_prod bot_products; v_name text;
+begin
+  perform bot_owner(p_telegram_id);
+  v_name := btrim(coalesce(p_platform, ''));
+
+  select * into v_prod from bot_products where id = p_product_id;
+  if not found then raise exception 'PRODUCT_NOT_FOUND'; end if;
+
+  delete from bot_product_platforms where product_id = p_product_id;
+  if v_name = '' then
+    return jsonb_build_object('product', v_prod.name, 'platforms', '[]'::jsonb);
+  end if;
+
+  return bot_add_product_platform(p_telegram_id, p_product_id, v_name);
+end $$;
+
+-- ------------------------------------------------------------
+-- 5. الحجز يلقّط المنصة
+-- ------------------------------------------------------------
+drop function if exists bot_request_card(bigint, uuid, text, text);
+
+create or replace function bot_request_card(
+  p_telegram_id bigint,
+  p_variant_id  uuid,
+  p_customer_ref text default null,
+  p_market text default null,
+  p_platform text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_card    bot_cards;
+  v_issue   bot_issues;
+  v_mk      bot_markets;
+  v_plat    text;
+  v_price   numeric;
+  v_pending int;
+  v_limit   int;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_variant from bot_variants where id = p_variant_id;
+  if not found or not v_variant.is_active then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  select * into v_product from bot_products where id = v_variant.product_id;
+  if not v_product.is_active then raise exception 'VARIANT_NOT_FOUND'; end if;
+
+  -- السوق والمنصة قبل البطاقة: خطأ بعد الحجز يترك بطاقة محجوزة
+  -- لبيعة لم تبدأ.
+  select * into v_mk from bot_markets
+   where code = bot_resolve_market(v_admin, p_market);
+  v_plat := bot_resolve_platform(v_product.id, p_platform);
+
+  select coalesce(nullif(value,'')::int, 5) into v_limit
+    from store_settings where key = 'bot_pending_limit';
+  v_limit := coalesce(v_limit, 5);
+
+  select count(*) into v_pending
+    from bot_issues where admin_id = v_admin.id and status = 'pending';
+  if v_pending >= v_limit then
+    raise exception 'PENDING_LIMIT:%', v_limit;
+  end if;
+
+  -- أقدم بطاقة أولاً (طابور)، وتخطّي أي صف يمسكه طلب متزامن آخر.
+  select * into v_card
+    from bot_cards
+   where variant_id = p_variant_id and status = 'available'
+   order by seq
+   for update skip locked
+   limit 1;
+  if not found then raise exception 'OUT_OF_STOCK'; end if;
+
+  update bot_cards set status = 'reserved' where id = v_card.id;
+
+  select price into v_price from bot_prices
+   where variant_id = p_variant_id and market = v_mk.code;
+
+  insert into bot_issues (card_id, variant_id, admin_id, card_code, customer_ref,
+                          price, market, currency, platform)
+  values (v_card.id, p_variant_id, v_admin.id, v_card.code,
+          nullif(btrim(coalesce(p_customer_ref,'')), ''),
+          v_price, v_mk.code, v_mk.currency, v_plat)
+  returning * into v_issue;
+
+  return jsonb_build_object(
+    'issue_id',     v_issue.id,
+    'card_code',    v_card.code,
+    'card_note',    v_card.note,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'platform',     v_plat,
+    'platforms',    bot_product_platforms_list(p_telegram_id, v_product.id),
+    'price',        v_issue.price,
+    'market',       v_mk.code,
+    'market_name',  v_mk.name,
+    'currency',     v_mk.currency,
+    'decimals',     v_mk.decimals,
+    'remaining',    (select count(*) from bot_cards
+                      where variant_id = p_variant_id and status = 'available'),
+    'pending',      v_pending + 1
+  );
+end $$;
+
+-- تثبيت منصة بيعة بعد تسليمها: البائع سُئل عند إصدار الوثيقة لا
+-- عند التسليم، فهنا يُسجَّل جوابه. ولا تُبدَّل منصة بيعة صدرت
+-- وثيقتها: الوثيقة في يد الزبون تقول شيئاً، والسجل يجب أن يقوله.
+create or replace function bot_issue_set_platform(
+  p_telegram_id bigint, p_issue_id uuid, p_platform text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_admin bot_admins; v_issue bot_issues; v_variant bot_variants; v_name text;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  v_name := btrim(coalesce(p_platform, ''));
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if exists (select 1 from bot_certificates where issue_id = p_issue_id) then
+    raise exception 'CERTIFICATE_EXISTS';
+  end if;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  if not exists (select 1 from bot_product_platforms
+                  where product_id = v_variant.product_id and platform = v_name) then
+    raise exception 'PLATFORM_NOT_FOR_PRODUCT';
+  end if;
+
+  update bot_issues set platform = v_name where id = p_issue_id;
+  return jsonb_build_object('issue_id', p_issue_id, 'platform', v_name);
+end $$;
+
+-- ------------------------------------------------------------
+-- 6. التأكيد يرجّع منصة البيعة
+-- ------------------------------------------------------------
+create or replace function bot_confirm_issue(p_telegram_id bigint, p_issue_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_issue   bot_issues;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_plats   jsonb;
+  v_sales   int;
+  v_of_kind int;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if v_issue.status <> 'pending' then
+    raise exception 'ISSUE_ALREADY_SETTLED:%', v_issue.status;
+  end if;
+
+  update bot_issues
+     set status = 'confirmed', settled_at = now(), settled_by = v_admin.id
+   where id = p_issue_id
+  returning * into v_issue;
+
+  update bot_cards set status = 'sold', sold_at = now() where id = v_issue.card_id;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  select * into v_product from bot_products where id = v_variant.product_id;
+  v_dur   := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+  v_plats := bot_product_platforms_list(p_telegram_id, v_product.id);
+
+  select count(*) into v_sales
+    from bot_issues where admin_id = v_issue.admin_id and status = 'confirmed';
+  -- وكم باع من هذه المدة تحديداً: الرقم الذي يسأل عنه البائع فعلاً
+  select count(*) into v_of_kind
+    from bot_issues
+   where admin_id = v_issue.admin_id and status = 'confirmed'
+     and variant_id = v_issue.variant_id;
+
+  return jsonb_build_object(
+    'issue_id', v_issue.id, 'status', 'confirmed',
+    'card_code', v_issue.card_code,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'customer_ref', v_issue.customer_ref,
+    'price',    v_issue.price,
+    'market',   v_issue.market,
+    'market_name', (select name from bot_markets where code = v_issue.market),
+    'currency', v_issue.currency,
+    'platform',  v_issue.platform,
+    'platforms', v_plats,
+    'months',   v_dur->'months',
+    'days',     v_dur->'days',
+    -- ما ينقص الوثيقة: منصة لهذه البيعة، ومدة للصنف
+    'needs_platform', v_issue.platform is null,
+    'needs_duration', v_variant.duration_value is null or v_variant.duration_unit is null,
+    'seller_sales', v_sales,
+    'seller_sales_of_variant', v_of_kind,
+    'remaining', (select count(*) from bot_cards
+                   where variant_id = v_issue.variant_id and status = 'available')
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 7. الصنف والجرد
+-- ------------------------------------------------------------
+create or replace function bot_variant_subject(p_variant_id uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_prices  jsonb;
+  v_plats   jsonb;
+begin
+  select * into v_variant from bot_variants where id = p_variant_id;
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+  select * into v_product from bot_products where id = v_variant.product_id;
+
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+
+  select coalesce(jsonb_agg(pp.platform order by pp.sort_order, pp.platform), '[]'::jsonb)
+    into v_plats from bot_product_platforms pp where pp.product_id = v_product.id;
+
+  select coalesce(jsonb_object_agg(m.code, jsonb_build_object(
+           'price', pp.price, 'currency', m.currency, 'name', m.name
+         )), '{}'::jsonb)
+    into v_prices
+    from bot_markets m
+    left join bot_prices pp on pp.variant_id = p_variant_id and pp.market = m.code
+   where m.is_active;
+
+  return jsonb_build_object(
+    'variant_id',   v_variant.id,
+    'variant_name', v_variant.name,
+    'product_id',   v_product.id,
+    'product_name', v_product.name,
+    'platforms',    v_plats,
+    'months',       v_dur->'months',
+    'days',         v_dur->'days',
+    'prices',       v_prices,
+    'needs_platform', jsonb_array_length(v_plats) = 0,
+    'needs_duration', v_variant.duration_value is null or v_variant.duration_unit is null
+  );
+end $$;
+
+create or replace function bot_data_audit(p_telegram_id bigint)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_rows jsonb; v_admins jsonb; v_np int; v_nd int; v_nr int;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select coalesce(jsonb_agg(x.j order by x.so, x.nm), '[]'::jsonb) into v_rows
+  from (
+    select pr.sort_order as so, pr.name as nm,
+      jsonb_build_object(
+        'product_id', pr.id,
+        'code',       pr.code,
+        'name',       pr.name,
+        'is_active',  pr.is_active,
+        'platforms', coalesce((
+          select jsonb_agg(pp.platform order by pp.sort_order, pp.platform)
+            from bot_product_platforms pp where pp.product_id = pr.id), '[]'::jsonb),
+        'variants', coalesce((
+          select jsonb_agg(v.j order by v.so, v.nm)
+            from (
+              select va.sort_order as so, va.name as nm,
+                jsonb_build_object(
+                  'variant_id',     va.id,
+                  'code',           va.code,
+                  'name',           va.name,
+                  'is_active',      va.is_active,
+                  'duration_value', va.duration_value,
+                  'duration_unit',  va.duration_unit,
+                  'months',         bot_duration_to_engagement(
+                                      va.duration_value, va.duration_unit)->'months',
+                  'days',           bot_duration_to_engagement(
+                                      va.duration_value, va.duration_unit)->'days',
+                  'prices', coalesce((
+                    select jsonb_object_agg(m.code, pp.price)
+                      from bot_markets m
+                      join bot_prices pp
+                        on pp.variant_id = va.id and pp.market = m.code
+                     where m.is_active), '{}'::jsonb)
+                ) as j
+              from bot_variants va where va.product_id = pr.id
+            ) v
+        ), '[]'::jsonb)
+      ) as j
+    from bot_products pr
+  ) x;
+
+  -- ومن يبيع في أي صفحة. الفارغ هنا يعني «في الاثنتين، ويُسأل».
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'telegram_id', a.telegram_id,
+           'name', coalesce(a.display_name, a.tg_name),
+           'role', a.role::text,
+           'market', a.market
+         ) order by a.role, a.created_at), '[]'::jsonb)
+    into v_admins from bot_admins a where a.is_active;
+
+  select count(*) into v_np from bot_products pr
+   where not exists (select 1 from bot_product_platforms pp where pp.product_id = pr.id);
+  select count(*) into v_nd from bot_variants
+   where duration_value is null or duration_unit is null;
+  select count(*) into v_nr from bot_variants va
+   where exists (select 1 from bot_markets m where m.is_active
+                  and not exists (select 1 from bot_prices pp
+                                   where pp.variant_id = va.id and pp.market = m.code));
+
+  return jsonb_build_object(
+    'products', v_rows,
+    'admins',   v_admins,
+    'markets',  (select coalesce(jsonb_agg(jsonb_build_object(
+                          'code', code, 'name', name, 'currency', currency)
+                        order by sort_order), '[]'::jsonb)
+                   from bot_markets where is_active),
+    'missing_platform', v_np,
+    'missing_duration', v_nd,
+    'missing_price',    v_nr
+  );
+end $$;
+
+-- ============================================================
+-- 8. الصلاحيات — service_role وحده، كما في 021.
+-- ============================================================
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 029_engagement_from_issue.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 029 الوثيقة تُولَد من البيعة
+--
+-- المرحلة 2. حتى الآن كانت الوثيقة تُبنى بفلو مستقلّ يسأل الأدمن
+-- عن المنصة والمدة من الصفر، ولا يعرف أنه جاء من بيعة. وكل ما
+-- يسأل عنه صار معروفاً في البيعة نفسها بعد 026–028. فهنا تُربط:
+-- دالة واحدة تأخذ رقم البيعة وأيام الهدية، وتقرأ الباقي.
+--
+-- ومعها تصحيحان في حساب التواريخ:
+--
+-- 1. البداية = يوم البيع، لا يوم تعبئة الزبون.
+--    كان starts_at يُثبَّت لحظة يملأ الزبون الاستمارة. فزبون
+--    يملأها بعد خمسة أيام كان يربح خمسة أيام مجاناً، والوثيقة
+--    تقول إن اشتراكه بدأ يوم لم يبدأ فيه. الاشتراك يبدأ حين
+--    يسلّمه البائع.
+--    ولأن «بلا بداية» كان هو علامة «لم يُعبَّأ بعد»، حلّ محلّها
+--    عمود صريح: filled_at.
+--
+-- 2. المدة بالأيام كانت تضيع.
+--    026 زادت duration_days، لكن bot_engagement_claim بقيت
+--    تنادي bot_engagement_expiry بثلاث وسائط، فوثيقة مدتها 45
+--    يوماً كانت تنتهي يوم صدورها. لم تصدر وثيقة كهذه بعدُ،
+--    فالخطأ كامن لا واقع — ويسقط هنا قبل أن تصدر أوّلُها.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. علامة التعبئة
+-- ------------------------------------------------------------
+-- الافتراضي now(): وثائق 023 تولد كاملة (البائع كتب بيانات
+-- الزبون بنفسه)، فتأخذه بلا أن تُلمس دالتها. ووثائق الالتزام
+-- تمرّر null صراحةً لأن زبونها لم يعبّئ بعد.
+alter table bot_certificates
+  add column if not exists filled_at timestamptz;
+
+alter table bot_certificates
+  alter column filled_at set default now();
+
+-- اليوم: بداية موجودة ⟺ مكتملة. فالنقل دقيق لا تقريبي.
+update bot_certificates set filled_at = starts_at
+ where filled_at is null and starts_at is not null;
+
+create index if not exists idx_bot_cert_filled on bot_certificates(filled_at);
+
+-- القيد القديم كان يربط اكتمال البيانات بوجود بداية. صار الربط
+-- بالتعبئة، والبداية تُعرف من أول لحظة.
+alter table bot_certificates drop constraint if exists bot_cert_claim_ok;
+alter table bot_certificates add constraint bot_cert_claim_ok check (
+  filled_at is not null
+  or (holder_name is null and whatsapp is null and instagram is null)
+);
+
+-- ------------------------------------------------------------
+-- 2. الحالة تُقرأ من التعبئة
+-- ------------------------------------------------------------
+create or replace function bot_engagement_status(c bot_certificates)
+returns text
+language sql immutable set search_path = public as $$
+  select case
+    when c.revoked_at is not null then 'revoked'
+    when c.filled_at  is null     then 'pending'
+    when c.ends_at is not null and c.ends_at <= now() then 'expired'
+    else 'active' end;
+$$;
+
+-- ------------------------------------------------------------
+-- 3. الوثيقة من البيعة
+-- ------------------------------------------------------------
+-- كل ما كان يُسأل عنه يُقرأ هنا: المنصة من البيعة، المدة من
+-- الصنف، البداية من لحظة إتمام البيعة. ولا يبقى للأدمن إلا أيام
+-- الهدية — وهي وحدها التي لا يعرفها أحد غيره.
+create or replace function bot_engagement_from_issue(
+  p_telegram_id bigint,
+  p_issue_id    uuid,
+  p_bonus_days  int default 0,
+  p_hours       int default 72
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_issue   bot_issues;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_months  int;
+  v_days    int;
+  v_bonus   int;
+  v_start   timestamptz;
+  v_cert    bot_certificates;
+  v_token   text;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  -- وثيقة التزام لبيعة لم تتمّ وعدٌ بما قد يُلغى بعد دقيقة
+  if v_issue.status <> 'confirmed' then
+    raise exception 'ISSUE_NOT_CONFIRMED:%', v_issue.status;
+  end if;
+  if exists (select 1 from bot_certificates where issue_id = p_issue_id) then
+    raise exception 'CERTIFICATE_EXISTS';
+  end if;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  select * into v_product from bot_products where id = v_variant.product_id;
+
+  -- المنصة: لقطة البيعة لا قائمة المنتج. الوثيقة تقول للزبون
+  -- منصةً بعينها، فإن لم تُحدَّد بعدُ فالبوت يسأل ثم يعيد النداء.
+  if v_issue.platform is null then raise exception 'PLATFORM_REQUIRED'; end if;
+
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+  v_months := nullif(v_dur->>'months', '')::int;
+  v_days   := nullif(v_dur->>'days',   '')::int;
+  if v_months is null and v_days is null then raise exception 'DURATION_MISSING'; end if;
+
+  v_bonus := coalesce(p_bonus_days, 0);
+  if v_bonus < 0 or v_bonus > 90 then raise exception 'INVALID_BONUS'; end if;
+
+  -- يوم البيع، لا يوم التعبئة ولا يوم النداء: بائع يصدر الوثيقة
+  -- بعد ساعة من البيعة لا يزيح بدايتها ساعة.
+  v_start := coalesce(v_issue.settled_at, now());
+
+  insert into bot_certificates
+    (code, ref_code, issue_id, platform, months, duration_days, bonus_days,
+     starts_at, ends_at, issued_by, customer, filled_at)
+  values
+    (bot_engagement_code(), bot_engagement_ref(), p_issue_id, v_issue.platform,
+     v_months, v_days, v_bonus,
+     v_start, bot_engagement_expiry(v_start, v_months, v_bonus, v_days),
+     v_admin.id, '[]'::jsonb, null)
+  returning * into v_cert;
+
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
+
+  insert into bot_fill_tokens (token, certificate_id, created_by, expires_at)
+  values (v_token, v_cert.id, v_admin.id,
+          now() + make_interval(hours => greatest(1, least(coalesce(p_hours, 72), 720))));
+
+  return jsonb_build_object(
+    'code',        v_cert.code,
+    'ref_code',    v_cert.ref_code,
+    'token',       v_token,
+    'issue_id',    p_issue_id,
+    'platform',    v_cert.platform,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'months',      v_cert.months,
+    'duration_days', v_cert.duration_days,
+    'bonus_days',  v_cert.bonus_days,
+    'starts_at',   v_cert.starts_at,
+    'ends_at',     v_cert.ends_at,
+    'expires_at',  now() + make_interval(hours => coalesce(p_hours, 72))
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 4. الفلو اليدوي يثبّت بدايته كذلك
+-- ------------------------------------------------------------
+-- /warranty للحالات الخاصة: بيعة قديمة، أو بيعة خارج البوت.
+-- بدايتها لحظة إصدارها — وهي أقرب ما يُعرف عنها.
+create or replace function bot_engagement_confirm(
+  p_telegram_id bigint, p_hours int default 72
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin bot_admins; v_st bot_wizard_state;
+  v_cert bot_certificates; v_token text; v_start timestamptz;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  select * into v_st from bot_wizard_state where admin_id = v_admin.id;
+  if not found then raise exception 'WIZARD_NOT_STARTED'; end if;
+  if v_st.platform is null then raise exception 'PLATFORM_MISSING'; end if;
+  if v_st.months   is null then raise exception 'MONTHS_MISSING';   end if;
+
+  v_start := now();
+
+  insert into bot_certificates
+    (code, ref_code, platform, months, bonus_days, starts_at, ends_at,
+     issued_by, customer, filled_at)
+  values
+    (bot_engagement_code(), bot_engagement_ref(), v_st.platform, v_st.months,
+     coalesce(v_st.bonus_days, 0), v_start,
+     bot_engagement_expiry(v_start, v_st.months, coalesce(v_st.bonus_days, 0), null),
+     v_admin.id, '[]'::jsonb, null)
+  returning * into v_cert;
+
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
+
+  insert into bot_fill_tokens (token, certificate_id, created_by, expires_at)
+  values (v_token, v_cert.id, v_admin.id,
+          now() + make_interval(hours => greatest(1, least(coalesce(p_hours, 72), 720))));
+
+  delete from bot_wizard_state where admin_id = v_admin.id;
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'ref_code', v_cert.ref_code, 'token', v_token,
+    'platform', v_cert.platform, 'months', v_cert.months,
+    'bonus_days', v_cert.bonus_days,
+    'starts_at', v_cert.starts_at, 'ends_at', v_cert.ends_at,
+    'expires_at', now() + make_interval(hours => coalesce(p_hours, 72))
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 5. التعبئة: بيانات الزبون وحدها
+-- ------------------------------------------------------------
+-- لم تعد تحسب تواريخ. التواريخ ثُبّتت يوم البيع، ولا يملك الزبون
+-- أن يزيحها بأن يتأخّر في التعبئة.
+create or replace function bot_engagement_claim(
+  p_token     text,
+  p_name      text,
+  p_whatsapp  text,
+  p_instagram text default null,
+  p_ip        text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_tok bot_fill_tokens; v_cert bot_certificates;
+  v_name text; v_phone text; v_insta text; v_start timestamptz;
+begin
+  -- لا حدّ هنا: bot_claim_guard تُنادى قبلها في معاملة مستقلة،
+  -- وإلا محا فشلُ هذه الدالة عدّادَ محاولاتها.
+  select * into v_tok from bot_fill_tokens
+   where token = btrim(coalesce(p_token, '')) for update;
+  if not found or v_tok.certificate_id is null then raise exception 'LINK_NOT_FOUND'; end if;
+  if v_tok.used_at is not null then raise exception 'LINK_USED'; end if;
+  if v_tok.expires_at <= now() then raise exception 'LINK_EXPIRED'; end if;
+
+  select * into v_cert from bot_certificates where id = v_tok.certificate_id for update;
+  if v_cert.revoked_at is not null then raise exception 'CERTIFICATE_REVOKED'; end if;
+  if v_cert.filled_at is not null then raise exception 'ALREADY_CLAIMED'; end if;
+
+  v_name := btrim(coalesce(p_name, ''));
+  if char_length(v_name) < 3 or char_length(v_name) > 80 then raise exception 'INVALID_NAME'; end if;
+
+  v_phone := bot_dz_phone(p_whatsapp);
+  if v_phone is null then raise exception 'INVALID_PHONE'; end if;
+
+  v_insta := nullif(regexp_replace(btrim(coalesce(p_instagram, '')), '^@+', ''), '');
+  if v_insta is not null then
+    if char_length(v_insta) > 40 then raise exception 'INVALID_INSTAGRAM'; end if;
+    if v_insta !~ '^[A-Za-z0-9._]+$' then raise exception 'INVALID_INSTAGRAM'; end if;
+  end if;
+
+  -- وثيقة أُصدرت قبل 029 لا بداية لها؛ تُثبَّت الآن بالحساب
+  -- الكامل (الأشهر والأيام والهدية) لا بالناقص الذي كان.
+  v_start := coalesce(v_cert.starts_at, now());
+
+  update bot_certificates
+     set holder_name = v_name,
+         whatsapp    = v_phone,
+         instagram   = v_insta,
+         filled_at   = now(),
+         starts_at   = v_start,
+         ends_at     = coalesce(
+                         v_cert.ends_at,
+                         bot_engagement_expiry(v_start, v_cert.months,
+                                               v_cert.bonus_days, v_cert.duration_days))
+   where id = v_cert.id
+  returning * into v_cert;
+
+  update bot_fill_tokens set used_at = now() where token = v_tok.token;
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'ref_code', v_cert.ref_code,
+    'issued_by_telegram_id',
+      (select telegram_id from bot_admins where id = v_cert.issued_by)
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 6. القراءة والإبطال يتبعان علامة التعبئة
+-- ------------------------------------------------------------
+-- الوثيقة لا تُعرض قبل أن يعبّئ صاحبها: بلا اسم لا تُثبت شيئاً،
+-- ولو صارت تواريخها معروفة.
+create or replace function bot_engagement_public(p_code text)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_cert bot_certificates;
+begin
+  if p_code is null or char_length(btrim(p_code)) < 8 then
+    raise exception 'CERTIFICATE_NOT_FOUND';
+  end if;
+  -- الحدّ في bot_read_guard، لنفس سبب bot_claim_guard أعلاه
+  select * into v_cert from bot_certificates where code = upper(btrim(p_code));
+  if not found then raise exception 'CERTIFICATE_NOT_FOUND'; end if;
+  if v_cert.filled_at is null then raise exception 'CERTIFICATE_PENDING'; end if;
+
+  return jsonb_build_object(
+    'code',        v_cert.code,
+    'ref_code',    v_cert.ref_code,
+    'holder_name', v_cert.holder_name,
+    'instagram',   v_cert.instagram,
+    'platform',    v_cert.platform,
+    'months',      v_cert.months,
+    'duration_days', v_cert.duration_days,
+    'bonus_days',  v_cert.bonus_days,
+    'starts_at',   v_cert.starts_at,
+    'ends_at',     v_cert.ends_at,
+    'status',      bot_engagement_status(v_cert),
+    'days_left',   case when v_cert.ends_at is null then null
+                        else greatest(0, (date_part('day', v_cert.ends_at - now()))::int) end
+  );
+end $$;
+
+create or replace function bot_engagement_verify(p_code text)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_cert bot_certificates;
+begin
+  select * into v_cert from bot_certificates
+   where code = upper(btrim(coalesce(p_code, '')));
+  if not found or v_cert.filled_at is null then
+    return jsonb_build_object('found', false);
+  end if;
+
+  return jsonb_build_object(
+    'found',      true,
+    'code',       v_cert.code,
+    'platform',   v_cert.platform,
+    'ends_at',    v_cert.ends_at,
+    'status',     bot_engagement_status(v_cert),
+    -- الاسم مختصر: يكفي صاحبه ليتعرّف، ولا يكشفه لغيره
+    'holder_hint', case when v_cert.holder_name is null then null
+                        else left(v_cert.holder_name, 1) || '***' end
+  );
+end $$;
+
+create or replace function bot_engagement_relink(
+  p_telegram_id bigint, p_code text, p_hours int default 72
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_admin bot_admins; v_cert bot_certificates; v_token text;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  select * into v_cert from bot_certificates
+   where code = upper(btrim(coalesce(p_code, ''))) for update;
+  if not found then raise exception 'CERTIFICATE_NOT_FOUND'; end if;
+  if v_admin.role <> 'owner' and v_cert.issued_by is distinct from v_admin.id then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if v_cert.revoked_at is not null then raise exception 'CERTIFICATE_REVOKED'; end if;
+  if v_cert.filled_at is not null then raise exception 'ALREADY_CLAIMED'; end if;
+
+  delete from bot_fill_tokens where certificate_id = v_cert.id;
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
+  insert into bot_fill_tokens (token, certificate_id, created_by, expires_at)
+  values (v_token, v_cert.id, v_admin.id,
+          now() + make_interval(hours => greatest(1, least(coalesce(p_hours, 72), 720))));
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'token', v_token,
+    'expires_at', now() + make_interval(hours => coalesce(p_hours, 72))
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 7. حالة البيعة بالنسبة للوثيقة
+-- ------------------------------------------------------------
+-- يسألها البوت بعد التأكيد ليعرف: أيسأل عن المنصة؟ عن المدة؟ أم
+-- يكفيه أن يسأل عن الهدية ثم يولّد الرابط؟
+create or replace function bot_issue_engagement(p_telegram_id bigint, p_issue_id uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_admin bot_admins; v_issue bot_issues;
+  v_variant bot_variants; v_product bot_products;
+  v_dur jsonb; v_cert bot_certificates;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  select * into v_product from bot_products where id = v_variant.product_id;
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+  select * into v_cert from bot_certificates where issue_id = p_issue_id;
+
+  return jsonb_build_object(
+    'issue_id',     p_issue_id,
+    'status',       v_issue.status,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'platform',     v_issue.platform,
+    'platforms',    bot_product_platforms_list(p_telegram_id, v_product.id),
+    'months',       v_dur->'months',
+    'days',         v_dur->'days',
+    'needs_platform', v_issue.platform is null,
+    'needs_duration', v_dur->'months' = 'null'::jsonb and v_dur->'days' = 'null'::jsonb,
+    'has_certificate', v_cert.id is not null,
+    'certificate_code', v_cert.code,
+    -- ما ستكون عليه لو أُصدرت الآن بلا هدية: معاينة قبل السؤال
+    'projected_start', coalesce(v_issue.settled_at, now()),
+    'projected_end',   case
+      when v_dur->'months' = 'null'::jsonb and v_dur->'days' = 'null'::jsonb then null
+      else bot_engagement_expiry(
+             coalesce(v_issue.settled_at, now()),
+             nullif(v_dur->>'months','')::int, 0, nullif(v_dur->>'days','')::int)
+      end
+  );
+end $$;
+
+-- ============================================================
+-- 8. الصلاحيات — service_role وحده، كما في 021.
+-- ============================================================
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 030_bot_catalog_commands.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 030 الكتالوج يُدار من البوت
+--
+-- المنصات والمدد والأسعار كلها تُضبط اليوم بنداء RPC برقم uuid،
+-- أي بلصق SQL في لوحة Supabase. وهذا يناقض ما بُني عليه البوت من
+-- أوّله: «لا هجرة ولا نشر — من داخل البوت».
+--
+-- فهنا أغلفة بالرموز النصّية نفسها التي يعرفها المالك من
+-- /addvariant و/addcards: رمز المنتج ورمز المدة. الدوال الأصلية
+-- بالـuuid تبقى كما هي — هذه تُترجم إليها لا أكثر.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. من رمزين إلى صنف
+-- ------------------------------------------------------------
+create or replace function bot_variant_by_code(
+  p_product_code text, p_variant_code text
+) returns bot_variants
+language plpgsql stable set search_path = public as $$
+declare v_prod bot_products; v_var bot_variants;
+begin
+  select * into v_prod from bot_products
+   where code = lower(btrim(coalesce(p_product_code, '')));
+  if not found then raise exception 'PRODUCT_NOT_FOUND'; end if;
+
+  select * into v_var from bot_variants
+   where product_id = v_prod.id and code = lower(btrim(coalesce(p_variant_code, '')));
+  if not found then raise exception 'VARIANT_NOT_FOUND'; end if;
+  return v_var;
+end $$;
+
+create or replace function bot_product_by_code(p_product_code text)
+returns bot_products
+language plpgsql stable set search_path = public as $$
+declare v_prod bot_products;
+begin
+  select * into v_prod from bot_products
+   where code = lower(btrim(coalesce(p_product_code, '')));
+  if not found then raise exception 'PRODUCT_NOT_FOUND'; end if;
+  return v_prod;
+end $$;
+
+-- ------------------------------------------------------------
+-- 2. المنصات
+-- ------------------------------------------------------------
+create or replace function bot_cmd_platform(
+  p_telegram_id bigint, p_product_code text, p_platform text,
+  p_remove boolean default false
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_prod bot_products;
+begin
+  perform bot_owner(p_telegram_id);
+  v_prod := bot_product_by_code(p_product_code);
+  if p_remove then
+    return bot_remove_product_platform(p_telegram_id, v_prod.id, p_platform);
+  end if;
+  return bot_add_product_platform(p_telegram_id, v_prod.id, p_platform);
+end $$;
+
+-- ------------------------------------------------------------
+-- 3. المدة
+-- ------------------------------------------------------------
+-- بالعربية كما تُكتب، وبالإنجليزية كما في العمود. من يكتب «شهر»
+-- لا يُطالَب بأن يتعلّم 'month'.
+create or replace function bot_duration_unit(p_word text)
+returns text
+language sql immutable set search_path = public as $$
+  select case lower(btrim(coalesce(p_word, '')))
+    when 'يوم'   then 'day'   when 'أيام'  then 'day'   when 'ايام' then 'day'
+    when 'day'   then 'day'   when 'days'  then 'day'
+    when 'أسبوع' then 'week'  when 'اسبوع' then 'week'  when 'أسابيع' then 'week'
+    when 'اسابيع' then 'week' when 'week'  then 'week'  when 'weeks' then 'week'
+    when 'شهر'   then 'month' when 'أشهر'  then 'month' when 'اشهر' then 'month'
+    when 'شهور'  then 'month' when 'month' then 'month' when 'months' then 'month'
+    when 'سنة'   then 'year'  when 'سنوات' then 'year'  when 'عام'  then 'year'
+    when 'year'  then 'year'  when 'years' then 'year'
+    else null end;
+$$;
+
+create or replace function bot_cmd_duration(
+  p_telegram_id bigint, p_product_code text, p_variant_code text,
+  p_value int, p_unit text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_var bot_variants; v_unit text;
+begin
+  perform bot_owner(p_telegram_id);
+  v_var := bot_variant_by_code(p_product_code, p_variant_code);
+
+  v_unit := bot_duration_unit(p_unit);
+  if v_unit is null then raise exception 'INVALID_UNIT'; end if;
+
+  return bot_set_variant_duration(p_telegram_id, v_var.id, p_value, v_unit);
+end $$;
+
+-- ------------------------------------------------------------
+-- 4. السعر
+-- ------------------------------------------------------------
+create or replace function bot_cmd_price(
+  p_telegram_id bigint, p_product_code text, p_variant_code text,
+  p_market text, p_price numeric
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_var bot_variants;
+begin
+  perform bot_owner(p_telegram_id);
+  v_var := bot_variant_by_code(p_product_code, p_variant_code);
+  return bot_set_price(p_telegram_id, v_var.id, p_market, p_price);
+end $$;
+
+-- ------------------------------------------------------------
+-- 5. الجرد كنصّ جاهز للعرض
+-- ------------------------------------------------------------
+-- bot_data_audit تعطي البنية كاملة؛ هذه تعطي ما يُقرأ في رسالة
+-- تليجرام: سطر لكل صنف، وما ينقصه معلَّماً.
+create or replace function bot_catalog_report(p_telegram_id bigint)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_out jsonb; v_mk jsonb;
+begin
+  perform bot_owner(p_telegram_id);
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'code', code, 'name', name, 'currency', currency)
+         order by sort_order), '[]'::jsonb)
+    into v_mk from bot_markets where is_active;
+
+  select coalesce(jsonb_agg(x.j order by x.so, x.nm), '[]'::jsonb) into v_out
+  from (
+    select pr.sort_order as so, pr.name as nm,
+      jsonb_build_object(
+        'code', pr.code,
+        'name', pr.name,
+        'is_active', pr.is_active,
+        'platforms', coalesce((
+          select jsonb_agg(pp.platform order by pp.sort_order, pp.platform)
+            from bot_product_platforms pp where pp.product_id = pr.id), '[]'::jsonb),
+        'variants', coalesce((
+          select jsonb_agg(v.j order by v.so, v.nm)
+            from (
+              select va.sort_order as so, va.name as nm,
+                jsonb_build_object(
+                  'code', va.code,
+                  'name', va.name,
+                  'is_active', va.is_active,
+                  'value', va.duration_value,
+                  'unit',  va.duration_unit,
+                  'stock', (select count(*) from bot_cards c
+                             where c.variant_id = va.id and c.status = 'available'),
+                  'prices', coalesce((
+                    select jsonb_object_agg(m.code, pp.price)
+                      from bot_markets m
+                      join bot_prices pp on pp.variant_id = va.id and pp.market = m.code
+                     where m.is_active), '{}'::jsonb)
+                ) as j
+              from bot_variants va where va.product_id = pr.id
+            ) v
+        ), '[]'::jsonb)
+      ) as j
+    from bot_products pr
+  ) x;
+
+  return jsonb_build_object(
+    'products', v_out,
+    'markets',  v_mk,
+    'sellers', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'telegram_id', a.telegram_id,
+               'name', coalesce(a.display_name, a.tg_name, a.telegram_id::text),
+               'role', a.role::text, 'market', a.market)
+             order by a.role, a.created_at)
+        from bot_admins a where a.is_active), '[]'::jsonb)
+  );
+end $$;
+
+-- ============================================================
+-- 6. الصلاحيات — service_role وحده، كما في 021.
+-- ============================================================
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ============================================================
+-- 7. المدة المخصّصة في الفلو اليدوي
+-- ============================================================
+-- كانت الحالة تعرف الأشهر وحدها، وأزرارها 1/3/6/12 بلا شهرين
+-- وبلا مخصّص. والمدة قد تكون بالأيام (بطاقة 45 يوماً)، فتُحفظ
+-- في عمودها لا في أيام الهدية: الهدية شيء والمدة شيء.
+alter table bot_wizard_state
+  add column if not exists duration_days integer;
+
+do $$ begin
+  alter table bot_wizard_state add constraint bot_wizard_days_ok
+    check (duration_days is null or duration_days between 1 and 999);
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  alter table bot_wizard_state add constraint bot_wizard_duration_one_ok
+    check (months is null or duration_days is null);
+exception when duplicate_object then null; end $$;
+
+alter table bot_wizard_state drop constraint if exists bot_wizard_state_awaiting_check;
+alter table bot_wizard_state add constraint bot_wizard_state_awaiting_check
+  check (awaiting in ('platform','months','bonus','preview',
+                      'platform_manual','bonus_manual',
+                      'months_manual','days_manual'));
+
+create or replace function bot_wizard_set(
+  p_telegram_id bigint, p_step text, p_value text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_admin bot_admins; v_n int; v_name text;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  if not exists (select 1 from bot_wizard_state where admin_id = v_admin.id) then
+    raise exception 'WIZARD_NOT_STARTED';
+  end if;
+
+  if p_step = 'platform' then
+    v_name := btrim(coalesce(p_value, ''));
+    if v_name = '' or char_length(v_name) > 60 then raise exception 'INVALID_PLATFORM'; end if;
+    update bot_wizard_state set platform = v_name, awaiting = 'months'
+     where admin_id = v_admin.id;
+
+  elsif p_step = 'months' then
+    v_n := nullif(btrim(coalesce(p_value, '')), '')::int;
+    if v_n is null or v_n < 1 or v_n > 60 then raise exception 'INVALID_MONTHS'; end if;
+    update bot_wizard_state
+       set months = v_n, duration_days = null, awaiting = 'bonus'
+     where admin_id = v_admin.id;
+
+  -- المدة بالأيام: تُمسح الأشهر معها، فلا تجتمع وحدتان
+  elsif p_step = 'days' then
+    v_n := nullif(btrim(coalesce(p_value, '')), '')::int;
+    if v_n is null or v_n < 1 or v_n > 999 then raise exception 'INVALID_DAYS'; end if;
+    update bot_wizard_state
+       set duration_days = v_n, months = null, awaiting = 'bonus'
+     where admin_id = v_admin.id;
+
+  elsif p_step = 'bonus' then
+    v_n := coalesce(nullif(btrim(coalesce(p_value, '')), '')::int, 0);
+    if v_n < 0 or v_n > 90 then raise exception 'INVALID_BONUS'; end if;
+    update bot_wizard_state set bonus_days = v_n, awaiting = 'preview'
+     where admin_id = v_admin.id;
+
+  -- انتظار إدخال يدوي: المنصة، أو المدة بإحدى وحدتيها، أو الهدية
+  elsif p_step in ('platform_manual', 'bonus_manual', 'months_manual', 'days_manual') then
+    update bot_wizard_state set awaiting = p_step where admin_id = v_admin.id;
+
+  -- «تعديل»: يعود لخطوة ويمحو ما بعدها، فلا تبقى قيمة معلّقة من
+  -- مسار سابق تدخل المعاينة بلا أن يراها الأدمن.
+  elsif p_step = 'back_platform' then
+    update bot_wizard_state
+       set awaiting = 'platform', platform = null, months = null,
+           duration_days = null, bonus_days = null
+     where admin_id = v_admin.id;
+  elsif p_step = 'back_months' then
+    update bot_wizard_state
+       set awaiting = 'months', months = null, duration_days = null, bonus_days = null
+     where admin_id = v_admin.id;
+  elsif p_step = 'back_bonus' then
+    update bot_wizard_state set bonus_days = null, awaiting = 'bonus'
+     where admin_id = v_admin.id;
+  else
+    raise exception 'UNKNOWN_STEP:%', p_step;
+  end if;
+
+  return bot_wizard_preview(p_telegram_id);
+end $$;
+
+create or replace function bot_wizard_preview(p_telegram_id bigint)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_admin bot_admins; v_st bot_wizard_state; v_start timestamptz;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  select * into v_st from bot_wizard_state where admin_id = v_admin.id;
+  if not found then raise exception 'WIZARD_NOT_STARTED'; end if;
+
+  v_start := now();
+  return jsonb_build_object(
+    'platform',      v_st.platform,
+    'months',        v_st.months,
+    'duration_days', v_st.duration_days,
+    'bonus_days',    v_st.bonus_days,
+    'awaiting',      v_st.awaiting,
+    'ready',         v_st.platform is not null
+                     and (v_st.months is not null or v_st.duration_days is not null)
+                     and v_st.bonus_days is not null,
+    'projected_start', v_start,
+    'projected_end',   case
+      when v_st.months is null and v_st.duration_days is null then null
+      else bot_engagement_expiry(v_start, v_st.months,
+                                 coalesce(v_st.bonus_days, 0), v_st.duration_days) end
+  );
+end $$;
+
+create or replace function bot_engagement_confirm(
+  p_telegram_id bigint, p_hours int default 72
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin bot_admins; v_st bot_wizard_state;
+  v_cert bot_certificates; v_token text; v_start timestamptz;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  select * into v_st from bot_wizard_state where admin_id = v_admin.id;
+  if not found then raise exception 'WIZARD_NOT_STARTED'; end if;
+  if v_st.platform is null then raise exception 'PLATFORM_MISSING'; end if;
+  if v_st.months is null and v_st.duration_days is null then
+    raise exception 'MONTHS_MISSING';
+  end if;
+
+  v_start := now();
+
+  insert into bot_certificates
+    (code, ref_code, platform, months, duration_days, bonus_days,
+     starts_at, ends_at, issued_by, customer, filled_at)
+  values
+    (bot_engagement_code(), bot_engagement_ref(), v_st.platform,
+     v_st.months, v_st.duration_days, coalesce(v_st.bonus_days, 0), v_start,
+     bot_engagement_expiry(v_start, v_st.months,
+                           coalesce(v_st.bonus_days, 0), v_st.duration_days),
+     v_admin.id, '[]'::jsonb, null)
+  returning * into v_cert;
+
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
+
+  insert into bot_fill_tokens (token, certificate_id, created_by, expires_at)
+  values (v_token, v_cert.id, v_admin.id,
+          now() + make_interval(hours => greatest(1, least(coalesce(p_hours, 72), 720))));
+
+  delete from bot_wizard_state where admin_id = v_admin.id;
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'ref_code', v_cert.ref_code, 'token', v_token,
+    'platform', v_cert.platform, 'months', v_cert.months,
+    'duration_days', v_cert.duration_days, 'bonus_days', v_cert.bonus_days,
+    'starts_at', v_cert.starts_at, 'ends_at', v_cert.ends_at,
+    'expires_at', now() + make_interval(hours => coalesce(p_hours, 72))
+  );
+end $$;
+
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 031_bot_terms.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 031 شروط التغطية: للمالك، ولكل خدمة
+--
+-- كانت النقاط الخمس مكتوبة في i18n.ts: تبديلها يحتاج نشر
+-- الدالة، وهي واحدة لكل الخدمات. وسناب ليس نتفليكس: ما يُغطّى
+-- في هذه لا يُغطّى في تلك.
+--
+-- وفخُّ التخزين وحده: لو قُرئت الشروط من الجدول وقت العرض،
+-- لتبدّلت الوثائق التي في أيدي الزبائن بأثر رجعي. زبون التُزم
+-- له بشروط، ثم يفتح رابطه فيجد غيرها. وهذه وثيقة التزام — ما
+-- وُعد به يبقى.
+--
+-- فالشروط تُلقَّط على الوثيقة يوم صدورها:
+--   الوثيقة القديمة تبقى على وعدها.
+--   والجديدة تأخذ الجديد.
+--   وما صدر قبل هذه الهجرة (terms فارغ) يقرأ الحيّ ثم المدمج
+--   في الكود — فلا وثيقة بلا شروط.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. الجدول
+-- ------------------------------------------------------------
+-- platform فارغ = الشروط العامة، تُستعمل لكل خدمة لم تُفرَد
+-- بشروطها. ولغة بلا شروط تسقط إلى العامة ثم إلى المدمج، فلا
+-- يُجبَر المالك على كتابة الثلاث دفعةً.
+create table if not exists bot_terms (
+  id         uuid primary key default gen_random_uuid(),
+  platform   text references bot_platforms(name) on update cascade on delete cascade,
+  lang       text not null check (lang in ('ar','fr','en')),
+  sort_order integer not null,
+  body       text not null check (char_length(btrim(body)) between 3 and 400),
+  updated_at timestamptz not null default now(),
+  unique (platform, lang, sort_order)
+);
+create index if not exists idx_bot_terms_lookup on bot_terms(platform, lang, sort_order);
+
+alter table bot_terms enable row level security;
+revoke all on bot_terms from anon, authenticated;
+
+-- اللقطة على الوثيقة: {"ar":[...],"fr":[...],"en":[...]}
+alter table bot_certificates
+  add column if not exists terms jsonb;
+
+-- ------------------------------------------------------------
+-- 2. القراءة
+-- ------------------------------------------------------------
+-- الخاصة بالخدمة، وإلّا العامة، وإلّا فارغ — والفراغ يعني
+-- «استعمل المدمج في الكود»، لا «بلا شروط».
+create or replace function bot_terms_for(p_platform text, p_lang text)
+returns text[]
+language sql stable set search_path = public as $$
+  select coalesce(
+    (select array_agg(body order by sort_order) from bot_terms
+      where platform = p_platform and lang = p_lang),
+    (select array_agg(body order by sort_order) from bot_terms
+      where platform is null and lang = p_lang)
+  );
+$$;
+
+-- اللقطة كاملة باللغات الثلاث، كما تُكتب على الوثيقة.
+create or replace function bot_terms_snapshot(p_platform text)
+returns jsonb
+language sql stable set search_path = public as $$
+  select coalesce(jsonb_object_agg(l.lang, to_jsonb(t.lines))
+                    filter (where t.lines is not null), '{}'::jsonb)
+    from (values ('ar'),('fr'),('en')) as l(lang)
+    cross join lateral (select bot_terms_for(p_platform, l.lang) as lines) t;
+$$;
+
+create or replace function bot_terms_list(
+  p_telegram_id bigint, p_platform text default null
+) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_plat text;
+begin
+  perform bot_owner(p_telegram_id);
+  v_plat := nullif(btrim(coalesce(p_platform, '')), '');
+
+  return jsonb_build_object(
+    'platform', v_plat,
+    -- الخاصة بهذه الخدمة وحدها، بلا سقوط: ليرى المالك ما كتبه هو
+    'own', (select coalesce(jsonb_object_agg(x.lang, x.lines), '{}'::jsonb)
+              from (select lang, to_jsonb(array_agg(body order by sort_order)) as lines
+                      from bot_terms
+                     where platform is not distinct from v_plat
+                     group by lang) x),
+    -- وما سيُطبَّق فعلاً بعد السقوط
+    'effective', bot_terms_snapshot(v_plat),
+    -- والخدمات التي أُفردت بشروط
+    'overridden', (select coalesce(jsonb_agg(distinct platform), '[]'::jsonb)
+                     from bot_terms where platform is not null)
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 3. الكتابة — للمالك وحده
+-- ------------------------------------------------------------
+-- استبدال كامل لا إضافة: الشروط تُقرأ كمجموعة، وتحرير سطر
+-- بعينه من تليجرام أبواب أخطاء لا تُغلق.
+create or replace function bot_set_terms(
+  p_telegram_id bigint, p_platform text, p_lang text, p_lines text[]
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_plat text; v_line text; v_n int := 0;
+begin
+  perform bot_owner(p_telegram_id);
+
+  if p_lang not in ('ar','fr','en') then raise exception 'INVALID_LANG'; end if;
+  v_plat := nullif(btrim(coalesce(p_platform, '')), '');
+  if v_plat is not null
+     and not exists (select 1 from bot_platforms where name = v_plat) then
+    raise exception 'PLATFORM_NOT_FOUND';
+  end if;
+
+  delete from bot_terms
+   where platform is not distinct from v_plat and lang = p_lang;
+
+  foreach v_line in array coalesce(p_lines, array[]::text[]) loop
+    continue when btrim(v_line) = '';
+    if char_length(btrim(v_line)) > 400 then raise exception 'LINE_TOO_LONG'; end if;
+    v_n := v_n + 1;
+    if v_n > 12 then raise exception 'TOO_MANY_LINES'; end if;
+    insert into bot_terms (platform, lang, sort_order, body)
+    values (v_plat, p_lang, v_n * 10, btrim(v_line));
+  end loop;
+
+  return jsonb_build_object(
+    'platform', v_plat, 'lang', p_lang, 'count', v_n,
+    'effective', bot_terms_snapshot(v_plat)
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 4. اللقطة عند الإصدار
+-- ------------------------------------------------------------
+create or replace function bot_engagement_from_issue(
+  p_telegram_id bigint,
+  p_issue_id    uuid,
+  p_bonus_days  int default 0,
+  p_hours       int default 72
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin   bot_admins;
+  v_issue   bot_issues;
+  v_variant bot_variants;
+  v_product bot_products;
+  v_dur     jsonb;
+  v_months  int;
+  v_days    int;
+  v_bonus   int;
+  v_start   timestamptz;
+  v_cert    bot_certificates;
+  v_token   text;
+begin
+  v_admin := bot_actor(p_telegram_id);
+
+  select * into v_issue from bot_issues where id = p_issue_id for update;
+  if not found then raise exception 'ISSUE_NOT_FOUND'; end if;
+  if v_issue.admin_id <> v_admin.id and v_admin.role <> 'owner' then
+    raise exception 'NOT_YOUR_ISSUE';
+  end if;
+  if v_issue.status <> 'confirmed' then
+    raise exception 'ISSUE_NOT_CONFIRMED:%', v_issue.status;
+  end if;
+  if exists (select 1 from bot_certificates where issue_id = p_issue_id) then
+    raise exception 'CERTIFICATE_EXISTS';
+  end if;
+
+  select * into v_variant from bot_variants where id = v_issue.variant_id;
+  select * into v_product from bot_products where id = v_variant.product_id;
+
+  if v_issue.platform is null then raise exception 'PLATFORM_REQUIRED'; end if;
+
+  v_dur := bot_duration_to_engagement(v_variant.duration_value, v_variant.duration_unit);
+  v_months := nullif(v_dur->>'months', '')::int;
+  v_days   := nullif(v_dur->>'days',   '')::int;
+  if v_months is null and v_days is null then raise exception 'DURATION_MISSING'; end if;
+
+  v_bonus := coalesce(p_bonus_days, 0);
+  if v_bonus < 0 or v_bonus > 90 then raise exception 'INVALID_BONUS'; end if;
+
+  v_start := coalesce(v_issue.settled_at, now());
+
+  insert into bot_certificates
+    (code, ref_code, issue_id, platform, months, duration_days, bonus_days,
+     starts_at, ends_at, issued_by, customer, filled_at, terms)
+  values
+    (bot_engagement_code(), bot_engagement_ref(), p_issue_id, v_issue.platform,
+     v_months, v_days, v_bonus,
+     v_start, bot_engagement_expiry(v_start, v_months, v_bonus, v_days),
+     v_admin.id, '[]'::jsonb, null,
+     bot_terms_snapshot(v_issue.platform))
+  returning * into v_cert;
+
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
+
+  insert into bot_fill_tokens (token, certificate_id, created_by, expires_at)
+  values (v_token, v_cert.id, v_admin.id,
+          now() + make_interval(hours => greatest(1, least(coalesce(p_hours, 72), 720))));
+
+  return jsonb_build_object(
+    'code',        v_cert.code,
+    'ref_code',    v_cert.ref_code,
+    'token',       v_token,
+    'issue_id',    p_issue_id,
+    'platform',    v_cert.platform,
+    'product_name', v_product.name,
+    'variant_name', v_variant.name,
+    'months',      v_cert.months,
+    'duration_days', v_cert.duration_days,
+    'bonus_days',  v_cert.bonus_days,
+    'starts_at',   v_cert.starts_at,
+    'ends_at',     v_cert.ends_at,
+    'expires_at',  now() + make_interval(hours => coalesce(p_hours, 72))
+  );
+end $$;
+
+create or replace function bot_engagement_confirm(
+  p_telegram_id bigint, p_hours int default 72
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin bot_admins; v_st bot_wizard_state;
+  v_cert bot_certificates; v_token text; v_start timestamptz;
+begin
+  v_admin := bot_actor(p_telegram_id);
+  select * into v_st from bot_wizard_state where admin_id = v_admin.id;
+  if not found then raise exception 'WIZARD_NOT_STARTED'; end if;
+  if v_st.platform is null then raise exception 'PLATFORM_MISSING'; end if;
+  if v_st.months is null and v_st.duration_days is null then
+    raise exception 'MONTHS_MISSING';
+  end if;
+
+  v_start := now();
+
+  insert into bot_certificates
+    (code, ref_code, platform, months, duration_days, bonus_days,
+     starts_at, ends_at, issued_by, customer, filled_at, terms)
+  values
+    (bot_engagement_code(), bot_engagement_ref(), v_st.platform,
+     v_st.months, v_st.duration_days, coalesce(v_st.bonus_days, 0), v_start,
+     bot_engagement_expiry(v_start, v_st.months,
+                           coalesce(v_st.bonus_days, 0), v_st.duration_days),
+     v_admin.id, '[]'::jsonb, null, bot_terms_snapshot(v_st.platform))
+  returning * into v_cert;
+
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || replace(gen_random_uuid()::text, '-', '');
+
+  insert into bot_fill_tokens (token, certificate_id, created_by, expires_at)
+  values (v_token, v_cert.id, v_admin.id,
+          now() + make_interval(hours => greatest(1, least(coalesce(p_hours, 72), 720))));
+
+  delete from bot_wizard_state where admin_id = v_admin.id;
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'ref_code', v_cert.ref_code, 'token', v_token,
+    'platform', v_cert.platform, 'months', v_cert.months,
+    'duration_days', v_cert.duration_days, 'bonus_days', v_cert.bonus_days,
+    'starts_at', v_cert.starts_at, 'ends_at', v_cert.ends_at,
+    'expires_at', now() + make_interval(hours => coalesce(p_hours, 72))
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 5. القراءة العامة تحمل شروطها
+-- ------------------------------------------------------------
+-- لقطة الوثيقة أولاً. وإن كانت فارغة (وثيقة صدرت قبل 031)
+-- فالحيّ، وإن لم يكن فالمدمج في الكود — تقرّره الصفحة.
+create or replace function bot_engagement_public(p_code text)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_cert bot_certificates; v_terms jsonb;
+begin
+  if p_code is null or char_length(btrim(p_code)) < 8 then
+    raise exception 'CERTIFICATE_NOT_FOUND';
+  end if;
+  select * into v_cert from bot_certificates where code = upper(btrim(p_code));
+  if not found then raise exception 'CERTIFICATE_NOT_FOUND'; end if;
+  if v_cert.filled_at is null then raise exception 'CERTIFICATE_PENDING'; end if;
+
+  v_terms := case
+    when v_cert.terms is not null and v_cert.terms <> '{}'::jsonb then v_cert.terms
+    else bot_terms_snapshot(v_cert.platform) end;
+
+  return jsonb_build_object(
+    'code',        v_cert.code,
+    'ref_code',    v_cert.ref_code,
+    'holder_name', v_cert.holder_name,
+    'instagram',   v_cert.instagram,
+    'platform',    v_cert.platform,
+    'months',      v_cert.months,
+    'duration_days', v_cert.duration_days,
+    'bonus_days',  v_cert.bonus_days,
+    'starts_at',   v_cert.starts_at,
+    'ends_at',     v_cert.ends_at,
+    'status',      bot_engagement_status(v_cert),
+    'terms',       v_terms,
+    'days_left',   case when v_cert.ends_at is null then null
+                        else greatest(0, (date_part('day', v_cert.ends_at - now()))::int) end
+  );
+end $$;
+
+-- ------------------------------------------------------------
+-- 6. أمر البوت بالرمز النصّي
+-- ------------------------------------------------------------
+create or replace function bot_cmd_terms(
+  p_telegram_id bigint, p_platform text, p_lang text, p_lines text[]
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+begin
+  perform bot_owner(p_telegram_id);
+  -- «-» تعني الشروط العامة: أسهل من خانة فارغة في سطر أمر
+  return bot_set_terms(p_telegram_id,
+    case when btrim(coalesce(p_platform, '')) in ('', '-') then null else p_platform end,
+    p_lang, p_lines);
+end $$;
+
+-- ============================================================
+-- 7. الصلاحيات — service_role وحده، كما في 021.
+-- ============================================================
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 032_instagram_required.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 032 يوزر الإنستغرام مطلوب
+--
+-- كان اختيارياً. وهو الحقل الذي يُعرف به الحساب المفعَّل: بلاه
+-- تقول الوثيقة «هذا الاشتراك لك» ولا تقول على أي حساب. والبائع
+-- لا يملك إصلاح ذلك بعد أن يعبّئ الزبون ويُستهلك الرابط.
+--
+-- الوثائق الصادرة قبل هذا لا تتأثّر: الشرط على التعبئة الجديدة
+-- وحدها، ولا قيد على العمود.
+-- ============================================================
+
+create or replace function bot_engagement_claim(
+  p_token     text,
+  p_name      text,
+  p_whatsapp  text,
+  p_instagram text default null,
+  p_ip        text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_tok bot_fill_tokens; v_cert bot_certificates;
+  v_name text; v_phone text; v_insta text; v_start timestamptz;
+begin
+  -- لا حدّ هنا: bot_claim_guard تُنادى قبلها في معاملة مستقلة،
+  -- وإلا محا فشلُ هذه الدالة عدّادَ محاولاتها.
+  select * into v_tok from bot_fill_tokens
+   where token = btrim(coalesce(p_token, '')) for update;
+  if not found or v_tok.certificate_id is null then raise exception 'LINK_NOT_FOUND'; end if;
+  if v_tok.used_at is not null then raise exception 'LINK_USED'; end if;
+  if v_tok.expires_at <= now() then raise exception 'LINK_EXPIRED'; end if;
+
+  select * into v_cert from bot_certificates where id = v_tok.certificate_id for update;
+  if v_cert.revoked_at is not null then raise exception 'CERTIFICATE_REVOKED'; end if;
+  if v_cert.filled_at is not null then raise exception 'ALREADY_CLAIMED'; end if;
+
+  v_name := btrim(coalesce(p_name, ''));
+  if char_length(v_name) < 3 or char_length(v_name) > 80 then raise exception 'INVALID_NAME'; end if;
+
+  v_phone := bot_dz_phone(p_whatsapp);
+  if v_phone is null then raise exception 'INVALID_PHONE'; end if;
+
+  -- مطلوب: به يُعرف الحساب المفعَّل، وبلاه لا تقول الوثيقة على
+  -- أيّ حساب هذا الاشتراك.
+  v_insta := nullif(regexp_replace(btrim(coalesce(p_instagram, '')), '^@+', ''), '');
+  if v_insta is null then raise exception 'INVALID_INSTAGRAM'; end if;
+  if char_length(v_insta) > 40 then raise exception 'INVALID_INSTAGRAM'; end if;
+  if v_insta !~ '^[A-Za-z0-9._]+$' then raise exception 'INVALID_INSTAGRAM'; end if;
+
+  -- وثيقة أُصدرت قبل 029 لا بداية لها؛ تُثبَّت الآن بالحساب
+  -- الكامل (الأشهر والأيام والهدية) لا بالناقص الذي كان.
+  v_start := coalesce(v_cert.starts_at, now());
+
+  update bot_certificates
+     set holder_name = v_name,
+         whatsapp    = v_phone,
+         instagram   = v_insta,
+         filled_at   = now(),
+         starts_at   = v_start,
+         ends_at     = coalesce(
+                         v_cert.ends_at,
+                         bot_engagement_expiry(v_start, v_cert.months,
+                                               v_cert.bonus_days, v_cert.duration_days))
+   where id = v_cert.id
+  returning * into v_cert;
+
+  update bot_fill_tokens set used_at = now() where token = v_tok.token;
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'ref_code', v_cert.ref_code,
+    'issued_by_telegram_id',
+      (select telegram_id from bot_admins where id = v_cert.issued_by)
+  );
+end $$;
+
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
+-- ── 033_claim_fields.sql ──────────────────────────────────────
+-- bundle: bot
+-- ============================================================
+-- Janeiro Store — 033 الاسم واليوزر مطلوبان، والرقم اختياري
+--
+-- الاسم واليوزر هما ما تقوم عليه الوثيقة: لمن هي، وعلى أيّ
+-- حساب. والرقم وسيلة تواصل، والزبون يُوجَد بيوزره كما يُوجَد
+-- برقمه — فلا يُحتجز الإصدار عليه.
+--
+-- والرقم إن أُعطي يُتحقَّق منه كما كان: اختياريٌّ لا يعني مقبولاً
+-- على أيّ صورة.
+--
+-- الوثائق الصادرة لا تتأثّر: الشرط على التعبئة الجديدة وحدها.
+-- ============================================================
+
+create or replace function bot_engagement_claim(
+  p_token     text,
+  p_name      text,
+  p_whatsapp  text,
+  p_instagram text default null,
+  p_ip        text default null
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_tok bot_fill_tokens; v_cert bot_certificates;
+  v_name text; v_phone text; v_insta text; v_start timestamptz;
+begin
+  -- لا حدّ هنا: bot_claim_guard تُنادى قبلها في معاملة مستقلة،
+  -- وإلا محا فشلُ هذه الدالة عدّادَ محاولاتها.
+  select * into v_tok from bot_fill_tokens
+   where token = btrim(coalesce(p_token, '')) for update;
+  if not found or v_tok.certificate_id is null then raise exception 'LINK_NOT_FOUND'; end if;
+  if v_tok.used_at is not null then raise exception 'LINK_USED'; end if;
+  if v_tok.expires_at <= now() then raise exception 'LINK_EXPIRED'; end if;
+
+  select * into v_cert from bot_certificates where id = v_tok.certificate_id for update;
+  if v_cert.revoked_at is not null then raise exception 'CERTIFICATE_REVOKED'; end if;
+  if v_cert.filled_at is not null then raise exception 'ALREADY_CLAIMED'; end if;
+
+  -- مطلوب: وثيقة بلا صاحب لا تُثبت شيئاً
+  v_name := btrim(coalesce(p_name, ''));
+  if char_length(v_name) < 3 or char_length(v_name) > 80 then raise exception 'INVALID_NAME'; end if;
+
+  -- مطلوب: به يُعرف الحساب المفعَّل
+  v_insta := nullif(regexp_replace(btrim(coalesce(p_instagram, '')), '^@+', ''), '');
+  if v_insta is null then raise exception 'INVALID_INSTAGRAM'; end if;
+  if char_length(v_insta) > 40 then raise exception 'INVALID_INSTAGRAM'; end if;
+  if v_insta !~ '^[A-Za-z0-9._]+$' then raise exception 'INVALID_INSTAGRAM'; end if;
+
+  -- اختياري. وإن أُعطي فبصورة صحيحة: اختياريٌّ لا يعني مقبولاً
+  -- على أيّ صورة، ورقمٌ مكسور أسوأ من لا رقم.
+  if nullif(btrim(coalesce(p_whatsapp, '')), '') is null then
+    v_phone := null;
+  else
+    v_phone := bot_dz_phone(p_whatsapp);
+    if v_phone is null then raise exception 'INVALID_PHONE'; end if;
+  end if;
+
+  -- وثيقة أُصدرت قبل 029 لا بداية لها؛ تُثبَّت الآن بالحساب
+  -- الكامل (الأشهر والأيام والهدية) لا بالناقص الذي كان.
+  v_start := coalesce(v_cert.starts_at, now());
+
+  update bot_certificates
+     set holder_name = v_name,
+         whatsapp    = v_phone,
+         instagram   = v_insta,
+         filled_at   = now(),
+         starts_at   = v_start,
+         ends_at     = coalesce(
+                         v_cert.ends_at,
+                         bot_engagement_expiry(v_start, v_cert.months,
+                                               v_cert.bonus_days, v_cert.duration_days))
+   where id = v_cert.id
+  returning * into v_cert;
+
+  update bot_fill_tokens set used_at = now() where token = v_tok.token;
+
+  return jsonb_build_object(
+    'code', v_cert.code, 'ref_code', v_cert.ref_code,
+    'issued_by_telegram_id',
+      (select telegram_id from bot_admins where id = v_cert.issued_by)
+  );
+end $$;
+
+do $$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname like 'bot\_%'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', f.sig);
+    execute format('grant execute on function %s to service_role', f.sig);
+  end loop;
+end $$;
+
