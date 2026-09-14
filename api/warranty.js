@@ -16,6 +16,12 @@
    لم يُبنَ على هذا المشروع أصلاً، فسقط الاعتماد على اكتشاف
    المسارات ذات الأقواس.
 
+   والنداء إلى الدالة بالمعاملات لا بالمسار: بوّابة Supabase
+   ردّت «Requested function was not found» على
+   /functions/v1/telegram-bot/warranty/verify/… بينما
+   ?verify=… يعمل. فالمسار الجميل يُترجَم هنا إلى الشكل الذي
+   تقبله البوّابة، والدالة تفهم الاثنين أصلاً.
+
    ولا يتبع التحويلات (redirect: manual): تعبئة الزبون تردّ 303
    إلى وثيقتها، فيُنقل التحويل كما هو ليراه المتصفّح ولا يُبتلع.
    ============================================================ */
@@ -41,13 +47,34 @@ function target(req) {
   return (path || "/") + (rest ? `?${rest}` : "");
 }
 
+/* المسار الجميل إلى الشكل الذي تقبله بوّابة Supabase.
+
+     /verify/JW-x  →  ?verify=JW-x
+     /claim/<tok>  →  ?claim=<tok>
+     /JW-x         →  ?doc=JW-x
+
+   الدالة تفهم الشكلين، لكن البوّابة لا تمرّر إليها مساراً تحت
+   اسمها على هذا المشروع. */
+function asQuery(pathAndQuery) {
+  const [rawPath, rawQuery = ""] = pathAndQuery.split("?");
+  const q = new URLSearchParams(rawQuery);
+  const seg = rawPath.split("/").filter(Boolean);
+
+  if (seg[0] === "verify" && seg[1]) q.set("verify", seg[1]);
+  else if (seg[0] === "claim" && seg[1]) q.set("claim", seg[1]);
+  else if (seg[0]) q.set("doc", seg[0]);
+
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
 module.exports = async function handler(req, res) {
   if (!BASE) {
     res.status(503).setHeader("content-type", "text/plain; charset=utf-8");
     return res.end("SUPABASE_URL غير مضبوط في إعدادات Vercel.");
   }
 
-  const upstream = `${BASE}/functions/v1/${FN}/warranty${target(req)}`;
+  const upstream = `${BASE}/functions/v1/${FN}${asQuery(target(req))}`;
 
   const init = {
     method: req.method,
