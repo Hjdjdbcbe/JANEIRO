@@ -131,7 +131,7 @@ async function main() {
       DENO_DIR: process.env.DENO_DIR || path.join(ROOT, ".deno-cache") },
     stdio: "ignore",
   });
-  process.env.SUPABASE_URL = `http://127.0.0.1:${SB}`;
+  process.env.SUPABASE_FUNCTIONS_URL = `http://127.0.0.1:${SB}`;
 
   for (let i = 0; i < 60; i++) {
     try { await fetch(`http://127.0.0.1:${BOT}/`); break; }
@@ -174,6 +174,14 @@ async function main() {
            "والشكل بعد إعادة الكتابة كذلك");
     assert(!r2.body.includes("?p=") && !r2.body.includes("&p="),
            "والمعامل p لا يتسرّب إلى الدالة");
+
+    // Vercel تضيف `path` من مجموعة إعادة الكتابة إلى جانب `p`.
+    // وصلت إلى Supabase فعلاً في النشر الحيّ؛ تُنزع هنا.
+    const rPath = await call(
+      `/api/warranty?p=verify/${rnd()}&path=verify%2Fشيء&lang=en`,
+      { headers: { "x-forwarded-for": "41.200.6.6" } });
+    assert(rPath.body.includes("No document"),
+           "ومعامل path الذي تضيفه Vercel لا يُربك الدالة");
     assert(r2.body.includes("Aucun document"), "واللغة تُنقل في العنوان");
 
     // والنداء المباشر بالمسار (بلا إعادة كتابة) يبقى مفهوماً
@@ -247,13 +255,16 @@ async function main() {
     assert(!rBad.body.includes("127.0.0.1"), "ولا يُكشف المضيف");
 
     // ---- غياب الإعداد يُقال، ولا يُخرج صفحة بيضاء ----
-    const keep = process.env.SUPABASE_URL;
+    const keep = process.env.SUPABASE_FUNCTIONS_URL;
+    delete process.env.SUPABASE_FUNCTIONS_URL;
+    const keepAlt = process.env.SUPABASE_URL;
     delete process.env.SUPABASE_URL;
     delete require.cache[require.resolve(path.join(ROOT, "api/warranty.js"))];
     const r4 = await call(`/warranty/verify/${rnd()}`);
-    assert(r4.status === 503 && r4.body.includes("SUPABASE_URL"),
-           "وبلا SUPABASE_URL يقول ما ينقصه");
-    process.env.SUPABASE_URL = keep;
+    assert(r4.status === 503 && r4.body.includes("SUPABASE_FUNCTIONS_URL"),
+           "وبلا عنوان الدالة يقول ما ينقصه");
+    process.env.SUPABASE_FUNCTIONS_URL = keep;
+    if (keepAlt) process.env.SUPABASE_URL = keepAlt;
 
     console.log(green(`\nVERCEL PROXY PASSED (${passed} فحصاً)`));
   } finally {
