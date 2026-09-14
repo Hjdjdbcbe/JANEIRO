@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/warranty", "destination": "/api/warranty" },
+    { "source": "/warranty/:path*", "destination": "/api/warranty/:path*" }
+  ],
+  "headers": [
+    {
+      "source": "/warranty/:path*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
+  ]
+}

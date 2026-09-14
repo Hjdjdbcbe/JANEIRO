@@ -5,8 +5,14 @@
 #
 #   bash tests/local/run-tests.sh
 #
-# Steps: shim -> 7 migrations -> migrations again (re-run check)
+# Steps: shim -> migrations -> migrations again (re-run check)
 #        -> backend.test.sql -> concurrency.test.sh
+#        -> bot.test.sql -> bot-concurrency.test.sh
+#        -> engagement.test.sql -> order-data.test.sql
+#        -> engagement-from-issue.test.sql -> terms.test.sql
+#        -> forbidden-text.test.sh
+#        -> qr.test.js -> duration.test.js -> bot-e2e.test.js
+#        -> vercel-proxy.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
 # role matching $PGUSER (default: the current OS user).
@@ -64,6 +70,78 @@ set +o pipefail
 
 bold "==> concurrency.test.sh"
 bash "$HERE/concurrency.test.sh" "$DB"
+
+bold "==> bot.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/bot.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: bot.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> bot-concurrency.test.sh"
+bash "$HERE/bot-concurrency.test.sh" "$DB"
+
+# البوت دالة Deno، فاختباره الكامل يحتاج deno مثبّتاً. بدونه
+# يتخطّى نفسه برسالة واضحة بدل أن يفشل التشغيل كله.
+bold "==> engagement.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/engagement.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: engagement.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> order-data.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/order-data.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: order-data.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> engagement-from-issue.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/engagement-from-issue.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: engagement-from-issue.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> terms.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/terms.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: terms.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> forbidden-text.test.sh"
+bash "$HERE/forbidden-text.test.sh"
+
+bold "==> qr.test.js"
+node "$HERE/qr.test.js"
+
+bold "==> duration.test.js"
+node "$HERE/duration.test.js"
+
+bold "==> bot-e2e.test.js"
+node "$HERE/bot-e2e.test.js" "$DB"
+
+# ونفسها على نسخة اللصق: هي ما يُنشر على Supabase فعلاً. دمجٌ
+# يسقط منه ملف أو يكسر تصديراً يُقلع مرة ثم يفشل عند أول نداء،
+# ولا يكشفه اختبارُ المصدر.
+bold "==> vercel-proxy.test.js"
+node "$HERE/vercel-proxy.test.js" "$DB"
+
+bold "==> bot-e2e.test.js (نسخة اللصق)"
+bash "$ROOT/tools/build-functions.sh" > /dev/null
+BOT_ENTRY=docs/bot-function.ts node "$HERE/bot-e2e.test.js" "$DB"
 
 echo
 green "ALL LOCAL TESTS PASSED"

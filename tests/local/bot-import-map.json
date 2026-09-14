@@ -1,0 +1,6 @@
+{
+  "_comment": "اختبار محلي فقط. الدالة تستورد supabase-js من esm.sh كما تفعل كل دوال المشروع؛ هذا الملف يوجّه نفس الاستيراد إلى npm ليعمل deno بلا إنترنت إلى esm.sh. لا يُستعمل عند النشر.",
+  "imports": {
+    "https://esm.sh/@supabase/supabase-js@2.45.0": "npm:@supabase/supabase-js@2.45.0"
+  }
+}

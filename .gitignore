@@ -12,6 +12,10 @@ supabase/.branches/
 # local test harness scratch
 tests/local/*.log
 
+# ذاكرة deno المؤقتة — ينشئها اختبار البوت (tests/local/bot-e2e.test.js)
+# ويعيد بناءها وحده عند الحاجة.
+.deno-cache/
+
 node_modules/
 .DS_Store
 
