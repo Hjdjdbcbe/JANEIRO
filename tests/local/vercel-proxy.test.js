@@ -70,7 +70,17 @@ const stub = http.createServer(async (req, res) => {
 const gate = http.createServer(async (req, res) => {
   const chunks = [];
   for await (const c of req) chunks.push(c);
-  const up = await fetch(`http://127.0.0.1:${BOT}${req.url.replace(/^\/functions\/v1\/telegram-bot/, "")}`, {
+
+  /* بوّابة Supabase على هذا المشروع لا تمرّر مساراً تحت اسم
+     الدالة: ترد «Requested function was not found». تُحاكى هنا،
+     وإلا مرّ اختبارٌ على شكل نداءٍ لا يعمل في الواقع. */
+  const after = req.url.replace(/^\/functions\/v1\/telegram-bot/, "");
+  if (after && !after.startsWith("?")) {
+    res.writeHead(404, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ code: "NOT_FOUND", message: "Requested function was not found" }));
+  }
+
+  const up = await fetch(`http://127.0.0.1:${BOT}${after}`, {
     method: req.method,
     redirect: "manual",
     headers: { "content-type": req.headers["content-type"] || "text/plain" },
@@ -100,6 +110,11 @@ function call(url, { method = "GET", body, headers = {} } = {}) {
   });
 }
 
+/* رمز فريد لكل تشغيل: حدّ القراءة يُحتسب لكل رمز ويبقى في
+   القاعدة بين التشغيلات، فإعادة الرمز نفسه تُصيبه في التشغيل
+   الثاني وتُرَدّ رسالة حدٍّ بدل الصفحة المتوقَّعة. */
+const rnd = () => "JW-" + require("crypto").randomBytes(5).toString("hex").toUpperCase();
+
 async function main() {
   await new Promise((r) => stub.listen(STUB, "127.0.0.1", r));
   await new Promise((r) => gate.listen(SB, "127.0.0.1", r));
@@ -125,14 +140,18 @@ async function main() {
 
   try {
     // ---- ما تبعثه البوّابة: هو العطب نفسه ----
-    const raw = await fetch(`http://127.0.0.1:${SB}/functions/v1/telegram-bot/warranty/verify/JW-0000000000`);
+    const byPath = await fetch(`http://127.0.0.1:${SB}/functions/v1/telegram-bot/warranty/verify/${rnd()}`);
+    assert(byPath.status === 404,
+           "البوّابة ترفض المسار تحت اسم الدالة — ولهذا يُترجَم إلى معاملات");
+
+    const raw = await fetch(`http://127.0.0.1:${SB}/functions/v1/telegram-bot?verify=${rnd()}`);
     assert(raw.headers.get("content-type") === "text/plain",
            "البوّابة تبعث text/plain — هذا هو العطب الذي نصلحه");
     assert((raw.headers.get("content-security-policy") || "").includes("sandbox"),
            "وsandbox معها");
 
     // ---- وما يبعثه الوسيط ----
-    const r = await call("/warranty/verify/JW-0000000000", {
+    const r = await call(`/warranty/verify/${rnd()}`, {
       headers: { "x-forwarded-for": "41.200.5.5" },
     });
     assert(r.status === 200, "الوسيط يمرّر 200");
@@ -148,7 +167,7 @@ async function main() {
     // رمز آخر: الحدّ على القراءة يُحتسب لكل رمز، وإعادة نفسه
     // تُصيبه فتُرَدّ رسالة حدٍّ لا رسالة «غير موجودة»
     // الشكل الذي تبنيه إعادة الكتابة فعلاً: المسار في المعامل p
-    const r2 = await call("/api/warranty?p=verify/JW-1111111111&lang=fr", {
+    const r2 = await call(`/api/warranty?p=verify/${rnd()}&lang=fr`, {
       headers: { "x-forwarded-for": "41.200.7.7" },
     });
     assert(r2.headers["content-type"] === "text/html; charset=utf-8",
@@ -158,7 +177,7 @@ async function main() {
     assert(r2.body.includes("Aucun document"), "واللغة تُنقل في العنوان");
 
     // والنداء المباشر بالمسار (بلا إعادة كتابة) يبقى مفهوماً
-    const rDirect = await call("/api/warranty/verify/JW-2222222222?lang=en", {
+    const rDirect = await call(`/api/warranty/verify/${rnd()}?lang=en`, {
       headers: { "x-forwarded-for": "41.200.8.8" },
     });
     assert(rDirect.body.includes("No document"),
@@ -213,7 +232,7 @@ async function main() {
     const keep = process.env.SUPABASE_URL;
     delete process.env.SUPABASE_URL;
     delete require.cache[require.resolve(path.join(ROOT, "api/warranty.js"))];
-    const r4 = await call("/warranty/verify/JW-0000000000");
+    const r4 = await call(`/warranty/verify/${rnd()}`);
     assert(r4.status === 503 && r4.body.includes("SUPABASE_URL"),
            "وبلا SUPABASE_URL يقول ما ينقصه");
     process.env.SUPABASE_URL = keep;
