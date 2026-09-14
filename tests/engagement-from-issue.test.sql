@@ -269,7 +269,7 @@ begin
 
   -- ولا تُعبَّأ مرتين
   begin
-    perform bot_engagement_claim(v_doc->>'token', 'زبون آخر', '0661445577');
+    perform bot_engagement_claim(v_doc->>'token', 'زبون آخر', '0661445577', 'other_user');
     assert false, 'عُبّئت مرتين';
   exception when others then
     assert sqlerrm like 'LINK_USED%' or sqlerrm like 'ALREADY_CLAIMED%',

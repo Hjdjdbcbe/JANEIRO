@@ -219,7 +219,7 @@ async function main() {
     const r3 = await call(`/warranty/claim/${tok}?lang=ar`, {
       method: "POST",
       headers: { "x-forwarded-for": "41.200.9.9" },
-      body: { full_name: "زبون الوسيط", whatsapp: "0661223344", instagram: "" },
+      body: { full_name: "زبون الوسيط", whatsapp: "0661223344", instagram: "proxy.user" },
     });
     assert(r3.status === 303, "الإرسال يردّ 303 لا 200، وجد: " + r3.status);
     assert((r3.headers["location"] || "").includes("janeiro-theta.vercel.app"),

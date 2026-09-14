@@ -143,7 +143,7 @@ export const DOC: Record<Lang, Doc> = {
       instagram: "يوزر الانستغرام",
       optional: "اختياري",
       whatsappHint: "رقم جزائري: 0550… أو +213550…",
-      instagramHint: "بلا @",
+      instagramHint: "بلا @ — به يُعرف حسابك المفعَّل",
     },
     errors: {
       LINK_NOT_FOUND: "هذا الرابط غير صحيح.",
@@ -211,7 +211,7 @@ export const DOC: Record<Lang, Doc> = {
       instagram: "Identifiant Instagram",
       optional: "facultatif",
       whatsappHint: "Numéro algérien : 0550… ou +213550…",
-      instagramHint: "sans @",
+      instagramHint: "sans @ — il identifie le compte activé",
     },
     errors: {
       LINK_NOT_FOUND: "Ce lien n'est pas valide.",
@@ -278,7 +278,7 @@ export const DOC: Record<Lang, Doc> = {
       instagram: "Instagram handle",
       optional: "optional",
       whatsappHint: "Algerian number: 0550… or +213550…",
-      instagramHint: "without @",
+      instagramHint: "without @ — it identifies the activated account",
     },
     errors: {
       LINK_NOT_FOUND: "This link is not valid.",
