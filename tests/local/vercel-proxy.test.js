@@ -228,6 +228,24 @@ async function main() {
            "والوثيقة تُقرأ عبر الوسيط بترويسة صحيحة");
     assert(r5.body.includes("زبون الوسيط"), "وتحمل اسم صاحبها");
 
+    // ---- خطأ من البوّابة يُشخَّص، ولا يُعرض خاماً ----
+    // اسم دالة لا وجود له: البوّابة تردّ 404 كما ردّت على
+    // المشروع الحقيقي، فنرى ما يعرضه الوسيط حينها.
+    process.env.TELEGRAM_FUNCTION_NAME = "لا-توجد-دالة";
+    delete require.cache[require.resolve(path.join(ROOT, "api/warranty.js"))];
+    const rBad = await call(`/warranty/verify/${rnd()}`, {
+      headers: { "x-forwarded-for": "41.200.4.4" },
+    });
+    delete process.env.TELEGRAM_FUNCTION_NAME;
+    delete require.cache[require.resolve(path.join(ROOT, "api/warranty.js"))];
+
+    assert(rBad.status === 404, "خطأ البوّابة يُمرَّر بحالته، وجد: " + rBad.status);
+    assert(rBad.headers["content-type"] === "text/html; charset=utf-8",
+           "ويخرج صفحة لا نصّاً خاماً");
+    assert(rBad.body.includes("تواصل مع البائع"), "وفيها ما يفعله الزبون");
+    assert(rBad.body.includes("/functions/v1/"), "وللمالك: أيّ عنوان نودي");
+    assert(!rBad.body.includes("127.0.0.1"), "ولا يُكشف المضيف");
+
     // ---- غياب الإعداد يُقال، ولا يُخرج صفحة بيضاء ----
     const keep = process.env.SUPABASE_URL;
     delete process.env.SUPABASE_URL;
