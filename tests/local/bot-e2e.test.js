@@ -831,13 +831,39 @@ async function run() {
   assert(formEn.includes("Full name") && formEn.includes("6 months + 14 days free"),
          "والإنجليزية كذلك");
 
-  // رقم غير جزائري يُرفض داخل الاستمارة لا في صفحة ميتة
+  // 033: لا قوس «(اختياري)» ولا «(إجباري)» بجنب أيّ عنوان.
+  // المتصفّح يقول ما ينقص، والقوس ضجيج يقرؤه الزبون ولا يفيده.
+  assert(!/\(\s*اختياري\s*\)/.test(formAr) && !/\(\s*إجباري\s*\)/.test(formAr)
+         && !/\(\s*مطلوب\s*\)/.test(formAr),
+         "ولا قوس «اختياري» أو «إجباري» بجنب أيّ عنوان");
+  assert(!/\(\s*facultatif\s*\)/i.test(formFr) && !/\(\s*optional\s*\)/i.test(formEn),
+         "ولا في الفرنسية والإنجليزية");
+  // والإجبار في المتصفّح يطابق الإجبار في القاعدة: حقلان لا ثلاثة
+  const reqAttrs = (formAr.match(/<input[^>]*\brequired\b[^>]*>/g) || [])
+    .map((t) => (t.match(/name="([a-z_]+)"/) || [])[1]).sort();
+  assert(JSON.stringify(reqAttrs) === JSON.stringify(["full_name", "instagram"]),
+         "الاسم واليوزر مطلوبان في المتصفّح، والرقم لا: " + JSON.stringify(reqAttrs));
+
+  // رقم غير جزائري يُرفض داخل الاستمارة لا في صفحة ميتة.
+  // ويُبعث معه يوزر صحيح، وإلا ردّت القاعدة على اليوزر ومرّ
+  // الاختبار على رسالة أخرى تشبهها.
   const badPhone = await wweb(`/warranty/claim/${wTok}?lang=ar`, {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ full_name: "أحمد بن يوسف", whatsapp: "0451234567" }).toString(),
+    body: new URLSearchParams({
+      full_name: "أحمد بن يوسف", whatsapp: "0451234567", instagram: "ahmed.dz01",
+    }).toString(),
   }).then((r) => r.text());
-  assert(badPhone.includes("غير صحيح") && badPhone.includes("<form"),
-         "رقم ثابت يُرفض والاستمارة تبقى معروضة");
+  assert(badPhone.includes("رقم واتساب جزائري غير صحيح") && badPhone.includes("<form"),
+         "رقم ثابت يُرفض برسالته هو، والاستمارة تبقى معروضة");
+
+  // واليوزر مطلوب ولو صحّ الرقم
+  const noInsta = await wweb(`/warranty/claim/${wTok}?lang=ar`, {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      full_name: "أحمد بن يوسف", whatsapp: "0550998877", instagram: "",
+    }).toString(),
+  }).then((r) => r.text());
+  assert(noInsta.includes("يوزر انستغرام غير صحيح"), "ويوزر فارغ يُرفض برسالته هو");
 
   // التعبئة الصحيحة -> تحويل إلى الوثيقة
   const wDone = await wweb(`/warranty/claim/${wTok}?lang=fr`, {
@@ -933,6 +959,41 @@ async function run() {
   // الرابط لا يُعمَّر مرتين
   const wAgain = await wweb(`/warranty/claim/${wTok}`).then((r) => r.text());
   assert(wAgain.includes("مسبقاً"), "ورابط التعبئة لا يُفتح بعد استعماله");
+
+  /* ==========================================================
+     033: زبون بلا واتساب يأخذ وثيقته كاملة
+     ==========================================================
+     الرقم وسيلة تواصل لا هويّة. زبونٌ يتعامل على الانستغرام
+     وحده كان يصطدم بحقل لا يستطيع تعبئته، فتبقى بيعته بلا
+     وثيقة — وهي مصدَّرة ومدفوعة. اليوزر يكفي لتعريف الحساب.
+     ========================================================== */
+  drain();
+  await update(message(SELLER, "/warranty"));
+  await update(tap(SELLER, "wp:Netflix"));
+  await update(tap(SELLER, "wm:3"));
+  await update(tap(SELLER, "wb:0"));
+  drain();
+  await update(tap(SELLER, "wz:ok"));
+  const nTok = (lastText("editMessageText").match(/(?:claim\/|fill=|claim=)([0-9a-f]{64})/) || [])[1];
+  assert(!!nTok, "رابط تعبئة ثانٍ");
+
+  const nDone = await wweb(`/warranty/claim/${nTok}?lang=ar`, {
+    method: "POST", redirect: "manual",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      full_name: "سعاد بلحاج", whatsapp: "", instagram: "souad.b",
+    }).toString(),
+  });
+  assert(nDone.status === 303, "إرسال بلا رقم يمرّ ويحوّل: " + nDone.status);
+  const nCode = ((nDone.headers.get("location") || "").match(/JW-[A-Z0-9]+/) || [])[0];
+  assert(!!nCode, "وله وثيقته");
+  assert(sql(`select whatsapp is null from bot_certificates where code='${nCode}'`) === "t",
+         "والرقم الفارغ يُخزَّن NULL لا نصاً فارغاً");
+
+  const nDoc = await wweb(`/warranty/${nCode}`).then((r) => r.text());
+  assert(nDoc.includes("سعاد بلحاج") && nDoc.includes("@souad.b"),
+         "والوثيقة تُصدر باسمها ويوزرها");
+  assert(nDoc.includes("وثيقة التزام الخدمة"), "وثيقة كاملة لا صفحة ناقصة");
 
   /* ==========================================================
      الوثيقة من البيعة — المسار الافتراضي

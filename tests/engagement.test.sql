@@ -507,4 +507,91 @@ begin
   raise notice 'PASS  صلاحيات 025 مغلقة على service_role';
 end $$;
 
+-- ------------------------------------------------------------
+-- 033: الاسم واليوزر مطلوبان، والرقم اختياري
+--
+-- الرقم وسيلة تواصل لا هويّة: الزبون يُعرَف بيوزره كما يُعرَف
+-- برقمه، فلا يُحتجَز إصدارُ وثيقته على رقم قد لا يملكه. لكن
+-- «اختياري» لا يعني «مقبول على أيّ صورة»: رقمٌ مكسور مخزَّنٌ
+-- أسوأ من لا رقم، لأنّه يُوهم أنّ للزبون سبيلَ تواصل.
+-- ------------------------------------------------------------
+do $$
+declare
+  v_sell  constant bigint := 910000002;
+  v_owner constant bigint := 910000001;
+  v_res jsonb; v_tok text; v_code text;
+begin
+  perform bot_wizard_begin(v_sell);
+  perform bot_wizard_set(v_sell, 'platform', 'Netflix');
+  perform bot_wizard_set(v_sell, 'months', '1');
+  perform bot_wizard_set(v_sell, 'bonus', '0');
+  v_res  := bot_engagement_confirm(v_sell);
+  v_code := v_res->>'code';
+  v_tok  := v_res->>'token';
+
+  -- اختياري، لا مهمَل: ما أُعطي يُتحقَّق منه
+  begin
+    perform bot_engagement_claim(v_tok, 'نور الدين', '0451234567', 'nour.dz', null);
+    assert false, 'a landline passed as an optional phone';
+  exception when others then
+    assert sqlerrm like 'INVALID_PHONE%', 'a bad phone is still refused, got: ' || sqlerrm;
+  end;
+  -- والرفض لم يستهلك الرابط: الزبون يصحّح ويعيد الإرسال
+  assert bot_engagement_claim_form(v_tok)->>'platform' = 'Netflix',
+         'a rejected attempt leaves the link usable';
+
+  -- بلا رقم: تمرّ
+  v_res := bot_engagement_claim(v_tok, 'نور الدين', null, 'nour.dz', null);
+  assert v_res->>'code' = v_code, 'a claim with no phone at all is accepted';
+  assert (select whatsapp from bot_certificates where code = v_code) is null,
+         'and the empty phone is stored as NULL, not as an empty string';
+  assert (select filled_at is not null and holder_name = 'نور الدين'
+            from bot_certificates where code = v_code),
+         'the document is filled: name and handle are what it needed';
+
+  -- والوثيقة تُقرأ عادية بلا رقم
+  v_res := bot_engagement_public(v_code);
+  assert v_res->>'status' = 'active', 'a phoneless document is a normal document';
+  assert v_res->>'instagram' = 'nour.dz', 'the handle is what identifies the account';
+
+  -- والداشبورد لا ينكسر على رقم غائب حتى حين يُطلب صراحة
+  v_res := bot_engagement_admin_list(v_owner, 'نور الدين', null, null, 100, 0, true);
+  assert (v_res->>'total')::int = 1, 'the dashboard finds it by name';
+  assert v_res->'rows'->0->'whatsapp' = 'null'::jsonb,
+         'and reports no phone as null rather than inventing one';
+  raise notice 'PASS  033: وثيقة بلا رقم تمرّ، ورقمٌ مكسور يُرفض';
+
+  -- ومسافاتٌ فارغة ليست رقماً كذلك
+  perform bot_wizard_begin(v_sell);
+  perform bot_wizard_set(v_sell, 'platform', 'Spotify');
+  perform bot_wizard_set(v_sell, 'months', '1');
+  perform bot_wizard_set(v_sell, 'bonus', '0');
+  v_res  := bot_engagement_confirm(v_sell);
+  v_code := v_res->>'code';
+  perform bot_engagement_claim(v_res->>'token', 'سليم ب', '   ', 'salim.b', null);
+  assert (select whatsapp from bot_certificates where code = v_code) is null,
+         'a blank phone is NULL too, not a stored run of spaces';
+
+  -- ولا يزال الاسم واليوزر يوقفان الإصدار
+  perform bot_wizard_begin(v_sell);
+  perform bot_wizard_set(v_sell, 'platform', 'Spotify');
+  perform bot_wizard_set(v_sell, 'months', '1');
+  perform bot_wizard_set(v_sell, 'bonus', '0');
+  v_tok := bot_engagement_confirm(v_sell)->>'token';
+  begin
+    perform bot_engagement_claim(v_tok, 'سليم ب', null, null, null);
+    assert false, 'no phone AND no handle was accepted';
+  exception when others then
+    assert sqlerrm like 'INVALID_INSTAGRAM%',
+           'dropping the phone did not make the handle optional, got: ' || sqlerrm;
+  end;
+  begin
+    perform bot_engagement_claim(v_tok, 'س', null, 'salim.b', null);
+    assert false, 'a one-letter name was accepted';
+  exception when others then
+    assert sqlerrm like 'INVALID_NAME%', 'the name is still required, got: ' || sqlerrm;
+  end;
+  raise notice 'PASS  033: الرقم وحده هو الاختياري';
+end $$;
+
 rollback;

@@ -746,8 +746,11 @@ function engFormPage(token: string, d: {
 }, lang: Lang): Response {
   const t = DOC[lang];
   const f = t.form;
+  /* بلا «(اختياري)» ولا «(مطلوب)»: الاستمارة ثلاثة حقول، وقوسٌ
+     بجنب كل عنوان ضجيج يقرؤه الزبون ولا يستفيد منه. المتصفّح
+     يقول ما ينقص عند الإرسال، والتلميح تحت الحقل يكفي. */
   const field = (id: string, label: string, hint: string, req: boolean, extra = "") => `
-    <label for="${id}">${esc(label)}${req ? "" : ` <span class="opt">(${esc(f.optional)})</span>`}</label>
+    <label for="${id}">${esc(label)}</label>
     <input id="${id}" name="${id}" ${req ? "required" : ""} autocomplete="off" ${extra}>
     <p class="hint">${esc(hint)}</p>`;
 
@@ -760,7 +763,7 @@ function engFormPage(token: string, d: {
       <p class="sub"><b>${esc(t.labels.coverage)}:</b> ${esc(t.duration(d.months, d.bonus_days, d.duration_days))}</p>
       <form method="POST" action="/warranty/claim/${esc(token)}?lang=${lang}">
         ${field("full_name", f.fullName, "", true, 'maxlength="80"')}
-        ${field("whatsapp", f.whatsapp, f.whatsappHint, true,
+        ${field("whatsapp", f.whatsapp, f.whatsappHint, false,
                 'inputmode="tel" placeholder="0550 00 00 00"')}
         ${field("instagram", f.instagram, f.instagramHint, true, `maxlength="40"`)}
         <button type="submit">${esc(f.submit)}</button>

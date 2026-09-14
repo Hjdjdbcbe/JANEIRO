@@ -74,7 +74,11 @@ type Doc = {
   form: {
     heading: string; intro: string; submit: string;
     fullName: string; whatsapp: string; instagram: string;
-    optional: string; whatsappHint: string; instagramHint: string;
+    /* لا تُعرض: الاستمارة لا تضع قوساً بجنب أيّ عنوان. تبقى
+       الكلمة مترجَمةً لأنّ حقول المنتجات (/addfield) قد تحتاجها،
+       ولا تعود إلى استمارة الزبون. */
+    optional: string;
+    whatsappHint: string; instagramHint: string;
   };
   errors: Record<string, string>;
   keep: string;
