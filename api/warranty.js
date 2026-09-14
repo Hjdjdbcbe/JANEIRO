@@ -11,20 +11,34 @@
    والقراءة من القاعدة؛ هذا الملف لا يعرف شيئاً عنها، ينقل لا
    يفسّر.
 
-   لا يتبع التحويلات (redirect: manual): تعبئة الزبون تردّ 303
-   إلى وثيقته، فيُنقل التحويل كما هو ليراه المتصفّح ولا يُبتلع.
+   اسم الملف بلا أقواس، والمسار يصل في المعامل `p` من إعادة
+   الكتابة في vercel.json. الشكل `api/warranty/[...path].js`
+   لم يُبنَ على هذا المشروع أصلاً، فسقط الاعتماد على اكتشاف
+   المسارات ذات الأقواس.
+
+   ولا يتبع التحويلات (redirect: manual): تعبئة الزبون تردّ 303
+   إلى وثيقتها، فيُنقل التحويل كما هو ليراه المتصفّح ولا يُبتلع.
    ============================================================ */
 
 const BASE = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
 const FN = process.env.TELEGRAM_FUNCTION_NAME || "telegram-bot";
 
-/** المسار بعد /warranty، أياً كان شكل العنوان قبل إعادة الكتابة. */
-function tail(rawUrl) {
-  const u = new URL(rawUrl || "/", "http://x");
-  const p = u.pathname
-    .replace(/^\/api\/warranty/, "")
-    .replace(/^\/warranty/, "");
-  return (p || "/") + u.search;
+/** المسار والمعاملات من الطلب، أياً كان شكله قبل إعادة الكتابة. */
+function target(req) {
+  const u = new URL(req.url || "/", "http://x");
+  const q = u.searchParams;
+
+  // `p` من إعادة الكتابة؛ وإن غاب فالمسار كما جاء (نداء مباشر)
+  let path = q.get("p");
+  q.delete("p");
+  if (path === null) {
+    path = u.pathname.replace(/^\/api\/warranty/, "").replace(/^\/warranty/, "");
+  } else {
+    path = "/" + path.replace(/^\/+/, "");
+  }
+
+  const rest = q.toString();
+  return (path || "/") + (rest ? `?${rest}` : "");
 }
 
 module.exports = async function handler(req, res) {
@@ -33,7 +47,7 @@ module.exports = async function handler(req, res) {
     return res.end("SUPABASE_URL غير مضبوط في إعدادات Vercel.");
   }
 
-  const upstream = `${BASE}/functions/v1/${FN}/warranty${tail(req.url)}`;
+  const upstream = `${BASE}/functions/v1/${FN}/warranty${target(req)}`;
 
   const init = {
     method: req.method,

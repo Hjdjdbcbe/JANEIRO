@@ -1,0 +1,8 @@
+{
+  "name": "janeiro-store",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Janeiro Store — المتجر ووسيط صفحات وثيقة الالتزام",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" }
+}

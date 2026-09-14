@@ -96,7 +96,7 @@ function call(url, { method = "GET", body, headers = {} } = {}) {
       status: (c) => { out.status = c; return res; },
       end: (b) => { out.body = b ? Buffer.from(b).toString("utf8") : ""; resolve(out); },
     };
-    require(path.join(ROOT, "api/warranty/[...path].js"))(req, res);
+    require(path.join(ROOT, "api/warranty.js"))(req, res);
   });
 }
 
@@ -147,12 +147,22 @@ async function main() {
     // ---- الشكل المكتوب في العنوان كما تعيد Vercel كتابته ----
     // رمز آخر: الحدّ على القراءة يُحتسب لكل رمز، وإعادة نفسه
     // تُصيبه فتُرَدّ رسالة حدٍّ لا رسالة «غير موجودة»
-    const r2 = await call("/api/warranty/verify/JW-1111111111?lang=fr", {
+    // الشكل الذي تبنيه إعادة الكتابة فعلاً: المسار في المعامل p
+    const r2 = await call("/api/warranty?p=verify/JW-1111111111&lang=fr", {
       headers: { "x-forwarded-for": "41.200.7.7" },
     });
     assert(r2.headers["content-type"] === "text/html; charset=utf-8",
            "والشكل بعد إعادة الكتابة كذلك");
+    assert(!r2.body.includes("?p=") && !r2.body.includes("&p="),
+           "والمعامل p لا يتسرّب إلى الدالة");
     assert(r2.body.includes("Aucun document"), "واللغة تُنقل في العنوان");
+
+    // والنداء المباشر بالمسار (بلا إعادة كتابة) يبقى مفهوماً
+    const rDirect = await call("/api/warranty/verify/JW-2222222222?lang=en", {
+      headers: { "x-forwarded-for": "41.200.8.8" },
+    });
+    assert(rDirect.body.includes("No document"),
+           "والنداء المباشر بالمسار يعمل كذلك");
 
     // ---- التحويل يُنقل ولا يُبتلع ----
     // وثيقة معلّقة تُصنع هنا: الفحص الأهم لا يتخطّى نفسه لأن
@@ -202,7 +212,7 @@ async function main() {
     // ---- غياب الإعداد يُقال، ولا يُخرج صفحة بيضاء ----
     const keep = process.env.SUPABASE_URL;
     delete process.env.SUPABASE_URL;
-    delete require.cache[require.resolve(path.join(ROOT, "api/warranty/[...path].js"))];
+    delete require.cache[require.resolve(path.join(ROOT, "api/warranty.js"))];
     const r4 = await call("/warranty/verify/JW-0000000000");
     assert(r4.status === 503 && r4.body.includes("SUPABASE_URL"),
            "وبلا SUPABASE_URL يقول ما ينقصه");
