@@ -118,7 +118,7 @@ begin
   v_issue := (bot_request_card(v_owner, v_var, null, 'dz')->>'issue_id')::uuid;
   perform bot_confirm_issue(v_owner, v_issue);
   v_doc := bot_engagement_from_issue(v_owner, v_issue, 0);
-  perform bot_engagement_claim(v_doc->>'token', 'زبون الشروط', '0661445566');
+  perform bot_engagement_claim(v_doc->>'token', 'زبون الشروط', '0661445566', 'terms_one');
 
   v_old := bot_engagement_public(v_doc->>'code')->'terms'->'ar'->>0;
   assert v_old = 'الشرط الأوّل', 'الوثيقة تحمل شروط يومها، وجد: ' || coalesce(v_old,'—');
@@ -134,7 +134,7 @@ begin
   v_issue := (bot_request_card(v_owner, v_var, null, 'dz')->>'issue_id')::uuid;
   perform bot_confirm_issue(v_owner, v_issue);
   v_doc := bot_engagement_from_issue(v_owner, v_issue, 0);
-  perform bot_engagement_claim(v_doc->>'token', 'زبون ثانٍ', '0661445577');
+  perform bot_engagement_claim(v_doc->>'token', 'زبون ثانٍ', '0661445577', 'terms_two');
   assert bot_engagement_public(v_doc->>'code')->'terms'->'ar'->>0 = 'شرط جديد تماماً',
          'والوثيقة الجديدة تأخذ الجديد';
   raise notice 'PASS  اللقطة: ما وُعد به يبقى';

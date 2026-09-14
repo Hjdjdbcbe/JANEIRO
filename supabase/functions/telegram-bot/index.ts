@@ -762,7 +762,7 @@ function engFormPage(token: string, d: {
         ${field("full_name", f.fullName, "", true, 'maxlength="80"')}
         ${field("whatsapp", f.whatsapp, f.whatsappHint, true,
                 'inputmode="tel" placeholder="0550 00 00 00"')}
-        ${field("instagram", f.instagram, f.instagramHint, false, 'maxlength="40"')}
+        ${field("instagram", f.instagram, f.instagramHint, true, `maxlength="40"`)}
         <button type="submit">${esc(f.submit)}</button>
       </form>
     </div><p class="brand">Janeiro Store</p>`,

@@ -218,13 +218,13 @@ begin
 
   -- ========== التعبئة ==========
   begin
-    perform bot_engagement_claim(v_tok, 'أح', '0550111222', null, null);
+    perform bot_engagement_claim(v_tok, 'أح', '0550111222', 'ahmed.dz01', null);
     assert false, 'a two-letter name was accepted';
   exception when others then
     assert sqlerrm like 'INVALID_NAME%', 'short name rejected, got: ' || sqlerrm;
   end;
   begin
-    perform bot_engagement_claim(v_tok, 'أحمد بن يوسف', '0451234567', null, null);
+    perform bot_engagement_claim(v_tok, 'أحمد بن يوسف', '0451234567', 'ahmed.dz01', null);
     assert false, 'a landline was accepted as WhatsApp';
   exception when others then
     assert sqlerrm like 'INVALID_PHONE%', 'landline rejected, got: ' || sqlerrm;
@@ -234,6 +234,21 @@ begin
     assert false, 'an invalid instagram handle was accepted';
   exception when others then
     assert sqlerrm like 'INVALID_INSTAGRAM%', 'bad handle rejected, got: ' || sqlerrm;
+  end;
+
+  -- اليوزر مطلوب منذ 032: به يُعرف الحساب المفعَّل، وبلاه تقول
+  -- الوثيقة «هذا الاشتراك لك» ولا تقول على أيّ حساب.
+  begin
+    perform bot_engagement_claim(v_tok, 'أحمد بن يوسف', '0550111222', null, null);
+    assert false, 'a claim without an instagram handle was accepted';
+  exception when others then
+    assert sqlerrm like 'INVALID_INSTAGRAM%', 'handle required, got: ' || sqlerrm;
+  end;
+  begin
+    perform bot_engagement_claim(v_tok, 'أحمد بن يوسف', '0550111222', '   ', null);
+    assert false, 'a blank instagram handle was accepted';
+  exception when others then
+    assert sqlerrm like 'INVALID_INSTAGRAM%', 'blank handle refused, got: ' || sqlerrm;
   end;
 
   v_res := bot_engagement_claim(v_tok, '  أحمد بن يوسف  ', '0550 99 88 77',
@@ -262,7 +277,7 @@ begin
 
   -- ========== الرابط مرة واحدة ==========
   begin
-    perform bot_engagement_claim(v_tok, 'شخص آخر', '0660111222', null, null);
+    perform bot_engagement_claim(v_tok, 'شخص آخر', '0660111222', 'someone.else', null);
     assert false, 'the link worked a second time';
   exception when others then
     assert sqlerrm like 'LINK_USED%', 'second claim blocked, got: ' || sqlerrm;
@@ -351,7 +366,7 @@ begin
   end;
   assert bot_engagement_claim_form(v_tok2)->>'platform' = 'Netflix', 'the new one works';
 
-  perform bot_engagement_claim(v_tok2, 'سارة م', '0770112233', null, null);
+  perform bot_engagement_claim(v_tok2, 'سارة م', '0770112233', 'sara_m', null);
   begin
     perform bot_engagement_relink(v_sell, v_code);
     assert false, 'relinked an already-claimed certificate';

@@ -193,7 +193,7 @@ const DOC: Record<Lang, Doc> = {
       instagram: "يوزر الانستغرام",
       optional: "اختياري",
       whatsappHint: "رقم جزائري: 0550… أو +213550…",
-      instagramHint: "بلا @",
+      instagramHint: "بلا @ — به يُعرف حسابك المفعَّل",
     },
     errors: {
       LINK_NOT_FOUND: "هذا الرابط غير صحيح.",
@@ -261,7 +261,7 @@ const DOC: Record<Lang, Doc> = {
       instagram: "Identifiant Instagram",
       optional: "facultatif",
       whatsappHint: "Numéro algérien : 0550… ou +213550…",
-      instagramHint: "sans @",
+      instagramHint: "sans @ — il identifie le compte activé",
     },
     errors: {
       LINK_NOT_FOUND: "Ce lien n'est pas valide.",
@@ -328,7 +328,7 @@ const DOC: Record<Lang, Doc> = {
       instagram: "Instagram handle",
       optional: "optional",
       whatsappHint: "Algerian number: 0550… or +213550…",
-      instagramHint: "without @",
+      instagramHint: "without @ — it identifies the activated account",
     },
     errors: {
       LINK_NOT_FOUND: "This link is not valid.",
@@ -1505,7 +1505,7 @@ function engFormPage(token: string, d: {
         ${field("full_name", f.fullName, "", true, 'maxlength="80"')}
         ${field("whatsapp", f.whatsapp, f.whatsappHint, true,
                 'inputmode="tel" placeholder="0550 00 00 00"')}
-        ${field("instagram", f.instagram, f.instagramHint, false, 'maxlength="40"')}
+        ${field("instagram", f.instagram, f.instagramHint, true, `maxlength="40"`)}
         <button type="submit">${esc(f.submit)}</button>
       </form>
     </div><p class="brand">Janeiro Store</p>`,
