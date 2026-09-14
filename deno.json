@@ -1,0 +1,4 @@
+{
+  "//": "package.json في الجذر يخصّ Vercel وحدها (اكتشاف دوال api/). وبوجوده يحسب Deno المشروع مشروعَ Node فيطلب node_modules، فيتوقّف تشغيل الدالة محلياً. هذا السطر يفصل الاثنين: Deno يحلّ الاستيراد من الشبكة كما كان، وVercel ترى package.json كما تريد.",
+  "nodeModulesDir": "none"
+}
