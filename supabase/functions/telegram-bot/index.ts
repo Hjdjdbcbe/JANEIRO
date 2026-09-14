@@ -45,6 +45,8 @@ const docUrl    = (c: string) =>
   SITE_URL ? `${SITE_URL}/warranty/${c}` : `${SELF_URL}?doc=${c}`;
 const verifyUrl = (c: string) =>
   SITE_URL ? `${SITE_URL}/warranty/verify/${c}` : `${SELF_URL}?verify=${c}`;
+const dashUrl   = (t: string) =>
+  SITE_URL ? `${SITE_URL}/warranty/admin/${t}` : `${SELF_URL}?admin=${t}`;
 const API        = `${API_BASE}/bot${TG_TOKEN}`;
 
 function db(): SupabaseClient {
@@ -156,6 +158,10 @@ const ERRORS: Record<string, string> = {
   LINK_EXPIRED:          "انتهت صلاحية الرابط.",
   RATE_LIMITED:          "محاولات كثيرة. انتظر قليلاً.",
   INVALID_KIND:          "نوع غير معروف.",
+  OWNER_ONLY:            "هذا الأمر للمالك وحده.",
+  SESSION_NOT_FOUND:     "لا توجد جلسة بهذا الرمز.",
+  SESSION_EXPIRED:       "انتهت صلاحية رابط الداشبورد. اطلب واحداً جديداً.",
+  SESSION_REVOKED:       "أُبطل رابط الداشبورد.",
 };
 
 function human(err: unknown): string {
@@ -435,6 +441,8 @@ const HELP = [
   "<code>/addcards giftcard year\nCODE-1\nCODE-2</code>",
   "/allstats — مبيعات الجميع",
   "/breakdown — المبيعات حسب المنتج",
+  "/dashboard — صفحة الزبائن على الموقع (رابط 24 ساعة)",
+  "/dashclose — إبطال رابط الداشبورد",
   "", "<b>الكتالوج</b> — ما تحتاجه الوثيقة", "",
   "/catalog — جرد: منصّة ومدّة وسعر كل صنف، وما ينقص",
   "/platform &lt;رمز المنتج&gt; &lt;المنصّة&gt;   ·   /unplatform …",
@@ -976,6 +984,158 @@ function engVerifyPage(v: {
       </div>
     </div><p class="brand">Janeiro Store</p>`,
     `<style>${ENG_CSS}</style>`, { lang, noindex: true });
+}
+
+/* ------------------------------------------------------------
+   داشبورد المالك — بحث وفلاتر
+   ------------------------------------------------------------
+   صفحة قراءة وحدها: لا إبطال ولا إعادة رابط منها. تلك أفعال،
+   والأفعال تبقى في البوت حيث الفاعل معروف بـchat id لا برمز
+   في URL يُنسخ ويُلصق.
+
+   ومبنيّة على السيرفر بالكامل، بلا JS وبلا مفتاح Supabase في
+   المتصفّح: البحث استمارة GET تعود إلى نفس العنوان. مفتاح anon
+   في صفحة تعرض زبائن لا معنى له — والجداول مقفولة عليه أصلاً.
+
+   والرمز يُعاد في كل رابط داخلي (بحث، فلتر، صفحة تالية)، فهو
+   الهوية. ولذلك عمره قصير ويُبطَل من البوت.
+   ------------------------------------------------------------ */
+const DASH_CSS = `
+.wrap{max-width:1000px}
+.dhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:14px}
+.dhead h1{margin:0}
+.dhead .who{color:var(--muted);font-size:14px;margin-inline-start:auto}
+form.f{background:var(--card);border:1px solid var(--line);border-radius:14px;
+ padding:14px;margin-bottom:14px}
+form.f .row{display:flex;flex-wrap:wrap;gap:10px}
+form.f input[type=search]{flex:1 1 220px;width:auto;padding:11px 13px;font:inherit;
+ color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+form.f button{width:auto;margin:0;padding:11px 20px;border-radius:10px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.chip{display:inline-block;padding:5px 12px;border-radius:999px;font-size:13px;
+ text-decoration:none;color:var(--muted);background:var(--bg);border:1px solid var(--line)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.cnt{color:var(--muted);font-size:14px;margin:0 0 10px}
+table{width:100%;border-collapse:collapse;background:var(--card);
+ border:1px solid var(--line);border-radius:14px;overflow:hidden}
+th,td{padding:11px 12px;text-align:start;font-size:14px;border-bottom:1px solid var(--line)}
+th{background:var(--soft);font-size:12px;letter-spacing:.04em;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td.nm{font-weight:600}
+td .ig{display:block;color:var(--muted);font-size:13px}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.pill.active{background:#E7F7EE;color:#11794A}
+.pill.expired,.pill.revoked{background:#FBE9E9;color:#B42318}
+.pill.pending{background:#FFF4E5;color:#9A5B00}
+.soon{color:#B42318;font-weight:700;font-size:12px;display:block}
+@media(prefers-color-scheme:dark){
+ .pill.active{background:#12301F;color:#66D9A0}
+ .pill.expired,.pill.revoked{background:#3A1A1A;color:#F5837C}
+ .pill.pending{background:#3A2A10;color:#F0B860}}
+.pager{display:flex;gap:10px;justify-content:center;margin-top:16px}
+.pager a{padding:9px 18px;border-radius:10px;background:var(--card);
+ border:1px solid var(--line);color:inherit;text-decoration:none;font-size:14px}
+.empty{background:var(--card);border:1px solid var(--line);border-radius:14px;
+ padding:34px 20px;text-align:center;color:var(--muted)}
+@media(max-width:700px){
+ table,thead,tbody,th,td,tr{display:block}
+ thead{display:none}
+ tr{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;
+    background:var(--card);padding:6px 2px}
+ td{border:0;padding:6px 12px}
+ td::before{content:attr(data-l);display:block;font-size:11px;color:var(--muted)}
+ table{border:0;background:none}}
+`;
+
+const DASH_STATUS: Record<string, string> = {
+  active: "سارٍ", expired: "انتهى", revoked: "ملغى", pending: "غير مُعمَّر",
+};
+
+type DashRow = {
+  code: string; ref_code: string | null; holder_name: string | null;
+  instagram: string | null; platform: string | null;
+  starts_at: string | null; ends_at: string | null;
+  status: string; seller: string | null;
+  days_left: number | null; ending_soon: boolean;
+};
+
+/** داشبورد المالك: بحث + فلاتر، بلا رقم واتساب. */
+function dashPage(token: string, d: {
+  total: number; rows: DashRow[]; platforms: string[];
+  expires_at: string; owner: string;
+}, q: { query: string; status: string; platform: string; offset: number; limit: number },
+): Response {
+  /* كل رابط داخلي يحمل الرمز والفلاتر الحالية: الرمز لأنه
+     الهوية، والفلاتر لئلا يمحو ضغطُ «التالي» بحثاً كُتب للتو. */
+  const link = (over: Record<string, string>) => {
+    const u = new URLSearchParams();
+    if (q.query) u.set("q", q.query);
+    if (q.status) u.set("status", q.status);
+    if (q.platform) u.set("platform", q.platform);
+    if (q.offset) u.set("from", String(q.offset));
+    for (const [k, v] of Object.entries(over)) v ? u.set(k, v) : u.delete(k);
+    const s = u.toString();
+    return `/warranty/admin/${token}${s ? `?${s}` : ""}`;
+  };
+  const chip = (label: string, key: "status" | "platform", val: string) =>
+    `<a class="chip${(key === "status" ? q.status : q.platform) === val ? " on" : ""}" ` +
+    `href="${link({ [key]: val, from: "" })}">${esc(label)}</a>`;
+
+  const rows = d.rows.map((r) => `<tr>
+    <td class="nm" data-l="الزبون">${esc(r.holder_name ?? "—")}
+      ${r.instagram ? `<span class="ig">@${esc(r.instagram)}</span>` : ""}</td>
+    <td data-l="الخدمة">${esc(r.platform ?? "—")}</td>
+    <td data-l="الحالة"><span class="pill ${esc(r.status)}">${esc(DASH_STATUS[r.status] ?? r.status)}</span>
+      ${r.ending_soon ? `<span class="soon">يتبقّى ${r.days_left} يوماً</span>` : ""}</td>
+    <td data-l="من — إلى">${esc(formatDate(r.starts_at, "ar"))} — ${esc(formatDate(r.ends_at, "ar"))}</td>
+    <td data-l="البائع">${esc(r.seller ?? "—")}</td>
+    <td data-l="الرمز" class="mono">${esc(r.code)}</td>
+  </tr>`).join("");
+
+  const from = q.offset + 1;
+  const to   = Math.min(q.offset + d.rows.length, d.total);
+
+  return page("الزبائن — Janeiro Store", `
+    <div class="dhead">
+      <h1>الزبائن</h1>
+      <span class="who">${esc(d.owner)} · الرابط صالح حتى ${esc(formatDate(d.expires_at, "ar"))}</span>
+    </div>
+
+    <form class="f" method="GET" action="/warranty/admin/${esc(token)}">
+      <div class="row">
+        <input type="search" name="q" value="${esc(q.query)}"
+               placeholder="اسم، يوزر، رقم، أو رمز وثيقة" autocomplete="off">
+        <button type="submit">ابحث</button>
+      </div>
+      ${q.status ? `<input type="hidden" name="status" value="${esc(q.status)}">` : ""}
+      ${q.platform ? `<input type="hidden" name="platform" value="${esc(q.platform)}">` : ""}
+      <div class="chips">
+        ${chip("الكل", "status", "")}
+        ${Object.entries(DASH_STATUS).map(([k, v]) => chip(v, "status", k)).join("")}
+      </div>
+      ${d.platforms.length > 1 ? `<div class="chips">
+        ${chip("كل الخدمات", "platform", "")}
+        ${d.platforms.map((p) => chip(p, "platform", p)).join("")}
+      </div>` : ""}
+    </form>
+
+    ${d.total === 0
+      ? `<div class="empty">ما كان حتى زبون بهذا البحث.</div>`
+      : `<p class="cnt">${from}–${to} من ${d.total}</p>
+    <table>
+      <thead><tr><th>الزبون</th><th>الخدمة</th><th>الحالة</th>
+        <th>من — إلى</th><th>البائع</th><th>الرمز</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`}
+
+    <div class="pager">
+      ${q.offset > 0
+        ? `<a href="${link({ from: String(Math.max(0, q.offset - q.limit)) })}">السابق</a>` : ""}
+      ${to < d.total
+        ? `<a href="${link({ from: String(q.offset + q.limit) })}">التالي</a>` : ""}
+    </div>
+    <p class="brand">Janeiro Store · للإبطال أو رابط جديد: البوت</p>`,
+    `<style>${DASH_CSS}</style>`, { lang: "ar", noindex: true });
 }
 
 // ------------------------------------------------------------
@@ -1965,6 +2125,38 @@ async function handleCommand(
       return;
     }
 
+    case "/dashboard": {
+      const r = await rpc<{ token: string; expires_at: string }>(
+        client, "bot_dashboard_open", { p_telegram_id: tgId, p_hours: 24 });
+      if (r.error) { await send(chat, r.error); return; }
+      const url = dashUrl(r.data!.token);
+      /* الرابط وحده رسالةً: من يملكه يفتح، فيُقال ذلك صراحةً
+         ولا يُترك ليُكتشف. وأيّ فتح جديد يُبطل ما قبله، فرابط
+         في محادثة قديمة يموت من نفسه. */
+      await send(chat, [
+        "🔐 <b>داشبورد الزبائن</b>", "",
+        `<a href="${esc(url)}">افتح الصفحة</a>`, "",
+        `صالح 24 ساعة (حتى ${esc(formatDate(r.data!.expires_at, "ar"))}).`,
+        "من يملك الرابط يفتحه — لا ترسله لأحد.",
+        "وأيّ رابط جديد يُبطل هذا.", "",
+        "للإبطال الآن: <code>/dashclose</code>",
+      ].join("\n"), [
+        [{ text: "📋 نسخ الرابط", copy_text: { text: url } }],
+        backRow,
+      ]);
+      return;
+    }
+
+    case "/dashclose": {
+      const r = await rpc<{ closed: number }>(
+        client, "bot_dashboard_close", { p_telegram_id: tgId });
+      if (r.error) { await send(chat, r.error); return; }
+      await send(chat, r.data!.closed > 0
+        ? "🔒 أُبطل رابط الداشبورد. لن يفتح بعد الآن."
+        : "ما كان رابط مفتوح أصلاً.", [backRow]);
+      return;
+    }
+
     case "/addcards": {
       if (args.length < 2) {
         await send(chat, "الصيغة — الأمر في سطر والأكواد بعده سطراً سطراً:\n" +
@@ -2360,6 +2552,19 @@ const LINK_ERRORS: Record<string, string> = {
 const linkError = (raw: string): string =>
   LINK_ERRORS[raw.split(":")[0].trim().replace(/[^A-Z_]/g, "")] ?? "تعذّر إتمام الطلب.";
 
+/* أخطاء الداشبورد بلغة صاحبها: «SESSION_EXPIRED» ليست جملة
+   يقرؤها أحد، والفرق بين منتهٍ ومُبطَل يهمّه — الأول نسيان،
+   والثاني يعني أنّه هو أبطله، أو أنّ أحداً فتح جلسة جديدة. */
+const DASH_ERRORS: Record<string, string> = {
+  SESSION_NOT_FOUND: "هذا الرابط غير صحيح.",
+  SESSION_EXPIRED:   "انتهت صلاحية هذا الرابط.",
+  SESSION_REVOKED:   "أُبطل هذا الرابط — فُتح رابط أحدث منه.",
+  OWNER_ONLY:        "هذه الصفحة للمالك وحده.",
+  NOT_AUTHORIZED:    "لا صلاحية لك.",
+};
+const dashError = (raw: string): string =>
+  DASH_ERRORS[raw.split(":")[0].trim().replace(/[^A-Z_]/g, "")] ?? "تعذّر فتح الصفحة.";
+
 /**
  * صفحات الزبون. لا تمرّ بالترويسة السرّية — الزبون ليس تليجرام
  * ولا يملكها. ما يحرسها الرمز في الرابط نفسه، ولذلك تُفصل بمعامل
@@ -2372,19 +2577,50 @@ async function customerRoute(req: Request, url: URL): Promise<Response | null> {
   const p = url.pathname.replace(/\/+$/, "");
   const mClaim  = p.match(/\/warranty\/claim\/([0-9a-f]{32,})$/i);
   const mVerify = p.match(/\/warranty\/verify\/([A-Za-z0-9-]{8,})$/);
+  const mAdmin  = p.match(/\/warranty\/admin\/([0-9a-f]{32,})$/i);
   const mDoc    = p.match(/\/warranty\/(JW-[A-Za-z0-9]{6,})$/i);
 
   const claim  = mClaim?.[1]  ?? url.searchParams.get("claim");
   const verify = mVerify?.[1] ?? url.searchParams.get("verify");
+  const admin  = mAdmin?.[1]  ?? url.searchParams.get("admin");
   const doc    = mDoc?.[1]    ?? url.searchParams.get("doc");
   const fill = url.searchParams.get("fill");
   const cert = url.searchParams.get("cert");
-  if (!claim && !verify && !doc && !fill && !cert) return null;
+  if (!claim && !verify && !doc && !fill && !cert && !admin) return null;
 
   const client = db();
   const q = url.searchParams.get("lang");
   const lang: Lang = isLang(q) ? q : "ar";
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "";
+
+  // ---------- داشبورد المالك ----------
+  if (admin) {
+    const guard = await client.rpc("bot_dashboard_guard", { p_token: admin, p_ip: ip });
+    if (guard.data === false) return page("Janeiro Store",
+      `<div class="card"><h1>${esc(DOC.ar.errors.RATE_LIMITED)}</h1></div>`,
+      "", { lang: "ar", noindex: true });
+
+    const limit  = 50;
+    const offset = Math.max(0, Number(url.searchParams.get("from") ?? 0) || 0);
+    const query    = (url.searchParams.get("q") ?? "").slice(0, 80);
+    const status   = url.searchParams.get("status") ?? "";
+    const platform = url.searchParams.get("platform") ?? "";
+
+    const { data, error } = await client.rpc("bot_dashboard_list", {
+      p_token: admin, p_query: query || null,
+      p_status: status || null, p_platform: platform || null,
+      p_limit: limit, p_offset: offset,
+    });
+    if (error) return page("Janeiro Store",
+      `<div class="card"><h1>${esc(dashError(String(error.message ?? "")))}</h1>
+       <p class="sub">اطلب رابطاً جديداً من البوت: <code>/dashboard</code></p></div>`,
+      "", { lang: "ar", noindex: true });
+
+    // بعد القراءة لا قبلها: زيارة فاشلة ليست زيارة
+    await client.rpc("bot_dashboard_seen", { p_token: admin, p_ip: ip });
+    return dashPage(admin, data as Parameters<typeof dashPage>[1],
+                    { query, status, platform, offset, limit });
+  }
 
   // ---------- وثيقة التزام الخدمة ----------
   if (verify) {

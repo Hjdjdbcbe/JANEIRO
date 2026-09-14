@@ -236,6 +236,23 @@ async function main() {
            "والوثيقة تُقرأ عبر الوسيط بترويسة صحيحة");
     assert(r5.body.includes("زبون الوسيط"), "وتحمل اسم صاحبها");
 
+    // ---- داشبورد المالك يمرّ بنفس الترجمة ----
+    // /admin/<tok> مسار جميل كغيره، والبوّابة لا تمرّر مساراً
+    // تحت اسم الدالة — فلو لم يُترجَم هنا لخرجت صفحةُ «لم أجد
+    // المطلوب» وبدت مشكلةَ صلاحيات لا مشكلةَ توجيه.
+    const dTok = sql(`select bot_dashboard_open(995001)->>'token'`);
+    const rDash = await call(`/warranty/admin/${dTok}`, {
+      headers: { "x-forwarded-for": "41.200.9.9" },
+    });
+    assert(rDash.status === 200, "الداشبورد يفتح عبر الوسيط، وجد: " + rDash.status);
+    assert(rDash.headers["content-type"] === "text/html; charset=utf-8",
+           "بترويسة HTML لا text/plain");
+    assert(rDash.body.includes("الزبائن") && rDash.body.includes("<table"),
+           "وبجدوله");
+    assert(rDash.body.includes("noindex"), "وبـnoindex");
+    assert(!rDash.body.includes("213661223344"),
+           "ولا رقم واتساب في صفحة تمرّ على الإنترنت");
+
     // ---- خطأ من البوّابة يُشخَّص، ولا يُعرض خاماً ----
     // اسم دالة لا وجود له: البوّابة تردّ 404 كما ردّت على
     // المشروع الحقيقي، فنرى ما يعرضه الوسيط حينها.

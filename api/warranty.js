@@ -59,6 +59,7 @@ function target(req) {
 
      /verify/JW-x  →  ?verify=JW-x
      /claim/<tok>  →  ?claim=<tok>
+     /admin/<tok>  →  ?admin=<tok>
      /JW-x         →  ?doc=JW-x
 
    الدالة تفهم الشكلين، لكن البوّابة لا تمرّر إليها مساراً تحت
@@ -70,6 +71,7 @@ function asQuery(pathAndQuery) {
 
   if (seg[0] === "verify" && seg[1]) q.set("verify", seg[1]);
   else if (seg[0] === "claim" && seg[1]) q.set("claim", seg[1]);
+  else if (seg[0] === "admin" && seg[1]) q.set("admin", seg[1]);
   else if (seg[0]) q.set("doc", seg[0]);
 
   const s = q.toString();
