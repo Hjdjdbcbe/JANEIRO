@@ -642,6 +642,30 @@ header.stuck .hbar{height:54px}
 }
 .category-chip svg{flex:none}
 
+/* ---- التصنيفات في الرئيسية: دوائر، لا حبّات ----
+   الحبّة الأفقية تعرض ستّ كلمات في صفٍّ واحد فيطول الصفّ ويُمرَّر
+   طويلاً. والدائرة تُكدّس الأيقونة فوق الاسم، فيدخل ضِعف العدد في
+   نفس العرض وتُقرأ الأيقونةُ أولاً — وهي أسرع من الكلمة.
+
+   مقصورةٌ على #catGrid: صفّ الترشيح في صفحة المنتجات يبقى حبّاتٍ،
+   فوظيفته هناك ترشيحٌ مرئيّ الحالة لا تصفّحٌ بصريّ. */
+#catGrid .category-chip{
+  flex-direction:column;gap:7px;width:76px;min-height:auto;padding:2px 0 4px;
+  background:none;border:0;box-shadow:none;white-space:normal;text-align:center}
+#catGrid .cticon{width:54px;height:54px;border-radius:50%;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0) 58%),
+    color-mix(in srgb, var(--cat) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--cat) 34%, transparent)}
+#catGrid .cticon svg{width:24px;height:24px}
+#catGrid .cticon img{border-radius:50%}
+#catGrid .category-chip span{font-size:11.5px;font-weight:600;line-height:1.35;
+  color:var(--ink-2)}
+/* المختارة: الحلقة تقولها، لا لونُ نصٍّ وحده — اللون وحده لا يكفي */
+#catGrid .category-chip[aria-selected="true"] .cticon{
+  border-color:var(--accent-ink);box-shadow:0 0 0 3px var(--accent-soft)}
+#catGrid .category-chip[aria-selected="true"] span{color:var(--accent-ink)}
+
 /* ============ CATEGORY ICON TILE ============
    One component, three placements (home carousel, shop carousel, side
    menu). Two states: an uploaded 128px asset from product-media, or the
