@@ -152,70 +152,58 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
 
+  /* الهيرو صار لوحاً داكناً تطفو فوقه البطاقات بدل صورةٍ نهارية
+     بغسلةٍ بيضاء. الضمانات هي هي — النصّ يُقرأ، والبطاقات لا
+     تُحجب، والقسم لا يبتلع الشاشة — وتغيّر ما يحرسها فقط. */
   const hero = await page.evaluate(() => {
-    const el = document.querySelector(".hero");
-    const cs = getComputedStyle(el);
-    const r = el.getBoundingClientRect();
-    const best = document.querySelector("#bestSec");
+    const el    = document.querySelector(".hero");
+    const panel = document.querySelector(".heroPanel");
+    const deck  = document.querySelector("#heroDeck");
+    const r     = el.getBoundingClientRect();
+    const best  = document.querySelector("#bestSec");
+    const lum = c => {
+      const n = c.match(/[\d.]+/g).map(Number);
+      const f = v => { v /= 255; return v <= 0.03928 ? v/12.92 : ((v+0.055)/1.055)**2.4; };
+      return 0.2126*f(n[0]) + 0.7152*f(n[1]) + 0.0722*f(n[2]);
+    };
     return {
-      bg: (cs.backgroundImage.match(/hero-[a-z]+/) || [])[0],
-      size: cs.backgroundSize,
-      position: cs.backgroundPosition,
       height: Math.round(r.height),
-      /* the artwork is a daylight photograph, so the reading layer has to
-         be a white wash. A dark stop over it would be the old treatment. */
-      wash: (() => {
-        const g = getComputedStyle(el, "::after").backgroundImage;
-        if (!g.includes("gradient")) return null;
-        const stops = g.match(/rgba?\([^)]*\)/g) || [];
-        const opaque = stops.filter(c => {
-          const n = c.match(/[\d.]+/g).map(Number);
-          return (n[3] === undefined || n[3] > 0.02);
-        });
-        return {
-          any: true,
-          // every visible stop is white; none of them darkens the photo
-          allWhite: opaque.length > 0 && opaque.every(c => {
-            const n = c.match(/[\d.]+/g).map(Number);
-            return n[0] > 240 && n[1] > 240 && n[2] > 240;
-          }),
-          // and it fades right out, so the cards themselves stay uncovered
-          clears: stops.some(c => {
-            const n = c.match(/[\d.]+/g).map(Number);
-            return n[3] !== undefined && n[3] <= 0.02;
-          }),
-        };
-      })(),
-      /* dark ink, not white: the copy sits on a light wash now */
-      inkLum: (() => {
-        const n = getComputedStyle(el.querySelector("h1")).color.match(/[\d.]+/g).map(Number);
-        const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-        return 0.2126 * f(n[0]) + 0.7152 * f(n[1]) + 0.0722 * f(n[2]);
-      })(),
+      /* اللوح داكن في الوضعين: النصّ فوقه أبيض ثابت، فلو تبع
+         اللوحُ الثيمَ لانقلب أبيضَ على أبيض عند أول تبديل. */
+      panelLum: lum(getComputedStyle(panel).backgroundColor),
+      inkLum:   lum(getComputedStyle(el.querySelector("h1")).color),
+      /* السطح يُعمَّر من الكتالوج، لا من صورٍ مثبّتة في الترميز */
+      deckCards: deck ? deck.querySelectorAll(".poster").length : 0,
+      deckImgs:  deck ? deck.querySelectorAll(".poster img").length : 0,
+      /* وهو زخرفة: الشارة و«غير متوفر» رسائل تخصّ بطاقةً تُشترى */
+      deckBadgeShown: deck && [...deck.querySelectorAll(".badge,.pout")]
+        .some(b => getComputedStyle(b).display !== "none"),
+      deckHidden: deck ? deck.getAttribute("aria-hidden") === "true" : false,
       copy: {
         badge: !!el.querySelector(".eyebrow"),
         lines: (el.querySelector("h1")?.innerHTML.match(/<br>/g) || []).length + 1,
         lede: !!el.querySelector(".lede"),
         buttons: [...el.querySelectorAll(".hero-cta button")].map(b => b.textContent.trim()),
       },
-      /* the next section starts under the artwork, not a screen later */
+      /* الحبّة التي يتشاركها الهيرو والعروض وصفحة المنتج: ضاعت
+         قاعدتها مرتين حين أُعيد بناء الهيرو، فتُحرس هنا. */
+      eyebrowPill: (() => {
+        const e = el.querySelector(".eyebrow");
+        return e ? parseFloat(getComputedStyle(e).borderTopLeftRadius) >= 40 : false;
+      })(),
       gapToNext: best ? Math.round(best.getBoundingClientRect().top - r.bottom) : null,
       nextIsBest: !!best && !!best.querySelector("#bestRail"),
-      // nothing left from the two heroes this replaces
       stale: document.querySelectorAll(".heroArt,#horbit,.hoBill,#featGrid,.hstage").length,
     };
   });
-  check(hero.bg === "hero-banner", `one banner serves both breakpoints: ${hero.bg}`);
-  check(hero.size === "cover", `the artwork covers its section: ${hero.size}`);
-  check(/^(0%|0px|left)/.test(hero.position),
-        `the crop favours the cards on the left of the frame: ${hero.position}`);
-  check(hero.height <= 560, `desktop height is capped at 560: ${hero.height}px`);
-  check(!!hero.wash, "a reading layer sits over the artwork");
-  check(!!hero.wash && hero.wash.allWhite,
-        "and it is a white wash, not a dark gradient over a daylight photo");
-  check(!!hero.wash && hero.wash.clears,
-        "fading to nothing, so the product cards are never veiled");
-  check(hero.inkLum < 0.12, `the copy is dark ink, not white (luminance ${hero.inkLum.toFixed(3)})`);
+  check(hero.panelLum < 0.06, `the hero panel is a dark ground (luminance ${hero.panelLum.toFixed(3)})`);
+  check(hero.inkLum > 0.7, `the copy on it is white, not dark ink (luminance ${hero.inkLum.toFixed(3)})`);
+  check(hero.height <= 720, `the hero does not eat the screen: ${hero.height}px`);
+  check(hero.deckCards === 3, `three cards on the deck, from the catalogue: ${hero.deckCards}`);
+  check(hero.deckImgs >= 1, `at least one of them is real artwork: ${hero.deckImgs}`);
+  check(!hero.deckBadgeShown, "the deck is decoration: no badge, no sold-out label");
+  check(hero.deckHidden, "and it is hidden from screen readers, not read as a product list");
+  check(hero.eyebrowPill, "the shared eyebrow keeps its pill radius");
   check(hero.copy.badge && hero.copy.lines === 2 && hero.copy.lede,
         `badge, a two-line heading and a lede (${hero.copy.lines} lines)`);
   check(hero.copy.buttons.length === 2,

@@ -372,18 +372,11 @@ header.stuck{padding-top:8px}
 }
 header.stuck .hshell{background:var(--glass-solid);box-shadow:0 8px 26px rgba(8,9,20,.16)}
 
-/* While it floats over the hero the bar is over a fixed daylight
-   photograph, and a photograph does not follow the theme -- so over the
-   hero neither does the bar. In dark mode the dark glass composited to
-   mid-grey against the bright banner and left the nav at 1.5:1. The whole
-   header takes its ink from --ink/--ink-2, so scoping those two here turns
-   the brand, the links and the icons together. Once the bar leaves the
-   hero (.stuck, or any other page) it is the page's own glass again. */
-html[data-page="home"] header:not(.stuck) .hshell{
-  --ink:#15152A; --ink-2:#46465E; --accent-ink:#5B21B6;
-  --surface:rgba(21,21,42,.06);
-  background:rgba(255,255,255,.74);
-  border-color:rgba(21,21,42,.12)}
+/* كان هنا استثناء يثبّت الشريط فاتحاً فوق الهيرو: الهيرو صورةٌ
+   نهارية ثابتة لا تتبع الثيم، فلم يكن الشريط يتبعه فوقها. الصورة
+   زالت — صار الهيرو لوحاً داكناً — فزال سبب الاستثناء معها، وبقاؤه
+   كان يترك حبّةً بيضاء فوق صفحةٍ سوداء في الوضع الداكن.
+   الشريط الآن زجاج الصفحة نفسه في الحالين. */
 
 @media(min-width:768px){header{padding-inline:var(--s8)}}
 
@@ -485,72 +478,85 @@ header.stuck .hbar{height:54px}
 
    One image at both sizes. The cards sit on the left of the frame and the
    desk is empty on the right, which is where the copy goes. */
-.hero{
-  --hero-ink:#15152A;
-  --hero-ink-2:#46465E;
-  position:relative;isolation:isolate;display:flex;align-items:flex-end;
-  min-height:60vh;
-  background:#EFEDF6 url(assets/hero/hero-banner.webp) left center/cover no-repeat;
-}
-@media(min-width:768px){
-  .hero{min-height:55vh;max-height:560px}
-}
+/* ------------------------------------------------------------
+   الهيرو — لوح داكن تطفو فوقه البطاقات
+   ------------------------------------------------------------
+   كانت صورةً فوتوغرافية بغسلة بيضاء فوقها. الصورة كانت تحمل
+   الواجهة، والبطاقات — وهي المنتَج نفسه وأقوى ما في الهوية —
+   تظهر بعدها بتمريرة. صار اللوح أرضاً محايدة والبطاقات هي
+   البطل: تُصوَّر كأشياء في اليد لا كصور مصغّرة.
 
-/* A light wash, not a dark one: the photograph is bright, and dimming it
-   to carry white text would throw away the daylight that makes it work.
-   Horizontal on a desktop, where the frame really does have an empty
-   right half to sit in. On a phone the frame is cropped to roughly a
-   third of its width and no horizontal band is reliably empty, so the
-   wash runs bottom-up instead and the copy sits under the cards. */
-.hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(to top,
-    rgba(255,255,255,.96) 0%, rgba(255,255,255,.94) 42%,
-    rgba(255,255,255,.90) 58%, rgba(255,255,255,.30) 72%,
-    rgba(255,255,255,0) 84%)}
-@media(min-width:768px){
-  .hero::after{background:linear-gradient(to left,
-    rgba(255,255,255,.92) 0%, rgba(255,255,255,.86) 34%,
-    rgba(255,255,255,.55) 58%, rgba(255,255,255,0) 82%)}
-}
+   واللوح داكن في الوضعين معاً. في الفاتح يفصله لونه، وفي
+   الداكن يذوب في الصفحة فيفصله حدّ رفيع — لا فرقٌ في اللون،
+   لأن الفرق هناك غير موجود أصلاً.
 
-.heroCopy{position:relative;z-index:1;width:100%;
-  padding-top:var(--s16);padding-bottom:var(--s8)}
-@media(min-width:768px){
-  /* held to the empty half; in RTL the copy is already in the physical
-     right, so the space is reserved on the inline-END side */
-  .heroCopy{padding-inline-end:44%;padding-top:calc(var(--hdr-space) + var(--s6));
-    padding-bottom:var(--s10,40px)}
-}
-@media(min-width:1220px){.heroCopy{padding-inline-end:46%}}
+   والنصّ أبيض دائماً فوقه، فألوانه لا تتبع الثيم: لونٌ يتبع
+   الثيم فوق أرضٍ لا تتبعه ينقلب أبيض على أبيض عند أول تبديل.
+   ------------------------------------------------------------ */
+/* الارتفاع محكوم: القسم الأول يُري ما تحته، وإلا صار صفحةً
+   كاملة بلا دليلٍ على أنّ للصفحة بقية. الاختبار يمسكه بين
+   58% و72% من الشاشة، وهو الذي أمسك أوّل نسخةٍ من هذا اللوح
+   عند 78%. */
+.hero{--hero-ink:#F7F6FB;--hero-ink-2:#B9B6CC;
+  padding-top:var(--hdr-space);padding-bottom:var(--s4)}
 
-/* The pill three eyebrows share -- the hero, the offers header and the
-   category line on a product page. Its base rule was lost when the hero
-   was rebuilt, which left all three as bare inline spans at body size;
-   restored here on the theme's own tokens, with the hero overriding only
-   the colours it needs over a photograph. */
+.heroPanel{position:relative;isolation:isolate;overflow:hidden;
+  background:#14121F;border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--r-sec);padding:var(--s6) var(--s6) 0;
+  display:flex;flex-direction:column;gap:var(--s6);
+  box-shadow:0 24px 60px -28px rgba(20,18,31,.55)}
+[data-theme="dark"] .heroPanel{background:#171528;border-color:var(--line-2)}
+
+/* الوهج البنفسجي: مصدر ضوء واحد خلف البطاقات، لا زخرفة موزّعة */
+.heroPanel::before{content:"";position:absolute;z-index:0;pointer-events:none;
+  inset-inline-start:-10%;top:-30%;width:70%;aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,rgba(108,53,255,.55),transparent 62%);
+  filter:blur(46px)}
+
+/* الحبّة التي تتشاركها ثلاثة وسوم: الهيرو، ترويسة العروض، وسطر
+   التصنيف في صفحة المنتج. ضاعت قاعدتها مرةً حين أُعيد بناء الهيرو
+   فخرجت الثلاثة نصّاً عارياً — ثم ضاعت مرةً ثانيةً للسبب نفسه.
+   مكانها هنا خارج الهيرو، لا داخله. */
 .eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
   color:var(--accent-ink);background:var(--tint-1);border:1px solid var(--line-2);
   padding:6px 14px;border-radius:var(--r-pill);margin-bottom:var(--s4)}
 .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 
-/* A purple tint at 13% is not a surface: on a phone the badge sits where
-   the wash has let go, and its ink measured 2.9:1 over the photograph. It
-   carries its own frosted pane now -- the same one the secondary button
-   uses, so the two read as one family. */
-.hero .eyebrow{color:#5B21B6;background:rgba(255,255,255,.78);
-  border:1px solid rgba(124,58,237,.30)}
-@supports(backdrop-filter:blur(1px)){.hero .eyebrow{backdrop-filter:blur(8px)}}
-.hero .eyebrow::before{background:#7C3AED}
-.hero h1{font-size:clamp(27px,7vw,46px);letter-spacing:normal;line-height:1.34;
+.heroCopy{position:relative;z-index:1}
+.hero .eyebrow{color:#D9CBFF;background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.18)}
+.hero .eyebrow::before{background:#B79BFF}
+.hero h1{font-size:clamp(28px,7.6vw,46px);letter-spacing:normal;line-height:1.3;
   color:var(--hero-ink)}
-/* Painted glyphs, so the gradient IS the ink and its blue end is the
-   thinnest part of it. #2563EB reads 2.8:1 where the phone's wash lets the
-   photograph through; #1D4ED8 is the same hue one step down and clears the
-   3:1 a heading of this size needs. The buttons keep #2563EB, where the
-   ink is white and the gradient is the ground. */
-.hero h1 .g{background:linear-gradient(120deg,#7C3AED,#1D4ED8);
+/* تدرّج فاتح: الأرض داكنة هنا، فطرفا التدرّج القديمين يسقطان عليها */
+.hero h1 .g{background:linear-gradient(120deg,#C4B5FD,#8FD2FF);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.hero .lede{color:var(--hero-ink-2);font-size:15.5px;margin-top:var(--s4);max-width:42ch}
+.hero .lede{color:var(--hero-ink-2);font-size:15.5px;margin-top:var(--s4);max-width:40ch}
+
+/* ---- سطح البطاقات ----
+   مقصوصة من الأسفل بالقصد: نصفها داخل اللوح ونصفها مقطوع،
+   فتقرأ كرزمة تُسحب منها واحدة لا كصفٍّ انتهى. */
+.heroDeck{position:relative;z-index:1;display:flex;justify-content:center;
+  align-items:flex-end;gap:0;margin-top:auto;
+  height:145px;pointer-events:none}
+.heroDeck .badge,.heroDeck .pout{display:none}
+.heroDeck .poster{width:132px;flex:none;border-radius:14px;
+  box-shadow:0 18px 40px -12px rgba(0,0,0,.65);
+  transform:rotate(var(--rot)) translateY(var(--dy))}
+.heroDeck .poster:nth-child(1){--rot:-7deg;--dy:16px;margin-inline-end:-26px;z-index:1}
+.heroDeck .poster:nth-child(2){--rot:0deg;--dy:0px;z-index:3}
+.heroDeck .poster:nth-child(3){--rot:7deg;--dy:16px;margin-inline-start:-26px;z-index:1}
+
+@media(min-width:768px){
+  .heroPanel{flex-direction:row;align-items:center;
+    padding:var(--s12) var(--s8);gap:var(--s8)}
+  .heroCopy{flex:1 1 52%}
+  .heroDeck{flex:1 1 48%;height:260px;margin-top:0;align-items:center}
+  .heroDeck .poster{width:168px}
+  .heroDeck .poster:nth-child(1){--dy:22px}
+  .heroDeck .poster:nth-child(3){--dy:22px}
+}
+
 .hero-cta{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
 /* The blue stop is #2563EB, not the #3B82F6 named in the brief: white on
    #3B82F6 measures 3.68:1, so the label fails where the gradient reaches
@@ -559,10 +565,13 @@ header.stuck .hbar{height:54px}
 .hbtn-1{background:linear-gradient(120deg,#7C3AED,#2563EB);color:#fff;border-radius:12px;
   box-shadow:0 10px 26px -10px rgba(124,58,237,.75)}
 .hbtn-1:hover{box-shadow:0 12px 30px -8px rgba(124,58,237,.95)}
-.hbtn-2{background:rgba(255,255,255,.72);color:var(--hero-ink);border-radius:12px;
-  border:1px solid rgba(124,58,237,.30)}
+/* زرٌّ شبحيّ على أرضٍ داكنة: كان لوحاً أبيض شبه معتم صُمّم
+   لهيروٍ فاتح، فبقي بعد تحوّل الأرض رقعةً رمادية تسحب النظر من
+   الزرّ الأول. الحدّ يكفي — والثانوي لا ينافس الأوّل. */
+.hbtn-2{background:rgba(255,255,255,.06);color:#EDEAF7;border-radius:12px;
+  border:1px solid rgba(255,255,255,.22)}
 @supports(backdrop-filter:blur(1px)){.hbtn-2{backdrop-filter:blur(8px)}}
-.hbtn-2:hover{background:rgba(255,255,255,.9);border-color:rgba(124,58,237,.5)}
+.hbtn-2:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.38)}
 
 /* the first section starts right under the artwork, not a screen later */
 #bestSec{padding-top:var(--s6)}
@@ -1283,13 +1292,18 @@ footer ul button:hover{color:var(--text-on-dark)}
 <!-- ================= HOME ================= -->
 <main id="home">
   <section class="hero">
-    <div class="wrap heroCopy">
-      <span class="eyebrow" data-i18n="hero_badge">متجر رقمي جزائري</span>
-      <h1><span data-i18n="hero_title_line1">كل أدواتك الرقمية،</span><br><span class="g" data-i18n="hero_title_line2">في مكان واحد.</span></h1>
-      <p class="lede" data-i18n="hero_subtitle">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
-      <div class="hero-cta">
-        <button class="btn hbtn-1" data-i18n="hero_browse" onclick="go('shop','all')">تصفح المنتجات</button>
-        <button class="btn hbtn-2" data-i18n="hero_offers" onclick="go('shop','__offers')">اكتشف العروض</button>
+    <div class="wrap">
+      <div class="heroPanel">
+        <div class="heroCopy">
+          <span class="eyebrow" data-i18n="hero_badge">متجر رقمي جزائري</span>
+          <h1><span data-i18n="hero_title_line1">كل أدواتك الرقمية،</span><br><span class="g" data-i18n="hero_title_line2">في مكان واحد.</span></h1>
+          <p class="lede" data-i18n="hero_subtitle">اشتراكات ومنتجات رقمية موثوقة، بأسعار مناسبة للسوق الجزائري وتفعيل سريع.</p>
+          <div class="hero-cta">
+            <button class="btn hbtn-1" data-i18n="hero_browse" onclick="go('shop','all')">تصفح المنتجات</button>
+            <button class="btn hbtn-2" data-i18n="hero_offers" onclick="go('shop','__offers')">اكتشف العروض</button>
+          </div>
+        </div>
+        <div class="heroDeck" id="heroDeck" aria-hidden="true"></div>
       </div>
     </div>
   </section>
@@ -2570,6 +2584,26 @@ function renderHome(){
   $("#bestRail").innerHTML = PRODUCTS.filter(p=>p.badge==="hot"||p.badge==="off")
     .concat(PRODUCTS.filter(p=>p.available&&!p.badge)).slice(0,4).map(cardHTML).join("");
   staggerIn("#bestRail");
+
+  /* سطح الهيرو: ثلاث بطاقات حقيقية من نفس مصدر الصفحة، لا صور
+     مثبّتة في الترميز. منتجٌ يُحذف أو تُبدَّل صورته يتبعه السطح
+     وحده — وصورة مثبّتة تبقى تعِد بما لم يعد يُباع. */
+  /* أصحابُ الصور أولاً: البطاقة بلا صورة تُرسَم بديلاً فاتحاً على
+     أرضٍ فاتحة، وهو صحيح في الشبكة وخاطئ فوق اللوح الداكن. فيُفضَّل
+     من له صورة، ويُكمَّل بالباقي إن لم يكفوا — فلا يخرج السطح فارغاً
+     على متجرٍ لم تُرفع صوره بعد. */
+  const deck = $("#heroDeck");
+  if(deck){
+    const picks   = heroPicks(HERO_SLUGS);
+    const withArt = picks.filter(p=>p.poster||p.image);
+    const rest    = picks.filter(p=>!withArt.includes(p));
+    const three   = withArt.concat(rest).slice(0,3);
+    /* الوسطى هي الواجهة: أمامَ الاثنتين وغير مقصوصة. فتُعطى لصاحب
+       الصورة، لا للأول في الترتيب — وإلا وقف البديل في الوسط
+       والصورةُ الحقيقية على الحافة. */
+    if(three.length === 3) three.splice(1, 0, three.shift());
+    deck.innerHTML = three.map(posterHTML).join("");
+  }
 
   $("#promoBoxes").innerHTML = heroPicks(HERO_SLUGS).map((p,i)=>{
     const rot=[-8,5,-4,7][i%4];
