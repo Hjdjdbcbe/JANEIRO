@@ -397,8 +397,13 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         gap: best ? Math.round(best.getBoundingClientRect().top - r.bottom) : null,
       };
     });
-    check(mh.height >= Math.round(mh.vh * 0.58) && mh.height <= Math.round(mh.vh * 0.72),
-          `${w}px: the banner holds 60vh without taking the screen (${mh.height}px of ${mh.vh}px)`);
+    /* حدٌّ أعلى وحده. كان هنا حدٌّ أدنى عند 58% يصف بانراً
+       فوتوغرافياً يملأ الشاشة؛ صار الهيرو لوحاً مضغوطاً يظهر
+       تحته البحث والتصنيفات في الطيّة الأولى، فالحدّ الأدنى
+       صار يطالب بضخامةٍ لم تعد مقصودة. والضمان الباقي هو
+       نفسه: ألّا يبتلع القسمُ الأولُ الشاشة. */
+    check(mh.height <= Math.round(mh.vh * 0.72),
+          `${w}px: the hero does not take the screen (${mh.height}px of ${mh.vh}px)`);
     check(mh.fits, `${w}px: badge, heading and both buttons sit inside the banner`);
     check(mh.gap !== null && mh.gap <= 4, `${w}px: no dead space under the banner (${mh.gap}px)`);
     check(mh.bestTop !== null && mh.bestTop < mh.vh,

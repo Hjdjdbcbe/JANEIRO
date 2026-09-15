@@ -502,16 +502,20 @@ header.stuck .hbar{height:54px}
 
 .heroPanel{position:relative;isolation:isolate;overflow:hidden;
   background:#14121F;border:1px solid rgba(255,255,255,.08);
-  border-radius:var(--r-sec);padding:var(--s6) var(--s6) 0;
-  display:flex;flex-direction:column;gap:var(--s6);
+  border-radius:var(--r-sec);padding:var(--s4) var(--s4) var(--s4) 0;
+  display:flex;align-items:center;gap:var(--s2);
   box-shadow:0 24px 60px -28px rgba(20,18,31,.55)}
 [data-theme="dark"] .heroPanel{background:#171528;border-color:var(--line-2)}
 
-/* الوهج البنفسجي: مصدر ضوء واحد خلف البطاقات، لا زخرفة موزّعة */
+/* الوهج البنفسجي: مصدر ضوء واحد خلف الرزمة، لا زخرفة موزّعة */
 .heroPanel::before{content:"";position:absolute;z-index:0;pointer-events:none;
-  inset-inline-start:-10%;top:-30%;width:70%;aspect-ratio:1;border-radius:50%;
+  inset-inline-start:-18%;top:-40%;width:72%;aspect-ratio:1;border-radius:50%;
   background:radial-gradient(circle,rgba(108,53,255,.55),transparent 62%);
-  filter:blur(46px)}
+  filter:blur(44px)}
+/* ومسحةٌ مائلة تقطع اللوح: نفس القصّة التي في البطاقة نفسها،
+   فيُقرأ اللوح من عائلتها لا كمستطيلٍ أسود غريب عنها. */
+.heroPanel::after{content:"";position:absolute;z-index:0;pointer-events:none;
+  inset:0;background:linear-gradient(108deg,transparent 58%,rgba(255,255,255,.055) 58.2%)}
 
 /* الحبّة التي تتشاركها ثلاثة وسوم: الهيرو، ترويسة العروض، وسطر
    التصنيف في صفحة المنتج. ضاعت قاعدتها مرةً حين أُعيد بناء الهيرو
@@ -522,42 +526,49 @@ header.stuck .hbar{height:54px}
   padding:6px 14px;border-radius:var(--r-pill);margin-bottom:var(--s4)}
 .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 
-.heroCopy{position:relative;z-index:1}
+.heroCopy{position:relative;z-index:2;flex:1 1 57%;min-width:0}
 .hero .eyebrow{color:#D9CBFF;background:rgba(255,255,255,.10);
-  border:1px solid rgba(255,255,255,.18)}
+  border:1px solid rgba(255,255,255,.18);margin-bottom:var(--s2)}
 .hero .eyebrow::before{background:#B79BFF}
-.hero h1{font-size:clamp(28px,7.6vw,46px);letter-spacing:normal;line-height:1.3;
+.hero h1{font-size:clamp(21px,5.4vw,42px);letter-spacing:normal;line-height:1.28;
   color:var(--hero-ink)}
 /* تدرّج فاتح: الأرض داكنة هنا، فطرفا التدرّج القديمين يسقطان عليها */
 .hero h1 .g{background:linear-gradient(120deg,#C4B5FD,#8FD2FF);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.hero .lede{color:var(--hero-ink-2);font-size:15.5px;margin-top:var(--s4);max-width:40ch}
+.hero .lede{color:var(--hero-ink-2);font-size:13px;line-height:1.55;
+  margin-top:var(--s2);max-width:34ch}
 
-/* ---- سطح البطاقات ----
-   مقصوصة من الأسفل بالقصد: نصفها داخل اللوح ونصفها مقطوع،
-   فتقرأ كرزمة تُسحب منها واحدة لا كصفٍّ انتهى. */
-.heroDeck{position:relative;z-index:1;display:flex;justify-content:center;
-  align-items:flex-end;gap:0;margin-top:auto;
-  height:145px;pointer-events:none}
+/* ---- الرزمة ----
+   بطاقاتٌ متراكبة تخرج من حافة اللوح، لا صفٌّ مصطفّ. التراكب هو
+   ما يجعلها رزمةً في اليد: صفٌّ متباعد يقرأ جرداً، ورزمةٌ تقرأ
+   اختياراً. وأولاها تُقصّ عند الحافة عمداً — ما يُقصّ يوحي بأن
+   وراءه المزيد. */
+.heroDeck{position:relative;z-index:1;flex:0 0 43%;align-self:stretch;
+  min-height:168px;pointer-events:none}
 .heroDeck .badge,.heroDeck .pout{display:none}
-.heroDeck .poster{width:132px;flex:none;border-radius:14px;
-  box-shadow:0 18px 40px -12px rgba(0,0,0,.65);
-  transform:rotate(var(--rot)) translateY(var(--dy))}
-.heroDeck .poster:nth-child(1){--rot:-7deg;--dy:16px;margin-inline-end:-26px;z-index:1}
-.heroDeck .poster:nth-child(2){--rot:0deg;--dy:0px;z-index:3}
-.heroDeck .poster:nth-child(3){--rot:7deg;--dy:16px;margin-inline-start:-26px;z-index:1}
+.heroDeck .poster{position:absolute;top:50%;width:66%;border-radius:12px;
+  box-shadow:0 16px 34px -10px rgba(0,0,0,.7);
+  transform:translateY(-50%) rotate(var(--rot)) translateX(var(--dx))}
+.heroDeck .poster:nth-child(1){--rot:-9deg;--dx:0;inset-inline-start:-14%;z-index:1}
+.heroDeck .poster:nth-child(2){--rot:-2deg;--dx:0;inset-inline-start:24%;z-index:3}
+.heroDeck .poster:nth-child(3){display:none}
 
-@media(min-width:768px){
-  .heroPanel{flex-direction:row;align-items:center;
-    padding:var(--s12) var(--s8);gap:var(--s8)}
-  .heroCopy{flex:1 1 52%}
-  .heroDeck{flex:1 1 48%;height:260px;margin-top:0;align-items:center}
-  .heroDeck .poster{width:168px}
-  .heroDeck .poster:nth-child(1){--dy:22px}
-  .heroDeck .poster:nth-child(3){--dy:22px}
+@media(min-width:560px){
+  .heroPanel{padding:var(--s8) var(--s8) var(--s8) 0;gap:var(--s4)}
+  .heroDeck{min-height:230px;flex-basis:46%}
+  .heroDeck .poster{width:58%}
+  .heroDeck .poster:nth-child(1){--rot:-11deg;inset-inline-start:-8%}
+  .heroDeck .poster:nth-child(2){--rot:-3deg;inset-inline-start:20%}
+  .heroDeck .poster:nth-child(3){display:block;--rot:6deg;--dx:0;inset-inline-start:48%;z-index:2}
+  .hero .lede{font-size:15px;max-width:38ch}
 }
 
-.hero-cta{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
+.hero-cta{display:flex;flex-direction:column;align-items:stretch;
+  gap:var(--s2);margin-top:var(--s4)}
+@media(min-width:560px){.hero-cta{flex-direction:row;flex-wrap:wrap;
+  align-items:center;gap:var(--s3);margin-top:var(--s6)}}
+.hero-cta .btn{padding-block:11px;font-size:14px}
+@media(min-width:560px){.hero-cta .btn{padding-block:13px;font-size:15px}}
 /* The blue stop is #2563EB, not the #3B82F6 named in the brief: white on
    #3B82F6 measures 3.68:1, so the label fails where the gradient reaches
    its blue end. Same hue one step darker clears 5.2:1; the purple start is
