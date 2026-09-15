@@ -412,6 +412,27 @@ async function run() {
   assert(mine.includes("ماذا بعت بالضبط"), "/stats يفصّل ماذا باع");
   assert(mine.includes("منتج الاختبار — سنة: <b>2</b>"),
          "والتفصيل يذكر المنتج والمدة والكمية");
+  /* ==========================================================
+     035: /sold — الوصول إلى المؤكَّدة بكودها
+     ==========================================================
+     البائع يضغط «تأكيد» فيختفي الكود من المحادثة ولا سبيل إليه
+     بعدها: لا لزبونٍ فقده، ولا لبيعةٍ أُكِّدت بالخطأ. هذا يفتحه.
+     ========================================================== */
+  drain();
+  await update(message(SELLER, "/sold"));
+  const sold = lastText("sendMessage");
+  assert(/E2E-/.test(sold), "/sold يعطي الأكواد — وهي كل الغرض منه");
+  assert(sold.includes("<code>"), "وفي <code> فتُنسخ بضغطة في تليجرام");
+  assert(/منتج الاختبار/.test(sold), "ومعها المنتج");
+  assert(!/لا توجد|ما كاينش/.test(sold), "وليست فارغة وقد بيعت بيعتان");
+
+  drain();
+  await update(message(OWNER, "/sold 1"));
+  const sold1 = lastText("sendMessage");
+  assert((sold1.match(/<code>/g) || []).length <= 2,
+         "والعدد المطلوب يُحترم: بيعة واحدة لا أكثر");
+  assert(/البائع:/.test(sold1), "والمالك يُقال له من باعها");
+
   drain();
   await update(message(SELLER, "/allstats"));
   assert(lastText("sendMessage").includes("للمالك وحده"), "البائع لا يرى مبيعات غيره");

@@ -395,6 +395,31 @@ function pendingText(rows: Pending[]): string {
   return out.join("\n").trim();
 }
 
+type Confirmed = {
+  issue_id: string; card_code: string; product_name: string; variant_name: string;
+  customer_ref: string | null; settled_at: string; seller: string; mine: boolean;
+  doc_code: string | null;
+};
+
+/* البيعات المؤكَّدة بأكوادها. الكود في <code>: ضغطةٌ واحدة في
+   تليجرام تنسخه، فلا حاجة إلى زرٍّ لكل سطر — وعشرة أزرارٍ
+   للنسخ تدفن القائمة التي جاء يقرؤها. */
+function confirmedText(rows: Confirmed[]): string {
+  if (!rows.length) return "🗂 ما كاينش بيعات مؤكَّدة بعد.";
+  const out = ["🗂 <b>آخر البيعات المؤكَّدة</b>", ""];
+  for (const r of rows) {
+    out.push(`• ${esc(r.product_name)} — ${esc(r.variant_name)}`);
+    out.push(`  <code>${esc(r.card_code)}</code>`);
+    out.push(`  ${esc(formatDate(r.settled_at, "ar"))}`);
+    if (!r.mine) out.push(`  البائع: ${esc(r.seller)}`);
+    if (r.customer_ref) out.push(`  الزبون: ${esc(r.customer_ref)}`);
+    if (r.doc_code) out.push(`  📄 وثيقة: <code>${esc(r.doc_code)}</code>`);
+    out.push("");
+  }
+  out.push("<i>اضغط على أي كود لنسخه.</i>");
+  return out.join("\n").trim();
+}
+
 /** رسالة البطاقة الصادرة: الكود + زرّا تأكيد/إلغاء. */
 function issueText(d: {
   product_name: string; variant_name: string; card_code: string;
@@ -422,6 +447,7 @@ const HELP = [
   "/stock — المخزون",
   "/stats — مبيعاتك",
   "/pending — عملياتك المعلّقة",
+  "/sold [عدد] — آخر بيعاتك المؤكَّدة بأكوادها (10 افتراضياً)",
   "/warranty — وثيقة التزام خدمة جديدة",
   "/revoke &lt;JW-…&gt; — إبطال وثيقة",
   "/relink &lt;JW-…&gt; — رابط جديد لوثيقة لم تُعمَّر",
@@ -1684,6 +1710,15 @@ async function handleCommand(
       const r = await rpc<Pending[]>(client, "bot_pending", { p_telegram_id: tgId });
       if (r.error) { await send(chat, r.error); return; }
       await send(chat, pendingText(r.data!), pendingButtons(r.data!));
+      return;
+    }
+
+    case "/sold": {
+      const n = Number(args[0]);
+      const r = await rpc<Confirmed[]>(client, "bot_confirmed",
+        { p_telegram_id: tgId, p_limit: Number.isFinite(n) && n > 0 ? n : 10 });
+      if (r.error) { await send(chat, r.error); return; }
+      await send(chat, confirmedText(r.data!), [backRow]);
       return;
     }
 
