@@ -253,8 +253,12 @@ h1 .h1a,h2 .h2a{color:inherit}
 .btn-ghost:hover{border-color:var(--accent)}
 .btn-soft{background:var(--raise);color:var(--fg)}
 .btn-soft:hover{background:var(--chip)}
-.btn-text{height:52px;padding:0 6px;font-weight:600;font-size:16px;display:inline-flex;align-items:center;color:var(--fg)}
-.btn-text:hover{color:var(--accent-fg)}
+/* the hero's second action: a light outline so it reads as a button,
+   without competing with the violet one */
+.btn-text{height:52px;padding:0 22px;border-radius:999px;border:1px solid var(--line2);background:var(--chip);
+  font-weight:600;font-size:16px;display:inline-flex;align-items:center;color:var(--fg);
+  transition:border-color var(--t-ui) ease,color var(--t-ui) ease}
+.btn-text:hover{border-color:var(--accent);color:var(--accent-fg)}
 .btn-block{display:flex;width:100%}
 
 /* ============ HERO ============ */
@@ -2172,9 +2176,15 @@ function homeSearch(v){
 /* The three cards fanned out in the hero. Products that have their own
    card artwork come first, hot ones before the rest, buyable before not;
    inside that the catalogue's own order holds (the sort is stable). */
+
+/* The front card is the store's choice: Snapchat+, as long as it is in
+   the catalogue with its artwork. Without it the ranking above decides. */
+const HERO_FRONT = "snapchat-plus";
 function heroPicks(){
   const score = p => (p.poster?4:0) + (p.badge==="hot"?2:0) + (p.available?1:0);
-  return PRODUCTS.slice().sort((a,b)=>score(b)-score(a)).slice(0,3);
+  const ranked = PRODUCTS.slice().sort((a,b)=>score(b)-score(a));
+  const front = ranked.find(p => p.slug === HERO_FRONT && p.poster);
+  return (front ? [front, ...ranked.filter(p => p !== front)] : ranked).slice(0,3);
 }
 function renderStack(){
   const box = $("#heroStack");
