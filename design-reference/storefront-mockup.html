@@ -1,0 +1,779 @@
+<!--
+  Janeiro Store — design reference (mockup).
+  This is the target look for the storefront: colours, fonts, section order,
+  product cards, spacing and the phone layout. It is a static mockup with
+  demo products and no real data or ordering; build the real site from
+  Supabase data the way frontend/index.html already does.
+-->
+<title>Janeiro Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky header + mobile menu → hero (copy + fanned ticket stack) → platform marquee → shop (offer card, search, tabs, 2-col ticket grid) → 4 steps → numbers → FAQ → WhatsApp band → footer. Dark-first by request; customer toggle switches to light. */
+:root{
+  --bg:#09080D; --surface:#121019; --surface2:#0D0B13; --raise:#1A1724; --line:#262133;
+  --fg:#F3F1F8; --muted:#A8A3B8; --faint:#6F6A80;
+  --accent:#7C3AED; --accent-hover:#6D28D9; --accent-fg:#B9A2FF; --on-accent:#FFFFFF;
+  --chip:rgba(139,92,246,.15); --header:rgba(9,8,13,.84); --dot:#1E1A29;
+  --shadow:none; --glow:rgba(124,58,237,.45); --ok:#34C77B;
+  --footer:#050407; --footer-fg:#F3F1F8; --footer-muted:#A8A3B8; --footer-line:#221E2E;
+  --f-display:'Alexandria','IBM Plex Sans Arabic',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#FFFFFF; --surface:#FFFFFF; --surface2:#F6F3FC; --raise:#F1EDF9; --line:#E6E1F0;
+  --fg:#15121D; --muted:#5D586B; --faint:#8C879A;
+  --accent:#7C3AED; --accent-hover:#6D28D9; --accent-fg:#6D28D9; --on-accent:#FFFFFF;
+  --chip:#F1EBFF; --header:rgba(255,255,255,.9); --dot:#ECE8F4;
+  --shadow:0 1px 2px rgba(20,16,30,.04),0 12px 30px -16px rgba(20,16,30,.22); --glow:rgba(124,58,237,.3); --ok:#16A15B;
+  --footer:#0F0D15; --footer-fg:#F3F1F8; --footer-muted:#A8A3B8; --footer-line:#221E2E;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.7;transition:background-color .25s,color .25s;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button,input{font-family:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent-fg);outline-offset:3px;border-radius:8px}
+h1,h2,h3{text-wrap:balance}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:16px}
+.ltr{direction:ltr;unicode-bidi:isolate}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ic{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* header */
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--header);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.hdr-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#B79BFF 0%,#7C3AED 55%,#3B1680 100%);box-shadow:0 0 22px var(--glow);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:20px;flex-shrink:0}
+.word{display:flex;align-items:baseline;gap:5px;font-family:var(--f-display)}
+.word b{font-weight:700;font-size:19px}
+.word small{font-weight:600;font-size:10px;letter-spacing:2.5px;color:var(--accent-fg)}
+.nav{display:flex;gap:26px;font-weight:500;font-size:15px;color:var(--muted)}
+.nav a:hover{color:var(--accent-fg)}
+.tools{display:flex;align-items:center;gap:8px}
+.langs{display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px}
+.langs button{min-width:40px;height:36px;padding:0 10px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:13px;font-weight:600}
+.langs button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.sq{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;position:relative}
+.sq.cart{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.badge{position:absolute;top:-6px;left:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--fg);color:var(--bg);font-size:12px;font-weight:700;display:grid;place-items:center;line-height:1}
+.menu-btn{display:none}
+.menu{border-top:1px solid var(--line);padding-block:12px 18px}
+.menu nav{display:flex;flex-direction:column}
+.menu nav a{padding:12px 4px;font-size:17px;font-weight:600;border-bottom:1px solid var(--line)}
+.menu .langs{margin-top:16px;align-self:flex-start;width:max-content}
+.menu-in{display:flex;flex-direction:column}
+@media (max-width:860px){.nav,.hdr-row .langs{display:none}.menu-btn{display:grid}}
+@media (min-width:861px){.menu{display:none!important}}
+
+/* eyebrow + headings */
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--accent-fg);letter-spacing:.2px}
+.eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--chip),0 0 12px var(--accent);flex-shrink:0}
+h1{margin:0;font-family:var(--f-display);font-weight:800;font-size:clamp(36px,5.4vw,66px);line-height:1.2;letter-spacing:-.5px}
+h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(28px,3.4vw,42px);line-height:1.3}
+h1 span,h2 span{color:var(--accent-fg)}
+.sub{margin:0;font-size:16px;color:var(--muted);max-width:36em}
+.more{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;color:var(--fg)}
+.more:hover{color:var(--accent-fg)}
+.sec{padding-block:64px}
+.sec-head{display:flex;flex-direction:column;gap:12px;margin-bottom:28px}
+.sec-head .bar{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+
+/* buttons */
+.btn{height:52px;padding:0 24px;border-radius:999px;font-weight:600;font-size:16px;display:inline-flex;align-items:center;justify-content:center;gap:10px;border:1px solid transparent;transition:transform .15s,background-color .2s,border-color .2s;white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn-p{background:var(--accent);color:var(--on-accent);box-shadow:0 10px 30px -12px var(--glow)}
+.btn-p:hover{background:var(--accent-hover)}
+.btn-s{background:var(--surface);border-color:var(--line)}
+.btn-s:hover{border-color:var(--accent)}
+.btn-t{height:52px;padding:0 6px;font-weight:600;display:inline-flex;align-items:center}
+.btn-t:hover{color:var(--accent-fg)}
+
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background-image:radial-gradient(var(--dot) 1.2px,transparent 1.2px);background-size:24px 24px;-webkit-mask-image:linear-gradient(#000 0%,#000 50%,transparent 100%);mask-image:linear-gradient(#000 0%,#000 50%,transparent 100%);pointer-events:none}
+.hero-in{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:32px 48px;padding-block:56px 32px}
+.hero-copy{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;gap:22px;align-items:flex-start}
+.eyebrow.pill{padding:7px 14px 7px 16px;border-radius:999px;background:var(--chip)}
+.eyebrow.pill i{box-shadow:0 0 10px var(--accent)}
+.lead{margin:0;max-width:34em;font-size:18px;line-height:1.85;color:var(--muted)}
+.btns{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
+.checks{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:14px;color:var(--muted)}
+.checks span{display:inline-flex;align-items:center;gap:7px}
+.ok{width:18px;height:18px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.ok .ic{width:11px;height:11px;stroke-width:3}
+
+/* product card art: the store's own 3:4 cards, or a placeholder drawn in the same style */
+.art{position:relative;display:block;width:100%;aspect-ratio:600/832;border-radius:4.33%/3.125%;overflow:hidden}
+[class*="im-"]{background-size:cover;background-position:center;background-repeat:no-repeat;background-color:var(--raise)}
+.ph{container-type:inline-size;background:#F4F4F6;--c1:#6C8DFA;--c2:#7B45E8;--tf:#fff}
+.ph::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,var(--c1),var(--c2));clip-path:polygon(0 0,100% 0,100% 46%,0 63%)}
+.ph-side{position:absolute;top:7%;writing-mode:vertical-rl;transform:rotate(180deg);font-size:7px;font-size:2.9cqw;letter-spacing:.55em;color:rgba(255,255,255,.75);font-family:var(--f-body);direction:ltr}
+.ph-side.l{left:6.5%}.ph-side.r{right:6.5%}
+.ph-tile{position:absolute;top:11%;left:50%;transform:translateX(-50%);width:48%;aspect-ratio:1;border-radius:22%;background:linear-gradient(150deg,var(--c1),var(--c2));color:var(--tf);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:30px;font-size:13cqw;direction:ltr;box-shadow:0 0 0 2.4cqw rgba(255,255,255,.3),0 0 0 2.8cqw rgba(255,255,255,.55),0 7cqw 9cqw -3cqw rgba(0,0,0,.4);overflow:hidden}
+.ph-tile::after{content:"";position:absolute;inset:0;background:linear-gradient(165deg,rgba(255,255,255,.45),rgba(255,255,255,0) 45%)}
+.ph-name{position:absolute;top:67%;left:6%;right:6%;text-align:center;font-family:var(--f-display);font-weight:800;font-size:24px;font-size:10.5cqw;line-height:1.1;color:#111;direction:ltr}
+.ph-dots{position:absolute;left:5%;right:5%;bottom:18.5%;border-top:1.3cqw dotted #B5B5BD}
+.ph-foot{position:absolute;left:0;right:0;bottom:0;height:16%;background:#161616;display:flex;align-items:center;justify-content:center;gap:5cqw;color:#fff;font-size:11px;font-size:4.6cqw;direction:ltr;font-family:var(--f-body)}
+.ph-foot::before,.ph-foot::after{content:"";position:absolute;top:-3cqw;width:6cqw;height:6cqw;border-radius:50%;background:#F4F4F6}
+.ph-foot::before{left:-3cqw}.ph-foot::after{right:-3cqw}
+.ph-j{width:10cqw;height:10cqw;border:.5cqw solid #fff;border-radius:50%;display:grid;place-items:center;font-family:Georgia,serif;font-style:italic;font-weight:700;font-size:5.5cqw}
+
+/* ticket card */
+.ticket{position:relative;display:flex;flex-direction:column;border-radius:22px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.perf{position:relative;height:0;margin:0 16px;border-top:2px dashed var(--line)}
+.perf::before,.perf::after{content:"";position:absolute;top:-11px;width:22px;height:22px;border-radius:50%;background:var(--bg);border:1px solid var(--line)}
+.perf::before{right:-28px}.perf::after{left:-28px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips span{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:var(--chip);color:var(--accent-fg);font-size:13px;font-weight:600;line-height:1.4;white-space:nowrap}
+.chips .ic{width:14px;height:14px;stroke-width:2}
+.price small{display:block;font-size:12px;color:var(--muted);line-height:1.4}
+.price strong{font-family:var(--f-display);font-weight:700;font-size:22px;line-height:1.3}
+.price em{font-style:normal;font-size:14px;color:var(--muted)}
+
+/* hero stack: the store's own cards fanned out */
+.stack{position:relative;flex:1 1 380px;min-width:0;max-width:460px;height:480px;margin-inline:auto;--dim:.7}
+:root[data-theme="light"] .stack{--dim:.94}
+.stack .card-img{position:absolute;top:8px;left:50%;width:min(270px,64%);height:auto;aspect-ratio:600/832;border-radius:4.33%/3.125%;display:block;overflow:hidden}
+.stack .b1{transform:translateX(-50%) translateX(-64px) rotate(-10deg) scale(.88);filter:brightness(var(--dim));animation:fanA .9s cubic-bezier(.2,.8,.2,1) both}
+.stack .b2{transform:translateX(-50%) translateX(64px) rotate(9deg) scale(.88);filter:brightness(var(--dim));animation:fanB .9s cubic-bezier(.2,.8,.2,1) both}
+.stack .f{transform:translateX(-50%) rotate(-2deg);box-shadow:0 40px 80px -30px var(--glow),0 24px 40px -24px rgba(0,0,0,.6);animation:fanF .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes fanA{from{transform:translateX(-50%) rotate(0) scale(.88)}}
+@keyframes fanB{from{transform:translateX(-50%) rotate(0) scale(.88)}}
+@keyframes fanF{from{transform:translateX(-50%) rotate(0) translateY(10px)}}
+.stack-cta{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:8px 8px 8px 8px;padding-inline-start:18px;border-radius:999px;border:1px solid var(--line);background:var(--header);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:var(--shadow);white-space:nowrap;z-index:2}
+.stack-cta .price small{font-size:11px}
+.stack-cta .price strong{font-size:17px}
+.stack-cta .btn{height:42px;padding:0 18px;font-size:14px}
+.par{font-size:14px;color:var(--muted)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tag{flex-shrink:0;padding:5px 11px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:600;line-height:1.5}
+
+/* marquee */
+.plats{position:relative;display:flex;flex-direction:column;gap:14px;padding-block:8px 48px}
+.plats p{margin:0;font-size:14px;color:var(--muted)}
+.marquee{overflow:hidden;direction:ltr;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.track{display:flex;gap:10px;width:max-content;animation:slide 28s linear infinite}
+.track span{padding:10px 18px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-family:var(--f-display);font-weight:600;font-size:15px;color:var(--muted);white-space:nowrap}
+@keyframes slide{to{transform:translateX(-50%)}}
+.marquee:hover .track{animation-play-state:paused}
+
+/* offer card */
+.offer{display:grid;grid-template-columns:minmax(0,1fr);border-radius:26px;border:1px solid var(--accent);background:var(--surface);box-shadow:0 30px 70px -40px var(--glow);overflow:hidden;margin-bottom:36px}
+.offer-top{display:flex;flex-wrap:wrap;align-items:center;gap:24px 32px;padding:26px}
+.offer-art{position:relative;width:150px;flex-shrink:0}
+.offer-art::before{content:"";position:absolute;inset:-30px;border-radius:50%;background:radial-gradient(circle,var(--glow) 0%,transparent 70%);pointer-events:none}
+.offer-art .art{transform:rotate(-3deg);box-shadow:0 24px 40px -22px rgba(0,0,0,.6)}
+.offer-txt{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.offer-txt h3{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(24px,2.6vw,30px);line-height:1.3}
+.offer-txt p{margin:0;color:var(--muted);font-size:15px}
+.offer-bot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:20px 26px 24px;background:var(--surface2)}
+.offer .perf{margin:0 20px}
+.offer .perf::before,.offer .perf::after{border-color:var(--accent)}
+.offer .price strong{font-size:28px}
+.offer-mini{display:none;font-size:12.5px;color:var(--accent-fg);font-weight:600}
+.acts{display:flex;flex-wrap:wrap;gap:10px}
+
+/* shop tools */
+.tools-row{display:flex;flex-direction:column;gap:14px;margin-bottom:22px}
+.search{position:relative;max-width:440px}
+.search input{width:100%;height:50px;padding:0 46px 0 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-size:15px}
+.search input::placeholder{color:var(--faint)}
+.search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--chip)}
+.search .ic{position:absolute;top:50%;right:15px;transform:translateY(-50%);color:var(--faint)}
+.tabs-scroll{overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
+.tabs-scroll::-webkit-scrollbar{display:none}
+.tabs{display:flex;gap:8px;width:max-content}
+.tabs button{height:42px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:14px;font-weight:600;white-space:nowrap}
+.tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+
+/* product grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:18px}
+@media (max-width:640px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
+@media (max-width:330px){.grid{grid-template-columns:minmax(0,1fr)}}
+.pcard{position:relative;display:flex;flex-direction:column;gap:12px;padding:10px 10px 12px;border-radius:22px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);transition:transform .2s,border-color .2s}
+.pcard:hover{transform:translateY(-3px);border-color:var(--accent)}
+.pcard .hot{position:absolute;top:18px;right:18px;z-index:2;padding:3px 10px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:11.5px;font-weight:600;line-height:1.6;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.pcard .info{padding:0 4px;display:flex;flex-direction:column;gap:2px}
+.pname{margin:0;font-size:16px;font-weight:700;line-height:1.45}
+.pcard .desc{margin:0;font-size:13.5px;line-height:1.65;color:var(--muted)}
+.pcard .foot{margin-top:auto;padding:10px 4px 0;border-top:1px dashed var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pcard .price strong{font-size:18px}
+.plus{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--raise);display:grid;place-items:center;flex-shrink:0}
+.plus:hover{border-color:var(--accent);color:var(--accent-fg)}
+.plus .ic{width:17px;height:17px;stroke-width:2.2}
+.buy{height:44px;width:100%;border:0;border-radius:999px;background:var(--accent);color:var(--on-accent);font-weight:600;font-size:15px}
+.buy:hover{background:var(--accent-hover)}
+@media (max-width:640px){.pcard{padding:8px 8px 10px;border-radius:18px;gap:10px}.pcard .hot{top:14px;right:14px;font-size:10.5px}.pname{font-size:15px}.pcard .desc{font-size:12.5px}.pcard .price strong{font-size:16px}.plus{width:36px;height:36px}.buy{height:42px;font-size:14px}}
+.empty{grid-column:1/-1;padding:40px 20px;border:1px dashed var(--line);border-radius:20px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--fg);font-size:17px;margin-bottom:4px}
+
+/* steps */
+.band{background:var(--surface2);border-block:1px solid var(--line)}
+.steps{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:14px}
+.step{display:grid;grid-template-columns:56px minmax(0,1fr);gap:4px 16px;padding:22px;border-radius:20px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+.step .circ{grid-row:1/span 4;width:56px;height:56px;border-radius:50%;border:1px solid var(--line);background:var(--chip);color:var(--accent-fg);display:grid;place-items:center}
+.step .circ .ic{width:24px;height:24px}
+.step:last-child{border-color:var(--accent)}
+.step:last-child .circ{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.step .num{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--accent-fg)}
+.step h3{margin:0;font-size:18px;font-weight:700;line-height:1.4}
+.step p{margin:0;font-size:14.5px;line-height:1.75;color:var(--muted)}
+.step .meta{justify-self:start;margin-top:8px;padding:5px 12px;border-radius:999px;background:var(--chip);color:var(--accent-fg);font-size:13px;font-weight:600}
+.after-steps{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;margin-top:26px;padding-top:24px;border-top:1px solid var(--line)}
+
+/* numbers */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{padding:22px 20px;border-radius:20px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px}
+.stat b{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3.6vw,42px);line-height:1.2;color:var(--accent-fg);font-variant-numeric:tabular-nums}
+.stat span{font-size:14px;color:var(--muted)}
+
+/* faq */
+.faq{display:flex;flex-direction:column;gap:12px;max-width:860px}
+details{border-radius:18px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+details[open]{border-color:var(--accent)}
+summary{list-style:none;min-height:64px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:16.5px;font-weight:600;cursor:pointer}
+summary::-webkit-details-marker{display:none}
+.pm{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--chip);color:var(--accent-fg);display:grid;place-items:center}
+.pm .ic{width:16px;height:16px;stroke-width:2.2;transition:transform .2s}
+details[open] .pm{background:var(--accent);color:var(--on-accent)}
+details[open] .pm .ic{transform:rotate(45deg)}
+details p{margin:0;padding:0 20px 20px;font-size:15px;line-height:1.85;color:var(--muted)}
+
+/* whatsapp band */
+.wa-band{position:relative;overflow:hidden;border-radius:28px;background:var(--accent);color:#fff;padding:40px 26px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px}
+.wa-band::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.16) 1.2px,transparent 1.2px);background-size:22px 22px;pointer-events:none}
+.wa-band > *{position:relative}
+.wa-band h2{font-weight:800;font-size:clamp(26px,3.2vw,38px);color:#fff}
+.wa-band p{margin:8px 0 0;font-size:17px;color:rgba(255,255,255,.88)}
+.wa-num{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:999px;background:rgba(255,255,255,.16);font-weight:700;font-size:17px;letter-spacing:.5px;user-select:all}
+.wa-band .btn{background:#fff;color:#2E1065;box-shadow:none}
+
+/* footer */
+.ftr{background:var(--footer);color:var(--footer-fg);margin-top:72px}
+.ftr .wrap{padding-block:52px 28px;display:flex;flex-direction:column;gap:34px}
+.fcols{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:32px}
+@media (max-width:860px){.fcols{grid-template-columns:repeat(2,minmax(0,1fr))}.fcol.brandcol{grid-column:1/-1}}
+.fcol{display:flex;flex-direction:column;gap:11px;font-size:15px}
+.fcol > strong{font-size:15px;color:#B9A2FF;letter-spacing:.3px}
+.fcol a,.fcol p{color:var(--footer-muted);margin:0}
+.fcol a:hover{color:#fff}
+.socials{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.socials a{height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--footer-line);display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--footer-fg)}
+.socials a:hover{border-color:#7C3AED}
+.fbot{padding-top:22px;border-top:1px solid var(--footer-line);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;font-size:13px;color:var(--footer-muted)}
+.fbot .checks{color:var(--footer-muted);font-size:13px}
+.fpay{display:flex;flex-wrap:wrap;gap:8px}
+.fpay span{padding:6px 13px;border-radius:999px;border:1px solid var(--footer-line);font-weight:600;font-size:13px}
+.ftr .word small{color:#B9A2FF}
+
+/* floating whatsapp + toast */
+.fab{position:fixed;left:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:35;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 14px 30px -10px var(--glow),0 0 0 4px var(--chip)}
+.fab .ic{width:26px;height:26px}
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;padding:12px 18px;border-radius:14px;background:var(--fg);color:var(--bg);font-weight:600;font-size:15px;box-shadow:0 12px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px;max-width:calc(100% - 32px)}
+.toast .ic{color:var(--accent)}
+
+@media (max-width:640px){
+  .sec{padding-block:48px}
+  /* tighter hero copy */
+  .hero-in{padding-block:22px 0;gap:16px}
+  .hero-copy{gap:14px}
+  .eyebrow.pill{padding:5px 12px 5px 14px;font-size:13px}
+  h1{font-size:33px;line-height:1.25}
+  .lead{font-size:15.5px;line-height:1.75}
+  .btns .btn{height:48px}
+  .btns .btn-t{height:48px}
+  .hero-copy .checks{display:none}
+  /* platforms strip: no label, hugs the stack */
+  .plats{padding-block:14px 0;gap:0}
+  .plats-lbl{display:none}
+  .track span{padding:8px 14px;font-size:13.5px}
+  /* shop: short header, products first, monthly offer after the grid */
+  #shop{padding-top:30px}
+  .shop{display:flex;flex-direction:column}
+  .shop .sec-head{order:0;margin-bottom:16px;gap:6px}
+  .shop .sec-head .bar{padding-bottom:0;border-bottom:0}
+  .shop .sec-head h2{font-size:25px}
+  .shop .sec-head h2 br{display:none}
+  .shop .sec-head .sub{display:none}
+  .shop .tools-row{order:1;gap:10px;margin-bottom:16px}
+  .search input{height:46px}
+  .tabs button{height:40px;padding:0 15px;font-size:13.5px}
+  .shop .grid{order:2}
+  .shop .offer{order:3;margin:28px 0 0}
+  /* smaller fanned stack, price pill tucked under the front card */
+  .stack{height:310px}
+  .stack .card-img{width:min(186px,50%)}
+  .stack .b1{transform:translateX(-50%) translateX(-48px) rotate(-10deg) scale(.88)}
+  .stack .b2{transform:translateX(-50%) translateX(48px) rotate(9deg) scale(.88)}
+  .stack-cta{gap:10px;padding:6px;padding-inline-start:14px}
+  .stack-cta .price strong{font-size:15px}
+  .stack-cta .btn{height:38px;padding:0 14px;font-size:13.5px}
+  /* compact offer: picture beside the text, one action row */
+  .offer{border-radius:22px}
+  .offer-top{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;gap:16px;padding:16px}
+  .offer-art{width:92px}
+  .offer-art::before{inset:-14px}
+  .offer-txt{gap:6px}
+  .offer-txt h3{font-size:20px}
+  .offer-txt p{font-size:13.5px;line-height:1.65}
+  .offer .chips{display:none}
+  .offer-mini{display:block}
+  .offer .perf{margin:0 14px}
+  .offer-bot{padding:14px 16px 16px;flex-wrap:nowrap}
+  .offer .price strong{font-size:22px}
+  .offer-bot .acts{flex-wrap:nowrap;gap:8px}
+  .offer-bot .btn{height:46px}
+  .offer-bot .lbl{display:none}
+  .offer-bot .btn-s{width:46px;padding:0}
+  .fab{width:50px;height:50px}
+  .fab .ic{width:23px;height:23px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  .track{flex-wrap:wrap;width:auto;justify-content:center}
+  .track [aria-hidden="true"]{display:none}
+}
+/* product card pictures: the same cards as assets/product-media/products/ in the repo.
+   On the real site they come from products.poster_path, not from these classes. */
+.im-claude{background-image:url(assets/product-media/products/claude-pro.webp)}
+.im-canva{background-image:url(assets/product-media/products/canva-pro.webp)}
+.im-snap{background-image:url(assets/product-media/products/snapchat-plus.webp)}
+.im-ps{background-image:url(assets/product-media/products/playstation-gift-card.webp)}
+.im-n8n{background-image:url(assets/product-media/products/n8n.webp)}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></symbol>
+  <symbol id="i-cart-add" viewBox="0 0 24 24"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><path d="M13 8.5v4M11 10.5h4"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/><path d="m10 13 4-4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+</svg>
+
+<div dir="rtl" lang="ar">
+
+<header class="hdr">
+  <div class="wrap">
+    <div class="hdr-row">
+      <a href="#top" class="brand" aria-label="Janeiro Store">
+        <span class="logo">J</span>
+        <span class="word ltr"><b>janeiro</b><small>STORE</small></span>
+      </a>
+      <nav class="nav" aria-label="القائمة">
+        <a href="#top">الرئيسية</a>
+        <a href="#shop">المنتجات</a>
+        <a href="#how">كيفاش تطلب</a>
+        <a href="#faq">الأسئلة</a>
+      </nav>
+      <div class="tools">
+        <div class="langs" role="group" aria-label="اللغة">
+          <button type="button" data-lang="ar" aria-pressed="true">ع</button>
+          <button type="button" data-lang="fr" aria-pressed="false">FR</button>
+          <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+        <button type="button" class="sq" id="themeBtn" aria-label="بدّل للوضع الفاتح">
+          <svg class="ic" id="themeIcon"><use href="#i-sun"/></svg>
+        </button>
+        <a href="#shop" class="sq cart" aria-label="السلة">
+          <svg class="ic"><use href="#i-cart"/></svg>
+          <span class="badge" id="cartBadge" hidden>0</span>
+        </a>
+        <button type="button" class="sq menu-btn" id="menuBtn" aria-label="افتح القائمة" aria-expanded="false" aria-controls="menu">
+          <svg class="ic" id="menuIcon"><use href="#i-menu"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="menu" id="menu" hidden>
+      <div class="menu-in">
+        <nav aria-label="القائمة">
+          <a href="#top">الرئيسية</a>
+          <a href="#shop">المنتجات</a>
+          <a href="#how">كيفاش تطلب</a>
+          <a href="#faq">الأسئلة</a>
+        </nav>
+        <div class="langs" role="group" aria-label="اللغة">
+          <button type="button" data-lang="ar" aria-pressed="true">ع</button>
+          <button type="button" data-lang="fr" aria-pressed="false">FR</button>
+          <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <span class="eyebrow pill"><i></i>+1000 زبون وثقو فينا</span>
+      <h1>كل اشتراكاتك الرقمية،<br><span>في بلاصة وحدة.</span></h1>
+      <p class="lead">Snapchat+، Claude Pro، Canva Pro، بطاقات PlayStation وبزاف حوايج أخرين. تخلّص بالدينار، وتستلم اشتراكك بلا تعقيد.</p>
+      <div class="btns">
+        <a href="#shop" class="btn btn-p">شوف المنتجات <svg class="ic"><use href="#i-arrow"/></svg></a>
+        <a href="#how" class="btn-t">كيفاش نطلب؟</a>
+      </div>
+      <div class="checks">
+        <span><span class="ok"><svg class="ic"><use href="#i-check"/></svg></span>ضمان طول المدة</span>
+        <span><span class="ok"><svg class="ic"><use href="#i-check"/></svg></span>تخلّص بالدينار</span>
+        <span><span class="ok"><svg class="ic"><use href="#i-check"/></svg></span>بلا ما تدير حساب</span>
+      </div>
+    </div>
+
+    <div class="stack">
+      <span class="card-img b1 im-claude" aria-hidden="true"></span>
+      <span class="card-img b2 im-canva" aria-hidden="true"></span>
+      <span class="card-img f im-snap" role="img" aria-label="بطاقة Snapchat+ من Janeiro Store"></span>
+      <div class="stack-cta">
+        <div class="price"><small>Snapchat+ · يبدا من</small><strong>[السعر]</strong> <em>دج</em></div>
+        <button type="button" class="btn btn-p" data-add="Snapchat+">اشري دركا</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap plats">
+    <p class="plats-lbl">المنصات اللي عندنا</p>
+    <div class="marquee">
+      <div class="track ltr">
+        <span>Snapchat+</span><span>Claude Pro</span><span>Canva Pro</span><span>PlayStation</span><span>n8n</span><span>Gemini Pro</span><span>CapCut Pro</span><span>Coursera Plus</span>
+        <span aria-hidden="true">Snapchat+</span><span aria-hidden="true">Claude Pro</span><span aria-hidden="true">Canva Pro</span><span aria-hidden="true">PlayStation</span><span aria-hidden="true">n8n</span><span aria-hidden="true">Gemini Pro</span><span aria-hidden="true">CapCut Pro</span><span aria-hidden="true">Coursera Plus</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="shop" class="sec">
+  <div class="wrap shop">
+    <div class="sec-head">
+      <span class="eyebrow"><i></i>المتجر</span>
+      <div class="bar">
+        <h2>اختار اشتراكك،<br><span>وخلّص بالدينار.</span></h2>
+        <p class="sub">كل اشتراك فيه تفعيل سريع، ضمان، ودعم بالدارجة.</p>
+      </div>
+    </div>
+
+    <article class="offer" aria-label="عرض الشهر: Claude Pro">
+      <div class="offer-top">
+        <div class="offer-art"><span class="art im-claude" role="img" aria-label="بطاقة Claude Pro من Janeiro Store"></span></div>
+        <div class="offer-txt">
+          <span class="tag" style="align-self:flex-start">عرض الشهر</span>
+          <h3><span class="ltr">Claude Pro</span> <span class="par" style="font-family:var(--f-body);font-size:15px;font-weight:500">كلود برو</span></h3>
+          <p>مساعد ذكاء اصطناعي يكتب، يبرمج ويحلّل معاك، على الحساب تاعك.</p>
+          <span class="offer-mini">تفعيل سريع · ضمان طول المدة · دعم</span>
+          <div class="chips">
+            <span><svg class="ic"><use href="#i-bolt"/></svg>تفعيل سريع</span>
+            <span><svg class="ic"><use href="#i-shield"/></svg>ضمان طول المدة</span>
+            <span><svg class="ic"><use href="#i-chat"/></svg>دعم بالدارجة</span>
+          </div>
+        </div>
+      </div>
+      <div class="perf" aria-hidden="true"></div>
+      <div class="offer-bot">
+        <div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div>
+        <div class="acts">
+          <button type="button" class="btn btn-s" data-add="Claude Pro" aria-label="زيد Claude Pro للسلة" style="height:48px"><svg class="ic"><use href="#i-cart-add"/></svg><span class="lbl">زيد للسلة</span></button>
+          <button type="button" class="btn btn-p" data-add="Claude Pro" style="height:48px">اشري دركا</button>
+        </div>
+      </div>
+    </article>
+
+    <div class="tools-row">
+      <div class="search">
+        <label for="q" class="sr">قلّب على منتج</label>
+        <input id="q" type="search" placeholder="قلّب على منتج… مثلاً Canva" autocomplete="off">
+        <svg class="ic"><use href="#i-search"/></svg>
+      </div>
+      <div class="tabs-scroll">
+        <div class="tabs" role="group" aria-label="الأقسام">
+          <button type="button" data-cat="all" aria-pressed="true">الكل</button>
+          <button type="button" data-cat="ai" aria-pressed="false">ذكاء اصطناعي</button>
+          <button type="button" data-cat="design" aria-pressed="false">تصميم ومونتاج</button>
+          <button type="button" data-cat="social" aria-pressed="false">سوشيال</button>
+          <button type="button" data-cat="games" aria-pressed="false">ألعاب</button>
+          <button type="button" data-cat="edu" aria-pressed="false">تعليم</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" id="grid">
+      <article class="pcard" data-cat="social" data-name="snapchat snap سناب">
+        <span class="hot">الأكثر طلباً</span><span class="art im-snap" role="img" aria-label="بطاقة Snapchat+"></span>
+        <div class="info"><h3 class="pname">سناب شات بلس</h3><p class="desc">ميزات سناب الحصرية على حسابك، بلا كلمة السر.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="Snapchat+" aria-label="زيد Snapchat+ للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="Snapchat+">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="ai" data-name="claude كلود anthropic">
+        <span class="art im-claude" role="img" aria-label="بطاقة Claude Pro"></span>
+        <div class="info"><h3 class="pname">كلود برو</h3><p class="desc">مساعد ذكاء اصطناعي للكتابة والبرمجة.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="Claude Pro" aria-label="زيد Claude Pro للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="Claude Pro">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="design" data-name="canva كانفا">
+        <span class="art im-canva" role="img" aria-label="بطاقة Canva Pro"></span>
+        <div class="info"><h3 class="pname">كانفا برو</h3><p class="desc">كل القوالب والعناصر Pro مفتوحين.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="Canva Pro" aria-label="زيد Canva Pro للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="Canva Pro">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="games" data-name="playstation بلايستيشن بلاي ستيشن psn ps gift card بطاقة">
+        <span class="art im-ps" role="img" aria-label="بطاقة PlayStation Gift Card"></span>
+        <div class="info"><h3 class="pname">بطاقة PlayStation</h3><p class="desc">اشحن رصيدك في PlayStation Store.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="PlayStation Gift Card" aria-label="زيد PlayStation Gift Card للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="PlayStation Gift Card">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="ai" data-name="n8n automation أتمتة">
+        <span class="art im-n8n" role="img" aria-label="بطاقة n8n"></span>
+        <div class="info"><h3 class="pname">إن إيت إن</h3><p class="desc">أتمتة الخدمة تاعك بلا كود.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="n8n" aria-label="زيد n8n للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="n8n">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="ai" data-name="gemini جيميناي جيمناي google">
+        <span class="art ph" style="--c1:#6C8DFA;--c2:#7B45E8;--tf:#fff" role="img" aria-label="بطاقة Gemini Pro"><span class="ph-side l">JANEIRO STORE</span><span class="ph-side r">JANEIRO STORE</span><span class="ph-tile">GP</span><span class="ph-name">Gemini Pro</span><span class="ph-dots"></span><span class="ph-foot"><span class="ph-j">J</span>janeiro-store.com</span></span>
+        <div class="info"><h3 class="pname">جيميناي برو</h3><p class="desc">ذكاء Google الاصطناعي، كامل الميزات.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="Gemini Pro" aria-label="زيد Gemini Pro للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="Gemini Pro">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="design" data-name="capcut كاب كات كابكات">
+        <span class="art ph" style="--c1:#3A3A3F;--c2:#0B0B0D;--tf:#fff" role="img" aria-label="بطاقة CapCut Pro"><span class="ph-side l">JANEIRO STORE</span><span class="ph-side r">JANEIRO STORE</span><span class="ph-tile">CC</span><span class="ph-name">CapCut Pro</span><span class="ph-dots"></span><span class="ph-foot"><span class="ph-j">J</span>janeiro-store.com</span></span>
+        <div class="info"><h3 class="pname">كاب كات برو</h3><p class="desc">مونتاج بلا علامة مائية، وكل الإفكتات.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="CapCut Pro" aria-label="زيد CapCut Pro للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="CapCut Pro">اشري دركا</button>
+      </article>
+      <article class="pcard" data-cat="edu" data-name="coursera كورسيرا">
+        <span class="art ph" style="--c1:#2E7BF0;--c2:#0047B3;--tf:#fff" role="img" aria-label="بطاقة Coursera Plus"><span class="ph-side l">JANEIRO STORE</span><span class="ph-side r">JANEIRO STORE</span><span class="ph-tile">C+</span><span class="ph-name">Coursera Plus</span><span class="ph-dots"></span><span class="ph-foot"><span class="ph-j">J</span>janeiro-store.com</span></span>
+        <div class="info"><h3 class="pname">كورسيرا بلس</h3><p class="desc">آلاف الكورسات، وبالشهادات.</p></div>
+        <div class="foot"><div class="price"><small>يبدا من</small><strong>[السعر]</strong> <em>دج</em></div><button type="button" class="plus" data-add="Coursera Plus" aria-label="زيد Coursera Plus للسلة"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+        <button type="button" class="buy" data-add="Coursera Plus">اشري دركا</button>
+      </article>
+      <div class="empty" id="empty" hidden><strong>ما لقينا حتى منتج بهاذ الاسم.</strong>جرّب اسم آخر، ولا كلّمنا على الواتساب ونجيبوهولك.</div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="sec band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow"><i></i>كيفاش نخدمو</span>
+      <div class="bar">
+        <h2>أربع خطوات،<br><span>واشتراكك عندك.</span></h2>
+        <a href="#faq" class="more">عندك سؤال؟ شوف الأسئلة <svg class="ic"><use href="#i-arrow"/></svg></a>
+      </div>
+    </div>
+    <ol class="steps">
+      <li class="step"><span class="circ"><svg class="ic"><use href="#i-cart"/></svg></span><span class="num">الخطوة 01</span><h3>اختار المنتج</h3><p>اشريه دركا، ولا زيد بزاف منتجات للسلة وطلبهم مرة وحدة.</p><span class="meta">بلا ما تدير حساب</span></li>
+      <li class="step"><span class="circ"><svg class="ic"><use href="#i-card"/></svg></span><span class="num">الخطوة 02</span><h3>خلّص بالدينار</h3><p>حوّل المبلغ بالطريقة اللي تناسبك.</p><span class="meta ltr">CCP · BaridiMob · Flexy</span></li>
+      <li class="step"><span class="circ"><svg class="ic"><use href="#i-upload"/></svg></span><span class="num">الخطوة 03</span><h3>ارفع الوصل</h3><p>صوّر وصل الدفع وارفعو في صفحة الطلب.</p><span class="meta">صورة وحدة برك</span></li>
+      <li class="step"><span class="circ"><svg class="ic" style="stroke-width:2.2"><use href="#i-check"/></svg></span><span class="num">الخطوة 04</span><h3>استلم اشتراكك</h3><p>نتأكدو من الدفع ونبعثولك اشتراكك.</p><span class="meta">متابعة على الواتساب</span></li>
+    </ol>
+    <div class="after-steps">
+      <div class="checks">
+        <span><span class="ok"><svg class="ic"><use href="#i-check"/></svg></span>ضمان طول المدة</span>
+        <span><span class="ok"><svg class="ic"><use href="#i-check"/></svg></span>دعم بالدارجة</span>
+        <span><span class="ok"><svg class="ic"><use href="#i-check"/></svg></span>تخلّص بالدينار</span>
+      </div>
+      <a href="#shop" class="btn btn-p">ابدا دركا <svg class="ic"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow"><i></i>الأرقام تاعنا</span>
+      <div class="bar"><h2>ناس وثقو فينا،<br><span>وكل يوم يزيدو.</span></h2></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b class="ltr">+1000</b><span>زبون خدمناهم</span></div>
+      <div class="stat"><b class="ltr">+540</b><span>عضو في جروب التيليغرام</span></div>
+      <div class="stat"><b>3</b><span>طرق دفع بالدينار</span></div>
+      <div class="stat"><b>3</b><span>لغات: عربي، فرنسي، إنجليزي</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="sec" style="padding-top:8px">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow"><i></i>الأسئلة</span>
+      <div class="bar"><h2>عندك سؤال؟<br><span>هاهي الأجوبة.</span></h2></div>
+    </div>
+    <div class="faq">
+      <details open><summary>لازم ندير حساب باش نطلب؟<span class="pm"><svg class="ic"><use href="#i-plus"/></svg></span></summary><p>لا. تطلب مباشرة، غير اسمك ورقمك باش نتواصلو معاك.</p></details>
+      <details><summary>كيفاش نخلّص؟<span class="pm"><svg class="ic"><use href="#i-plus"/></svg></span></summary><p>بـ CCP، BaridiMob ولا Flexy. من بعد ترفع صورة الوصل في صفحة الطلب.</p></details>
+      <details><summary>شحال ياخذ باش يوصلني الاشتراك؟<span class="pm"><svg class="ic"><use href="#i-plus"/></svg></span></summary><p>بعد ما نتأكدو من الوصل، يوصلك اشتراكك في [المدة].</p></details>
+      <details><summary>واش كاين ضمان؟<span class="pm"><svg class="ic"><use href="#i-plus"/></svg></span></summary><p>إيه، الاشتراك مضمون طول المدة. إذا صرا مشكل كلّمنا على الواتساب ونحلوهولك.</p></details>
+      <details><summary>نقدر نطلب بزاف منتجات مرة وحدة؟<span class="pm"><svg class="ic"><use href="#i-plus"/></svg></span></summary><p>إيه، زيدهم للسلة وكمّل الطلب مرة وحدة.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="wa-band">
+    <div>
+      <h2>ما لقيتش واش تحوس؟</h2>
+      <p>كلّمنا على الواتساب ونجيبوهولك.</p>
+      <span class="wa-num ltr">0798 56 17 63</span>
+    </div>
+    <a href="https://wa.me/213798561763" class="btn"><svg class="ic"><use href="#i-chat"/></svg>كلّمنا على الواتساب</a>
+  </div>
+</section>
+</main>
+
+<footer class="ftr">
+  <div class="wrap">
+    <div class="fcols">
+      <div class="fcol brandcol">
+        <div class="brand"><span class="logo">J</span><span class="word ltr"><b>janeiro</b><small>STORE</small></span></div>
+        <p>اشتراكاتك الرقمية بالدينار، من الدزاير.</p>
+        <div class="socials">
+          <a href="https://wa.me/213798561763"><svg class="ic"><use href="#i-chat"/></svg>واتساب</a>
+          <a href="https://www.snapchat.com/add/janeiro_store"><svg class="ic"><use href="#i-bolt"/></svg>سناب</a>
+          <a href="#facebook"><svg class="ic"><use href="#i-users"/></svg>فيسبوك</a>
+          <a href="#telegram"><svg class="ic"><use href="#i-send"/></svg>تيليغرام</a>
+        </div>
+      </div>
+      <nav class="fcol" aria-label="المتجر">
+        <strong>المتجر</strong>
+        <a href="#shop">المنتجات</a>
+        <a href="#how">كيفاش تطلب</a>
+        <a href="#faq">الأسئلة</a>
+      </nav>
+      <nav class="fcol" aria-label="المساعدة">
+        <strong>المساعدة</strong>
+        <a href="#track">تتبّع الطلب</a>
+        <a href="https://wa.me/213798561763">تواصل معانا</a>
+        <a href="#refund">سياسة الاسترجاع</a>
+      </nav>
+      <nav class="fcol" aria-label="قانوني">
+        <strong>قانوني</strong>
+        <a href="#terms">الشروط والأحكام</a>
+        <a href="#privacy">سياسة الخصوصية</a>
+      </nav>
+    </div>
+    <div class="fbot">
+      <div class="fpay ltr"><span>CCP</span><span>BaridiMob</span><span>Flexy</span></div>
+      <span>© 2026 Janeiro Store · صُنع في الدزاير</span>
+    </div>
+  </div>
+</footer>
+
+<a href="https://wa.me/213798561763" class="fab" aria-label="كلّمنا على الواتساب"><svg class="ic"><use href="#i-chat"/></svg></a>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><svg class="ic"><use href="#i-check"/></svg><span id="toastText"></span></div>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+
+  /* theme */
+  var themeBtn = document.getElementById('themeBtn');
+  var themeUse = document.querySelector('#themeIcon use');
+  function applyTheme(t) {
+    root.setAttribute('data-theme', t);
+    var dark = t !== 'light';
+    themeUse.setAttribute('href', dark ? '#i-sun' : '#i-moon');
+    themeBtn.setAttribute('aria-label', dark ? 'بدّل للوضع الفاتح' : 'بدّل للوضع الداكن');
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('janeiro-theme'); } catch (e) {}
+  applyTheme(saved === 'light' ? 'light' : 'dark');
+  themeBtn.addEventListener('click', function () {
+    var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    try { localStorage.setItem('janeiro-theme', next); } catch (e) {}
+  });
+
+  /* mobile menu */
+  var menu = document.getElementById('menu');
+  var menuBtn = document.getElementById('menuBtn');
+  var menuUse = document.querySelector('#menuIcon use');
+  function setMenu(open) {
+    menu.hidden = !open;
+    menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuBtn.setAttribute('aria-label', open ? 'سكّر القائمة' : 'افتح القائمة');
+    menuUse.setAttribute('href', open ? '#i-x' : '#i-menu');
+  }
+  menuBtn.addEventListener('click', function () { setMenu(menu.hidden); });
+  menu.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { setMenu(false); }); });
+
+  /* language pills (both copies stay in sync) */
+  var langBtns = document.querySelectorAll('[data-lang]');
+  langBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var l = b.getAttribute('data-lang');
+      langBtns.forEach(function (x) { x.setAttribute('aria-pressed', x.getAttribute('data-lang') === l ? 'true' : 'false'); });
+    });
+  });
+
+  /* tabs + search */
+  var tabs = document.querySelectorAll('.tabs button');
+  var cards = document.querySelectorAll('#grid .pcard');
+  var q = document.getElementById('q');
+  var empty = document.getElementById('empty');
+  var cat = 'all';
+  function filter() {
+    var term = (q.value || '').trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function (c) {
+      var okCat = cat === 'all' || c.getAttribute('data-cat') === cat;
+      var hay = (c.getAttribute('data-name') + ' ' + c.textContent).toLowerCase();
+      var okTerm = !term || hay.indexOf(term) !== -1;
+      c.hidden = !(okCat && okTerm);
+      if (!c.hidden) shown++;
+    });
+    empty.hidden = shown !== 0;
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      cat = t.getAttribute('data-cat');
+      tabs.forEach(function (x) { x.setAttribute('aria-pressed', x === t ? 'true' : 'false'); });
+      filter();
+    });
+  });
+  q.addEventListener('input', filter);
+
+  /* cart */
+  var count = 0;
+  var badge = document.getElementById('cartBadge');
+  var toast = document.getElementById('toast');
+  var toastText = document.getElementById('toastText');
+  var timer = null;
+  document.querySelectorAll('[data-add]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      count += 1;
+      badge.textContent = count;
+      badge.hidden = false;
+      toastText.textContent = b.getAttribute('data-add') + ' تزاد للسلة';
+      toast.hidden = false;
+      clearTimeout(timer);
+      timer = setTimeout(function () { toast.hidden = true; }, 1800);
+    });
+  });
+
+  /* faq: one open at a time */
+  var all = document.querySelectorAll('.faq details');
+  all.forEach(function (d) {
+    d.addEventListener('toggle', function () {
+      if (d.open) all.forEach(function (o) { if (o !== d) o.open = false; });
+    });
+  });
+})();
+</script>
