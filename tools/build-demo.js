@@ -216,10 +216,10 @@ const dataUri = (file) => {
 
   // ---------- 6. say plainly that it is a demo ----------
   html = html.replace("</body>", `
-<div id="demoTag" style="position:fixed;inset-block-end:calc(var(--s4) + env(safe-area-inset-bottom));
-  inset-inline-start:var(--s4);z-index:95;background:var(--code-bg);color:#fff;
+<div id="demoTag" style="position:fixed;inset-block-end:calc(16px + env(safe-area-inset-bottom));
+  inset-inline-start:16px;z-index:95;background:var(--code-bg);color:#fff;
   font-family:var(--f-body);font-size:11.5px;font-weight:600;line-height:1.5;
-  padding:8px 13px;border-radius:999px;box-shadow:var(--sh-3);max-width:min(78vw,320px)">
+  padding:8px 13px;border-radius:999px;box-shadow:0 12px 30px rgba(0,0,0,.3);max-width:min(78vw,320px)">
   معاينة — لا تُرسل طلبات فعلية
 </div>
 </body>`);

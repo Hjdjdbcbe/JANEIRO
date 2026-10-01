@@ -1,4 +1,4 @@
-/* The visual system: light/dark theme (FOUC guard, persistence), a measured
+/* The visual system: dark-by-default theme (FOUC guard, persistence), a measured
    WCAG contrast sweep over every visible text node on every page — not a
    curated list, because a curated list only ever proves the pairs I
    remembered — and the typography rules the brief set out.
@@ -101,7 +101,8 @@ const SWEEP = () => {
     if (el.closest("#hd")) { skipped++; return; }
     /* Text sitting on product artwork has a raster background; there is no
        colour to compute against. Counted and reported, never silently dropped. */
-    if (el.closest(".poster") && el.closest(".poster").querySelector("img.pimg")) { skipped++; return; }
+    const art = el.closest(".art, .card-img, .cthumb");
+    if (art && art.querySelector("img.pimg")) { skipped++; return; }
     const own = Array.from(el.childNodes)
       .filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim()).join(" ");
     if (!own) return;
@@ -153,29 +154,39 @@ const SWEEP = () => {
   };
 
   // ---------- default theme + FOUC ----------
+  /* Black + violet is everyone's starting point: the device's own
+     light/dark preference is not consulted, in either direction. */
   let page = await newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: "light" });
   await page.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  check(await page.getAttribute("html", "data-theme") === "light", "no stored choice + light OS -> light");
+  check(await page.getAttribute("html", "data-theme") === "dark", "no stored choice + light OS -> still dark");
+  check(await page.getAttribute('meta[name="theme-color"]', "content") === "#09080D", "theme-color is the dark ground");
 
-  // The <head> script must have run before the first style is applied.
-  // If it were deferred, data-theme would still be unset at that point.
-  const early = await page.evaluate(() => window.__earlyTheme);
-  check(early === "light" || early === undefined, "theme attribute set in <head>, not after load");
+  /* The <head> script must have set the attribute before first paint:
+     read it from the raw HTML parse, before any module ran. */
+  const early = await page.evaluate(async () => {
+    const html = await (await fetch(location.href)).text();
+    const head = html.slice(0, html.indexOf("</head>"));
+    return /setAttribute\("data-theme"/.test(head) && !/prefers-color-scheme/.test(head);
+  });
+  check(early, "theme attribute set in <head>, with no OS lookup");
 
   const dark = await newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: "dark" });
   await dark.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
   check(await dark.getAttribute("html", "data-theme") === "dark", "no stored choice + dark OS -> dark");
 
-  // ---------- the choice outranks the OS ----------
+  // ---------- the visitor's choice ----------
   await dark.click("#themeBtn");
   check(await dark.getAttribute("html", "data-theme") === "light", "toggle flips dark -> light");
   check(await dark.evaluate(() => localStorage.getItem("janeiro-theme")) === "light", "choice is persisted");
   await dark.reload({ waitUntil: "networkidle" });
   check(await dark.getAttribute("html", "data-theme") === "light",
-        "saved light survives reload under a dark OS preference");
+        "a saved light choice survives a reload");
   check(await dark.getAttribute("#themeBtn", "aria-pressed") === "false", "aria-pressed tracks the theme");
   const meta = await dark.getAttribute('meta[name="theme-color"]', "content");
   check(meta === "#FFFFFF", `theme-color follows the theme: ${meta}`);
+  await dark.click("#themeBtn");
+  check(await dark.getAttribute("html", "data-theme") === "dark" &&
+        await dark.evaluate(() => localStorage.getItem("janeiro-theme")) === "dark", "and the button flips it back");
   await dark.close();
 
   // ---------- contrast sweep, every page, both themes ----------
@@ -187,6 +198,9 @@ const SWEEP = () => {
       document.documentElement.setAttribute("data-theme", t);
       localStorage.setItem("janeiro-theme", t);
     }, theme);
+    /* let the 200ms colour transitions the switch starts finish, or the
+       sweep reads a half-way colour */
+    await page.waitForTimeout(450);
     for (const p of PAGES) {
       await page.evaluate(n => window.go(n, n === "shop" ? "all" : undefined), p);
       await page.waitForTimeout(180);
@@ -209,73 +223,72 @@ const SWEEP = () => {
   await page.waitForTimeout(200);
 
   /* document.fonts.check() is NOT usable here: it returns true when no
-     matching @font-face rule exists at all, so it passes just as happily
-     when the font never loaded. It did exactly that while the faces were
-     still coming from fonts.googleapis.com, which this browser cannot
-     reach -- the assertion could not fail. Measure instead: render the
+     matching @font-face rule exists at all. Measure instead: render the
      same Arabic string in the face and in a forced fallback and require
-     the advance widths to differ. */
+     the advance widths to differ. The faces are self-hosted, so this
+     also proves nothing is coming from fonts.googleapis.com. */
   const type = await page.evaluate(async () => {
     await document.fonts.ready;
-    const AR = "كل أدواتك الرقمية موثوقة";
+    await Promise.all([document.fonts.load('800 40px Alexandria', 'كل'), document.fonts.load('400 40px "IBM Plex Sans Arabic"', 'كل')]);
+    const AR = "كل اشتراكاتك الرقمية في بلاصة وحدة";
     const c = document.createElement("canvas").getContext("2d");
-    const w = f => { c.font = "400 40px " + f; return +c.measureText(AR).width.toFixed(1); };
-    const faces = [...document.fonts].map(f => `${f.family}/${f.status}`);
-    return { base: w("monospace"), lalezar: w("Lalezar, monospace"),
-             cairo: w("Cairo, monospace"), faces };
+    const w = f => { c.font = f + " monospace"; return +c.measureText(AR).width.toFixed(1); };
+    return {
+      base: w("400 40px"),
+      alex: w("800 40px Alexandria,"),
+      plex: w('400 40px "IBM Plex Sans Arabic",'),
+      remote: [...document.querySelectorAll('link[rel="stylesheet"]')].map(l => l.href).filter(h => /googleapis/.test(h)).length,
+      faces: [...document.fonts].map(f => `${f.family}/${f.status}`),
+    };
   });
-  check(type.faces.length > 0, `@font-face rules registered: ${type.faces.length}`);
-  check(type.faces.every(f => /loaded/.test(f)) || type.faces.some(f => /loaded/.test(f)),
-        `at least one face reports loaded: ${type.faces.slice(0, 3).join(", ")}`);
-  check(type.lalezar !== type.base,
-        `Lalezar renders Arabic, not a fallback (${type.lalezar} vs ${type.base})`);
-  check(type.cairo !== type.base,
-        `Cairo renders Arabic, not a fallback (${type.cairo} vs ${type.base})`);
-  check(type.lalezar !== type.cairo,
-        `Lalezar and Cairo are distinct faces (${type.lalezar} vs ${type.cairo})`);
+  check(type.faces.some(f => /Alexandria\/loaded/.test(f)) && type.faces.some(f => /IBM Plex Sans Arabic\/loaded/.test(f)),
+        `both faces load: ${type.faces.filter(f => /loaded/.test(f)).slice(0, 4).join(", ")}`);
+  check(type.alex !== type.base, `Alexandria renders Arabic, not a fallback (${type.alex} vs ${type.base})`);
+  check(type.plex !== type.base, `IBM Plex Sans Arabic renders Arabic, not a fallback (${type.plex} vs ${type.base})`);
+  check(type.alex !== type.plex, "and they are two distinct faces");
+  check(type.remote === 0, "no font stylesheet from Google Fonts");
 
-  /* The brief was explicit: never the handwritten face on prices or payment
-     details. Asserted by walking what the browser resolved, not by reading
-     the stylesheet — a later rule could always override an earlier one. */
-  const MONEY = ".pprice b, .pprice .old, .pprice .from, .ctot b, .stickybar .amt b, " +
-                ".paybox .r b, .opt .pr, .cinfo .pr, .summary .r b, .mono, .dl div";
+  /* headings in Alexandria, body copy in IBM Plex Sans Arabic -- read off
+     what the browser resolved, not the stylesheet */
+  const roles = await page.evaluate(() => {
+    const ff = s => getComputedStyle(document.querySelector(s)).fontFamily;
+    return { h1: ff(".hero h1"), h2: ff("#store h2"), lead: ff(".hero .lead"), btn: ff(".hero .btn"), card: ff("#homeGrid .pdesc") };
+  });
+  check(/^"?Alexandria/.test(roles.h1) && /^"?Alexandria/.test(roles.h2), `headings use Alexandria: ${roles.h1}`);
+  check([roles.lead, roles.btn, roles.card].every(f => /^"?IBM Plex Sans Arabic/.test(f)), `body copy uses IBM Plex Sans Arabic: ${roles.lead}`);
+
+  /* No synthesised weights: Alexandria ships 500-800, Plex 400/500/600/700.
+     Anything asked of a face outside what it has is drawn by the browser. */
   for (const p of ["home", "shop", "order", "track"]) {
     await page.evaluate(n => window.go(n, n === "shop" ? "all" : undefined), p);
     await page.waitForTimeout(180);
-    const bad = await page.evaluate(sel => {
+    const faux = await page.evaluate(() => {
       const out = [];
-      document.querySelectorAll(sel).forEach(el => {
-        if (!el.textContent.trim()) return;
-        const f = getComputedStyle(el).fontFamily;
-        if (/Lalezar/i.test(f)) out.push(`${el.className || el.tagName} -> ${f}`);
+      document.querySelectorAll("*").forEach(el => {
+        if (!Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim())) return;
+        const cs = getComputedStyle(el), w = +cs.fontWeight;
+        const fam = cs.fontFamily.split(",")[0].replace(/"/g, "").trim();
+        if (fam === "Alexandria" && (w < 500 || w > 800)) out.push(`${el.tagName}.${el.className} @${w}`);
+        if (fam === "IBM Plex Sans Arabic" && ![400, 500, 600, 700].includes(w)) out.push(`${el.tagName}.${el.className} @${w}`);
       });
       return out;
-    }, MONEY);
-    check(bad.length === 0, `${p}: no price or payment detail in the display face` +
-      (bad.length ? ` — ${bad.slice(0, 3).join(", ")}` : ""));
+    });
+    check(faux.length === 0, `${p}: no faux weights${faux.length ? " — " + faux.slice(0, 4).join(", ") : ""}`);
   }
 
-  /* Lalezar ships one weight. Asking it for 600 or 800 makes the browser
-     synthesise a bold, which on a joined script closes up the letterforms. */
-  const faux = await page.evaluate(() => {
-    const out = [];
-    document.querySelectorAll("*").forEach(el => {
-      if (!Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim())) return;
-      const cs = getComputedStyle(el);
-      if (!/Lalezar/i.test(cs.fontFamily)) return;
-      if (+cs.fontWeight !== 400) out.push(`${el.tagName}.${el.className} @${cs.fontWeight}`);
-    });
-    return out;
-  });
-  check(faux.length === 0, `no faux bold on the single-weight display face` +
-    (faux.length ? ` — ${faux.slice(0, 4).join(", ")}` : ""));
+  /* order numbers, account numbers and the message preview are read
+     digit by digit, so they stay on the mono face */
+  const monos = await page.evaluate(() => [...document.querySelectorAll(".mono, .msgprev")]
+    .map(e => getComputedStyle(e).fontFamily).filter(f => !/IBM Plex Mono/.test(f)));
+  check(monos.length === 0, "numbers read digit by digit stay on IBM Plex Mono");
 
   /* Arabic joins; negative tracking pulls the joins into each other. */
+  await page.evaluate(() => window.go("home"));
   const tight = await page.evaluate(() => {
     const out = [];
     document.querySelectorAll("*").forEach(el => {
       const t = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join("");
-      if (!/[\u0600-\u06FF]/.test(t)) return;               // Arabic runs only
+      if (!/[\u0600-\u06FF]/.test(t)) return;
       const ls = getComputedStyle(el).letterSpacing;
       if (ls !== "normal" && parseFloat(ls) < 0) out.push(`${el.tagName}.${el.className} @${ls}`);
     });
@@ -308,13 +321,13 @@ const SWEEP = () => {
        exactly that, and reported a failure at the wrong element. */
     const parts = await g.evaluate(() => {
       const out = [];
-      /* .hbtn-2 is a translucent white pane, and the badge is another: a
+      /* the badge pill is a translucent violet pane: a
          label on one of those sits on the photo THROUGH its own fill, so
          the fill is carried out as a veil and composited over the sampled
          pixel here. Anything with a transparent background yields a=0 and
          is scored against the bare photo. The primary button is an opaque
          gradient and is scored by the sweep above instead. */
-      for (const q of [".eyebrow", "h1", "h1 .g", ".lede", ".hbtn-2"]) {
+      for (const q of [".eyebrow.pill", "h1 .h1a", "h1 > span:not(.h1a)", ".lead", ".btn-text"]) {
         const e = document.querySelector(".hero " + q);
         if (!e) continue;
         const r = e.getBoundingClientRect();
@@ -344,7 +357,7 @@ const SWEEP = () => {
        inside the eyebrow's clip and scored the badge against its own
        heading's ink. Each element's own translucent tint goes with it,
        which only ever makes the reading harsher than the truth. */
-    await g.evaluate(() => { document.querySelector(".heroCopy").style.visibility = "hidden"; });
+    await g.evaluate(() => { document.querySelector(".hero-copy").style.visibility = "hidden"; });
     await g.waitForTimeout(150);
 
     const results = [];
@@ -407,7 +420,7 @@ const SWEEP = () => {
     await g.waitForTimeout(900);
     if (scrolled) { await g.evaluate(() => window.scrollTo(0, 1200)); await g.waitForTimeout(500); }
     const info = await g.evaluate(() => {
-      const parts = [...document.querySelectorAll("#hd .nav button, #hd .brand b")];
+      const parts = [...document.querySelectorAll("#hd .nav button, #hd .word b")];
       const r = parts.map(p => p.getBoundingClientRect());
       return {
         box: { x: Math.round(Math.min(...r.map(b => b.left))), y: Math.round(Math.min(...r.map(b => b.top))),
@@ -416,7 +429,7 @@ const SWEEP = () => {
         ink: getComputedStyle(parts[1] || parts[0]).color,
       };
     });
-    await g.evaluate(() => document.querySelectorAll("#hd .nav button, #hd .brand b")
+    await g.evaluate(() => document.querySelectorAll("#hd .nav button, #hd .word b")
       .forEach(e => { e.style.visibility = "hidden"; }));
     await g.waitForTimeout(150);
     const shot = (await g.screenshot({ clip: info.box })).toString("base64");

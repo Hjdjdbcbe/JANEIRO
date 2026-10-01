@@ -41,42 +41,44 @@ correctly render as hidden and the deal assertions will fail.
 
 ## What ui.test.js covers
 
-- **Category icons** — the tile in all three placements, tinted from
-  `accent_color`; an uploaded `icon_path` rendering as a lazy 128x128
-  image through the public bucket; the designed glyph showing when there
-  is no asset, when the asset 404s, and *underneath* a working image so
-  a lazy load never leaves a blank tile.
-- **Deals** — the section rendering live deals with the struck price and
-  the discount percentage, the countdown actually counting down, the
-  deal price following through to the detail page and the cart total,
-  and the section hiding entirely when the server returns no deals.
-- **Motion** — the stagger step capped at 60ms and the total at 300ms,
-  no interaction transition over 400ms, nothing transitioning a layout
-  property, the orbit ring at 60s, one short cart pulse, and
-  `prefers-reduced-motion` leaving nothing animating or stuck invisible.
-- **Layout** — no horizontal scroll at 375, 390 and 430px.
+Measured against the design reference (`design-reference/`):
+
+- **Category tabs**: text only, one per row of `categories` plus "الكل";
+  on the home page they filter the grid in place, with the search box.
+- **Product cards**: the 3:4 artwork from `poster_path`, or the drawn
+  stand-in in the same shape from `accent_color`; name, description,
+  يبدا من + the lowest price, the + button only on single-plan products,
+  and اشري دركا.
+- **عرض الشهر**: the first live deal (struck list price, discount chip,
+  the deal plan preselected and charged in the cart), or a hot product
+  when no deal is live.
+- **Hero**: badge, two-line heading, three ticks, three fanned cards with
+  real artwork first, and the price pill that opens the product.
+- **Header, FAQ, WhatsApp band**: nav, ع / FR / EN pills, cart, the FAQ
+  opening one card at a time, the number from `store_settings`.
+- **Motion**: stagger caps, no transition over 400ms or on layout
+  properties, and `prefers-reduced-motion` stopping everything,
+  the platforms strip included.
+- **Phone layout** (375, 390, 430px): no horizontal scroll, the short
+  hero, the strip under the cards, a one-line shop heading, products by
+  the second screen, عرض الشهر after the grid.
+- **Languages**: FR/EN for every static string, persistence, catalogue
+  machine translation.
 
 ## What theme.test.js covers
 
-- **Resolution** — the light default, the OS preference as the initial
-  value, and a stored choice outranking the OS across a reload. The
-  `data-theme` attribute has to be set by the blocking script in `<head>`,
-  not after load, or the saved theme flashes.
-- **Typography** — the faces actually render, measured by advance width
-  against a forced fallback. `document.fonts.check()` is unusable for this:
-  it returns true when no matching `@font-face` rule exists at all, so it
-  passed just as happily while the fonts were loading from
-  fonts.googleapis.com, which this browser cannot reach. The suite also
-  asserts the brief's rule that no price, order number or payment detail
-  is ever set in the display face, that nothing asks the single-weight
-  display face for a synthesised bold, and that no Arabic run carries
-  negative letter-spacing.
-- **Contrast** — a WCAG 2.1 sweep over *every* visible text node on all six
-  pages in both themes (~1000 nodes), not a curated list: a list only ever
-  proves the pairs someone remembered. Translucent fills are composited
-  down the ancestor chain, and a gradient contributes one candidate per
-  colour stop with the **worst** one scored, so a failing end of a gradient
-  cannot hide behind a passing one. Text over product artwork has no
+- **Resolution**: dark for every first-time visitor whatever the OS says,
+  the sun/moon choice saved and outranking it across a reload, and the
+  `data-theme` attribute set by the blocking script in `<head>`.
+- **Typography**: Alexandria and IBM Plex Sans Arabic actually render
+  (measured by advance width against a forced fallback, since
+  `document.fonts.check()` passes even with no `@font-face` at all), are
+  self-hosted, take the heading/body roles, are never asked for a weight
+  they do not ship, and no Arabic run carries negative letter-spacing.
+- **Contrast**: a WCAG 2.1 sweep over *every* visible text node on six
+  pages in both themes, compositing translucent fills and scoring the
+  worst stop of any gradient, plus pixel-sampled checks of the hero copy
+  and the header. Text over product artwork has no
   computable background; those nodes are counted and reported, never
   silently dropped.
 
