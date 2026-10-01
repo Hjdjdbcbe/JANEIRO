@@ -155,18 +155,20 @@ const SWEEP = () => {
   // ---------- default theme + FOUC ----------
   let page = await newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: "light" });
   await page.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  check(await page.getAttribute("html", "data-theme") === "light", "no stored choice + light OS -> light");
+  /* dark is the store's look: a visitor who never chose gets it whatever
+     their OS prefers */
+  check(await page.getAttribute("html", "data-theme") === "dark", "no stored choice + light OS -> dark (the default)");
 
   // The <head> script must have run before the first style is applied.
   // If it were deferred, data-theme would still be unset at that point.
   const early = await page.evaluate(() => window.__earlyTheme);
-  check(early === "light" || early === undefined, "theme attribute set in <head>, not after load");
+  check(early === "dark" || early === undefined, "theme attribute set in <head>, not after load");
 
   const dark = await newPage({ viewport: { width: 1280, height: 1000 }, colorScheme: "dark" });
   await dark.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
   check(await dark.getAttribute("html", "data-theme") === "dark", "no stored choice + dark OS -> dark");
 
-  // ---------- the choice outranks the OS ----------
+  // ---------- the visitor's choice is what changes it ----------
   await dark.click("#themeBtn");
   check(await dark.getAttribute("html", "data-theme") === "light", "toggle flips dark -> light");
   check(await dark.evaluate(() => localStorage.getItem("janeiro-theme")) === "light", "choice is persisted");
@@ -221,20 +223,20 @@ const SWEEP = () => {
     const c = document.createElement("canvas").getContext("2d");
     const w = f => { c.font = "400 40px " + f; return +c.measureText(AR).width.toFixed(1); };
     const faces = [...document.fonts].map(f => `${f.family}/${f.status}`);
-    return { base: w("monospace"), lalezar: w("Lalezar, monospace"),
-             cairo: w("Cairo, monospace"), faces };
+    return { base: w("monospace"), display: w("Alexandria, monospace"),
+             body: w('"IBM Plex Sans Arabic", monospace'), faces };
   });
   check(type.faces.length > 0, `@font-face rules registered: ${type.faces.length}`);
   check(type.faces.every(f => /loaded/.test(f)) || type.faces.some(f => /loaded/.test(f)),
         `at least one face reports loaded: ${type.faces.slice(0, 3).join(", ")}`);
-  check(type.lalezar !== type.base,
-        `Lalezar renders Arabic, not a fallback (${type.lalezar} vs ${type.base})`);
-  check(type.cairo !== type.base,
-        `Cairo renders Arabic, not a fallback (${type.cairo} vs ${type.base})`);
-  check(type.lalezar !== type.cairo,
-        `Lalezar and Cairo are distinct faces (${type.lalezar} vs ${type.cairo})`);
+  check(type.display !== type.base,
+        `Alexandria renders Arabic, not a fallback (${type.display} vs ${type.base})`);
+  check(type.body !== type.base,
+        `IBM Plex Sans Arabic renders Arabic, not a fallback (${type.body} vs ${type.base})`);
+  check(type.display !== type.body,
+        `Alexandria and IBM Plex Sans Arabic are distinct faces (${type.display} vs ${type.body})`);
 
-  /* The brief was explicit: never the handwritten face on prices or payment
+  /* The brief was explicit: never the display face on prices or payment
      details. Asserted by walking what the browser resolved, not by reading
      the stylesheet — a later rule could always override an earlier one. */
   const MONEY = ".pprice b, .pprice .old, .pprice .from, .ctot b, .stickybar .amt b, " +
@@ -247,7 +249,7 @@ const SWEEP = () => {
       document.querySelectorAll(sel).forEach(el => {
         if (!el.textContent.trim()) return;
         const f = getComputedStyle(el).fontFamily;
-        if (/Lalezar/i.test(f)) out.push(`${el.className || el.tagName} -> ${f}`);
+        if (/^\s*"?Alexandria/i.test(f)) out.push(`${el.className || el.tagName} -> ${f}`);
       });
       return out;
     }, MONEY);
@@ -255,19 +257,20 @@ const SWEEP = () => {
       (bad.length ? ` — ${bad.slice(0, 3).join(", ")}` : ""));
   }
 
-  /* Lalezar ships one weight. Asking it for 600 or 800 makes the browser
-     synthesise a bold, which on a joined script closes up the letterforms. */
+  /* Alexandria ships 500-800 only. A weight outside that range makes the
+     browser synthesise one, which on a joined script closes up the
+     letterforms. */
   const faux = await page.evaluate(() => {
     const out = [];
     document.querySelectorAll("*").forEach(el => {
       if (!Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim())) return;
       const cs = getComputedStyle(el);
-      if (!/Lalezar/i.test(cs.fontFamily)) return;
-      if (+cs.fontWeight !== 400) out.push(`${el.tagName}.${el.className} @${cs.fontWeight}`);
+      if (!/^\s*"?Alexandria/i.test(cs.fontFamily)) return;
+      if (+cs.fontWeight < 500 || +cs.fontWeight > 800) out.push(`${el.tagName}.${el.className} @${cs.fontWeight}`);
     });
     return out;
   });
-  check(faux.length === 0, `no faux bold on the single-weight display face` +
+  check(faux.length === 0, `no synthesised weight on the display face` +
     (faux.length ? ` — ${faux.slice(0, 4).join(", ")}` : ""));
 
   /* Arabic joins; negative tracking pulls the joins into each other. */
