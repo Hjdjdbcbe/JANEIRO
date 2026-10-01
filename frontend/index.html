@@ -448,6 +448,9 @@ h1 .h1a,h2 .h2a{color:inherit}
 .stat{padding:22px 20px;border-radius:20px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px}
 .stat b{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3.6vw,42px);line-height:1.2;color:var(--accent-fg);font-variant-numeric:tabular-nums}
 .stat span{font-size:14px;color:var(--muted)}
+.stat[hidden]{display:none}
+/* the figures read left-to-right but sit on the label's side */
+.stat b{align-self:flex-start}
 
 /* ============ FAQ ============ */
 .faq{display:flex;flex-direction:column;gap:12px;max-width:860px}
@@ -1016,9 +1019,9 @@ h1 .h1a,h2 .h2a{color:inherit}
       </div>
       <div class="stats">
         <div class="stat"><b class="ltr">+1000</b><span data-i18n="stat1">زبون خدمناهم</span></div>
-        <div class="stat"><b class="ltr">+540</b><span data-i18n="stat2">عضو في جروب التيليغرام</span></div>
-        <div class="stat"><b id="statPay">3</b><span data-i18n="stat3">طرق دفع بالدينار</span></div>
-        <div class="stat"><b>3</b><span data-i18n="stat4">لغات: عربي، فرنسي، إنجليزي</span></div>
+        <div class="stat"><b class="ltr" id="statProducts"></b><span data-i18n="stat2">اشتراك ومنتج رقمي تقدر تطلبهم دركا</span></div>
+        <div class="stat"><b class="ltr">7/7</b><span data-i18n="stat3">نردّو عليك كل يوم، من 9 الصباح حتى 11 الليل</span></div>
+        <div class="stat"><b class="ltr">100%</b><span data-i18n="stat4">ترجعلك دراهمك إذا ما قدرناش نفعّلو</span></div>
       </div>
     </div>
   </section>
@@ -1581,9 +1584,9 @@ const I18N = {
   stats_h1: { ar:"ناس وثقو فينا،", fr:"Des gens nous font confiance,", en:"People trust us," },
   stats_h2: { ar:"وكل يوم يزيدو.", fr:"et chaque jour un peu plus.", en:"and more every day." },
   stat1: { ar:"زبون خدمناهم", fr:"clients servis", en:"customers served" },
-  stat2: { ar:"عضو في جروب التيليغرام", fr:"membres dans le groupe Telegram", en:"members in the Telegram group" },
-  stat3: { ar:"طرق دفع بالدينار", fr:"moyens de paiement en dinars", en:"ways to pay in dinars" },
-  stat4: { ar:"لغات: عربي، فرنسي، إنجليزي", fr:"langues : arabe, français, anglais", en:"languages: Arabic, French, English" },
+  stat2: { ar:"اشتراك ومنتج رقمي تقدر تطلبهم دركا", fr:"abonnements et produits à commander dès maintenant", en:"subscriptions and products you can order now" },
+  stat3: { ar:"نردّو عليك كل يوم، من 9 الصباح حتى 11 الليل", fr:"on vous répond tous les jours, de 9h à 23h", en:"we reply every day, 9am to 11pm" },
+  stat4: { ar:"ترجعلك دراهمك إذا ما قدرناش نفعّلو", fr:"remboursé si nous ne pouvons pas activer", en:"refunded if we can't activate it" },
 
   /* ---- FAQ ---- */
   faq_eyebrow: { ar:"الأسئلة", fr:"Questions", en:"Questions" },
@@ -2339,6 +2342,10 @@ function renderOffer(){
 }
 
 function renderHome(){
+  /* a number the catalogue proves: what can be ordered right now */
+  const live = PRODUCTS.filter(p => p.available).length;
+  $("#statProducts").textContent = live || "";
+  $("#statProducts").closest(".stat").hidden = !live;
   renderStack();
   renderMarquee();
   renderOffer();
@@ -2370,7 +2377,7 @@ function renderStoreInfo(){
     const labels = PAYMENT_METHODS.map(m => m.label);
     $("#fpay").innerHTML = labels.map(l => `<span>${esc(l)}</span>`).join("");
     $("#stepPayMeta").textContent = labels.join(" · ");
-    $("#statPay").textContent = labels.length;
+
   }
 }
 
