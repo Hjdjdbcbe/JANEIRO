@@ -208,6 +208,64 @@ const RUN = Date.now().toString(36);
   await p.click("#setSave");
   await p.waitForFunction(() => /تحفظت/.test(document.querySelector("#toast").textContent), null, { timeout: 10000 });
 
+  // ---------- site texts: edited here, shown on the storefront ----------
+  sql(`delete from site_texts where key in ('nav_home', 'n_products')`);
+  await p.click('#tabs .tab[data-v="texts"]');
+  await p.waitForSelector("#tq");
+  const parsed = await p.evaluate(async () => parseI18N(await (await fetch("/")).text()).length);
+  const inSource = Number(require("child_process").execSync(
+    "awk '/const I18N = \\{/,/^};/' frontend/index.html | grep -cE '^\\s*[a-z][a-z0-9_]*:\\s*\\{'").toString());
+  check(parsed === inSource && parsed > 200, `every storefront text is offered for editing (${parsed} of ${inSource})`);
+  await p.fill("#tq", "nav_home");
+  await p.waitForTimeout(450); // the search re-renders after a short pause
+  await p.waitForSelector('[data-tkey="nav_home"]');
+  const newHome = "البداية " + RUN, newHomeFr = "Début " + RUN;
+  await p.fill('[data-tkey="nav_home"] [data-tlang="ar"]', newHome);
+  await p.fill('[data-tkey="nav_home"] [data-tlang="fr"]', newHomeFr);
+  check(await p.locator("#tbar").isVisible(), "unsaved edits raise the save bar");
+  await p.click("#tSave");
+  await p.waitForFunction(() => /تحفظ/.test(document.querySelector("#toast").textContent), null, { timeout: 10000 });
+  check(sql(`select value from site_texts where key = 'nav_home' and lang = 'ar'`) === newHome, "the edit is stored");
+  check(sql(`select count(*) from site_texts where key = 'nav_home' and lang = 'en'`) === "0",
+        "untouched languages store nothing (they keep the built-in text)");
+
+  // a placeholder the site fills in cannot be dropped
+  await p.fill("#tq", "n_products");
+  await p.waitForTimeout(450); // the search re-renders after a short pause
+  await p.waitForSelector('[data-tkey="n_products"]');
+  await p.fill('[data-tkey="n_products"] [data-tlang="ar"]', "منتجات بزاف");
+  await p.click("#tSave");
+  await p.waitForTimeout(500);
+  check(/\{n\}/.test(await toast()) && sql(`select count(*) from site_texts where key = 'n_products'`) === "0",
+        `dropping {n} is refused before it reaches the site (${await toast()})`);
+  await p.click("#tUndo");
+
+  const shop = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await shop.addInitScript(b => { window.JANEIRO_CONFIG = { SUPABASE_URL: b, SUPABASE_ANON_KEY: "mock-anon" }; }, BASE);
+  await shop.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await shop.waitForFunction(t => document.querySelector('#mainNav [data-i18n="nav_home"]')?.textContent === t, newHome, { timeout: 10000 }).catch(() => {});
+  check(await shop.locator('#mainNav [data-i18n="nav_home"]').textContent() === newHome, "the storefront shows the edited Arabic text");
+  await shop.evaluate(() => document.querySelector('[data-lang="fr"]')?.click());
+  await shop.waitForTimeout(400);
+  check(await shop.locator('#mainNav [data-i18n="nav_home"]').textContent() === newHomeFr, "and the edited French text");
+  await shop.evaluate(() => document.querySelector('[data-lang="en"]')?.click());
+  await shop.waitForTimeout(400);
+  check(await shop.locator('#mainNav [data-i18n="nav_home"]').textContent() === "Home", "an unedited language keeps the built-in text");
+  await shop.evaluate(() => document.querySelector('[data-lang="ar"]')?.click());
+
+  // back to the original
+  await p.fill("#tq", "nav_home");
+  await p.waitForTimeout(450); // the search re-renders after a short pause
+  await p.waitForSelector('[data-tkey="nav_home"] [data-treset]');
+  await p.click('[data-tkey="nav_home"] [data-treset]');
+  await p.click("#tSave");
+  await p.waitForFunction(() => /للأصل/.test(document.querySelector("#toast").textContent), null, { timeout: 10000 });
+  check(sql(`select count(*) from site_texts where key = 'nav_home'`) === "0", "«رجّع الأصل» removes the edit");
+  await shop.reload({ waitUntil: "networkidle" });
+  await shop.waitForTimeout(600);
+  check(await shop.locator('#mainNav [data-i18n="nav_home"]').textContent() === "الرئيسية", "and the storefront is back to its own text");
+  await shop.close();
+
   // ---------- every section loads cleanly, on a desktop and on a phone ----------
   for (const [w, h] of [[1280, 900], [390, 844]]) {
     await p.setViewportSize({ width: w, height: h });

@@ -292,6 +292,23 @@ button.tile:hover{border-color:var(--accent)}
 .sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);
   padding:14px 0 calc(8px + env(safe-area-inset-bottom,0px));display:flex;gap:9px;flex-wrap:wrap;z-index:5}
 
+/* ---------- site texts ---------- */
+.tgrp{font-size:15px;margin:22px 2px 8px;color:var(--accent-fg)}
+.trow{margin-top:8px;padding:12px 14px;gap:6px}
+.trow.edited{border-inline-start:3px solid var(--accent)}
+.trh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:22px}
+.tcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(max-width:900px){.tcols{grid-template-columns:minmax(0,1fr)}}
+.tcell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tcell span{font-size:11.5px;color:var(--muted)}
+.tcell textarea{min-height:40px;resize:vertical;font-size:13.5px;line-height:1.55;padding:8px 10px}
+.tcell textarea.dirty{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.tcell textarea.bad{border-color:var(--dead);box-shadow:0 0 0 3px color-mix(in srgb,var(--dead) 25%,transparent)}
+.savebar{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:9px;
+  margin-top:14px;padding:10px 12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--accent);
+  box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.savebar span{flex:1;font-weight:600;font-size:13.5px}
+
 /* ---------- bot stock ---------- */
 .vtable{display:flex;flex-direction:column;gap:8px}
 .vrow{display:grid;grid-template-columns:minmax(0,1.3fr) auto minmax(0,1.6fr) auto;gap:10px 14px;align-items:center;
@@ -390,6 +407,7 @@ button.tile:hover{border-color:var(--accent)}
       <button class="tab" data-v="sales" aria-current="false"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>المبيعات<span class="cnt hidden" id="cntSales"></span></button>
       <button class="tab" data-v="sellers" aria-current="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>البائعين</button>
       <span class="grp">الإعدادات</span>
+      <button class="tab" data-v="texts" aria-current="false"><svg viewBox="0 0 24 24"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>نصوص الموقع</button>
       <button class="tab" data-v="settings" aria-current="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>الإعدادات</button>
     </nav>
 
@@ -427,6 +445,7 @@ button.tile:hover{border-color:var(--accent)}
       <section id="sales" class="hidden"></section>
       <section id="sellers" class="hidden"></section>
       <section id="settings" class="hidden"></section>
+      <section id="texts" class="hidden"></section>
     </main>
   </div>
 </div>
@@ -1413,6 +1432,7 @@ const ERR = {
   CARD_IN_USE: "هذا الكود محجوز عند بائع ولا مباع، ما يتوقّفش.",
   CARD_NOT_FOUND: "الكود ما كانش.",
   PRODUCT_EXISTS: "كاين منتج بنفس الكود.", VARIANT_EXISTS: "كاينة مدة بنفس الكود في هذا المنتج.",
+  TEXT_TOO_LONG: "نص طويل بزاف (4000 حرف على الأكثر).", INVALID_KEY: "مفتاح نص غير معروف.", TOO_MANY_ITEMS: "تعديلات بزاف في مرة وحدة — احفظ على دفعات.",
   INVALID_CODE: "الكود: حروف لاتينية وأرقام بلا فراغ.",
   INVALID_UNIT: "وحدة المدة غير صالحة.", DURATION_RANGE: "المدة خارج المجال المسموح.",
   INVALID_DURATION: "المدة لازم تكون أكبر من صفر.",
@@ -2166,11 +2186,173 @@ async function refreshCounts() {
   try { const b = await rpc("admin_bot_summary"); setCount("cntSales", b.pending); } catch {}
 }
 
+/* ---------------- store: every text on the site ----------------
+   The storefront's wording lives in its I18N dictionary, three languages
+   per key. That dictionary stays the source; site_texts (036) holds only
+   the owner's edits, which the storefront lays over it at load. So this
+   page reads the defaults from the live storefront itself -- never a
+   copy that could drift -- and the edits from the table. */
+const TEXT_GROUPS = {
+  "header, menus, footer": "الرأس والقوائم والتذييل", "hero": "الواجهة الأولى", "shop + product cards": "المتجر وبطاقات المنتجات",
+  "how it works": "كيفاش تطلب", "numbers": "الأرقام", "FAQ": "الأسئلة", "WhatsApp band": "شريط الواتساب",
+  "cart": "السلة", "product page": "صفحة المنتج", "bundles (page kept, no longer in the menus)": "الباقات",
+  "checkout": "إتمام الطلب", "order received": "الطلب وصل", "tracking": "تتبّع الطلب",
+  "warranty certificate": "وثيقة الضمان", "about": "شكون حنا", "policies": "الشروط والسياسات",
+  "server wording, rendered for FR/EN": "حالات الطلب (من السيرفر)", "loading + errors": "التحميل والأخطاء",
+};
+const TEXT_LANGS = [["ar", "العربية"], ["fr", "Français"], ["en", "English"]];
+const textsState = { group: "", q: "", onlyEdited: false };
+let TEXT_DEFAULTS = null;       // [{ key, group, ar, fr, en }]
+let TEXT_SAVED = {};            // "key|lang" -> value (the owner's edits)
+
+/* Reads the I18N object literal out of the storefront's source with a
+   small scanner -- no eval. Keys look like  name: { ar:"…", fr:"…", en:"…" },
+   and the dashed section comments above them ("---- hero ----") name the
+   groups. */
+function parseI18N(html) {
+  const at = html.indexOf("const I18N = {");
+  if (at < 0) throw new Error("ما لقيناش قاموس النصوص في صفحة الموقع.");
+  const src = html.slice(at + "const I18N = {".length);
+  const out = []; let group = "", i = 0, depth = 0, cur = null, key = null, pendingKey = null;
+  const readString = () => {
+    let j = i + 1, s = "";
+    while (j < src.length && src[j] !== '"') { if (src[j] === "\\") { s += src[j] + src[j + 1]; j += 2; } else s += src[j++]; }
+    i = j + 1; return JSON.parse('"' + s + '"');
+  };
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2), body = src.slice(i + 2, end);
+      const m = body.match(/^\s*-{3,}\s*(.+?)\s*-{3,}\s*$/);
+      if (m && depth === 0) group = m[1];
+      i = end + 2; continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") { i = src.indexOf("\n", i); continue; }
+    if (ch === '"') { const v = readString(); if (cur && key) { cur[key] = v; key = null; } continue; }
+    if (ch === "{") { depth++; if (depth === 1) cur = { key: pendingKey, group }; i++; continue; }
+    if (ch === "}") {
+      if (depth === 0) break;                 // the end of I18N itself
+      depth--; if (depth === 0 && cur) { out.push(cur); cur = null; } i++; continue;
+    }
+    const m = /^[A-Za-z_][A-Za-z0-9_]*(?=\s*:)/.exec(src.slice(i, i + 80));
+    if (m) { if (depth === 0) pendingKey = m[0]; else key = m[0]; i += m[0].length; continue; }
+    i++;
+  }
+  return out.filter(e => e.key && typeof e.ar === "string");
+}
+
+const tokensOf = s => (String(s || "").match(/\{[a-z_]+\}/g) || []).sort().join(",");
+
+async function loadTexts() {
+  const box = $("#texts");
+  box.innerHTML = head("نصوص الموقع", "كل كتابة في الموقع، بثلاث لغات.") + `<div class="empty">…</div>`;
+  try {
+    if (!TEXT_DEFAULTS) {
+      const r = await fetch(new URL("../", location.href), { cache: "no-store" });
+      if (!r.ok) throw new Error(`ما قدرناش نقراو صفحة الموقع (${r.status}).`);
+      TEXT_DEFAULTS = parseI18N(await r.text());
+    }
+    const rows = await rest("site_texts?select=key,lang,value");
+    TEXT_SAVED = Object.fromEntries(rows.map(x => [`${x.key}|${x.lang}`, x.value]));
+  } catch (e) {
+    const missing = /site_texts|PGRST205|404/.test(String(e.message || e));
+    box.innerHTML = head("نصوص الموقع") + `<div class="card"><div class="notice"><b>ما قدرناش نحمّلو النصوص</b>${
+      missing ? "طبّق supabase/migrations/036_site_texts.sql في Supabase، ومن بعد ارجع هنا." : esc(errText(e))}</div></div>`;
+    return;
+  }
+  const s = textsState, groups = [...new Set(TEXT_DEFAULTS.map(e => e.group))];
+  const edited = new Set(Object.keys(TEXT_SAVED).map(k => k.split("|")[0]));
+  box.innerHTML = head("نصوص الموقع",
+      `كل كتابة في الموقع بثلاث لغات — ${TEXT_DEFAULTS.length} نص. بدّل واش تحب واضغط «حفظ». خانة فارغة ترجع للنص الأصلي.`,
+      `<a class="btn sm" id="txView" target="_blank" rel="noopener">شوف الموقع ↗</a>`) + `
+    <div class="toolbar">${searchBox("tq", "قلّب في النصوص — كلمة ولا اسم المفتاح", s.q)}
+      <select id="tgroup" aria-label="القسم"><option value="">كل الأقسام</option>${groups.map(g =>
+        `<option value="${esc(g)}" ${s.group === g ? "selected" : ""}>${esc(TEXT_GROUPS[g] || g)}</option>`).join("")}</select>
+      <label class="switch"><input type="checkbox" id="tedited" ${s.onlyEdited ? "checked" : ""}> المبدّلة برك (${edited.size})</label>
+    </div>
+    <p class="hint">الكلمات بين { } مثل <span class="mono">{n}</span> يعمّرها الموقع وحدو (عدد، اسم...) — خلّيها كيما راهي.</p>
+    <div id="tlist"></div>
+    <div class="savebar hidden" id="tbar"><span id="tbarN"></span>
+      <button class="btn" id="tUndo">تراجع</button><button class="btn go" id="tSave">حفظ</button></div>`;
+  siteBase().then(b => { const a = $("#txView"); if (b) a.href = b; else a.href = new URL("../", location.href).href; });
+  onSearch($("#tq"), q => { s.q = q; fillTexts(); });
+  $("#tgroup").onchange = e => { s.group = e.target.value; fillTexts(); };
+  $("#tedited").onchange = e => { s.onlyEdited = e.target.checked; fillTexts(); };
+  $("#tUndo").onclick = () => fillTexts();
+  $("#tSave").onclick = saveTexts;
+  fillTexts();
+}
+
+function fillTexts() {
+  const s = textsState, q = s.q.toLowerCase();
+  const list = TEXT_DEFAULTS.filter(e =>
+    (!s.group || e.group === s.group) &&
+    (!s.onlyEdited || TEXT_LANGS.some(([l]) => `${e.key}|${l}` in TEXT_SAVED)) &&
+    (!q || e.key.includes(q) || TEXT_LANGS.some(([l]) =>
+      String(TEXT_SAVED[`${e.key}|${l}`] ?? e[l] ?? "").toLowerCase().includes(q))));
+  const shown = list.slice(0, 120);
+  let lastGroup = null;
+  $("#tlist").innerHTML = shown.map(e => {
+    const gh = !s.group && e.group !== lastGroup ? `<h3 class="tgrp">${esc(TEXT_GROUPS[e.group] || e.group)}</h3>` : "";
+    lastGroup = e.group;
+    const isEdited = TEXT_LANGS.some(([l]) => `${e.key}|${l}` in TEXT_SAVED);
+    return gh + `<div class="card trow ${isEdited ? "edited" : ""}" data-tkey="${esc(e.key)}">
+      <div class="trh"><span class="mono meta">${esc(e.key)}</span>
+        ${isEdited ? `<span class="pill t-work">مبدّل</span><button class="copy" data-treset>رجّع الأصل</button>` : ""}</div>
+      <div class="tcols">${TEXT_LANGS.map(([l, name]) => {
+        const def = e[l] ?? "", cur = TEXT_SAVED[`${e.key}|${l}`] ?? def;
+        return `<label class="tcell"><span>${name}${`${e.key}|${l}` in TEXT_SAVED ? " •" : ""}</span>
+          <textarea rows="${Math.min(6, Math.max(1, Math.ceil(def.length / 52)))}" dir="${l === "ar" ? "rtl" : "ltr"}"
+            data-tlang="${l}" data-def="${esc(def)}" data-cur="${esc(cur)}" placeholder="${esc(def)}">${esc(cur)}</textarea></label>`;
+      }).join("")}</div>
+    </div>`;
+  }).join("") + (list.length > shown.length
+      ? `<p class="hint" style="text-align:center">يبانو ${shown.length} من ${list.length} — قلّب ولا اختار قسم باش تلقى الباقي.</p>`
+      : list.length ? "" : `<div class="empty"><b>ما كاين حتى نص</b>جرّب كلمة أخرى.</div>`);
+
+  $$("#tlist textarea").forEach(ta => ta.oninput = () => { ta.classList.toggle("dirty", ta.value !== ta.dataset.cur); textsBar(); });
+  $$("#tlist [data-treset]").forEach(b => b.onclick = () => {
+    b.closest("[data-tkey]").querySelectorAll("textarea").forEach(ta => {
+      ta.value = ta.dataset.def; ta.classList.toggle("dirty", ta.value !== ta.dataset.cur); });
+    textsBar();
+  });
+  textsBar();
+}
+
+function textChanges() {
+  return $$("#tlist textarea.dirty").map(ta => ({
+    ta, key: ta.closest("[data-tkey]").dataset.tkey, lang: ta.dataset.tlang,
+    /* typing the original back is the same as clearing it: no row */
+    value: ta.value.trim() === ta.dataset.def.trim() ? "" : ta.value.trim(),
+  }));
+}
+function textsBar() {
+  const n = textChanges().length;
+  $("#tbar").classList.toggle("hidden", !n);
+  $("#tbarN").textContent = `${n} تعديل ما تحفظش`;
+}
+async function saveTexts() {
+  const items = textChanges();
+  /* a dropped {n} would print a raw "{n}" or lose the number on the site */
+  const broken = items.filter(x => x.value && tokensOf(x.value) !== tokensOf(x.ta.dataset.def));
+  $$("#tlist textarea.bad").forEach(t => t.classList.remove("bad"));
+  if (broken.length) {
+    broken.forEach(x => x.ta.classList.add("bad"));
+    broken[0].ta.focus();
+    return toast(`لازم تخلّي ${tokensOf(broken[0].ta.dataset.def) || "الكلمات بين { }"} كيما راهي في «${broken[0].key}».`);
+  }
+  try {
+    const r = await rpc("admin_set_site_texts", { p_items: items.map(({ key, lang, value }) => ({ key, lang, value })) });
+    toast(`تحفظ ${r.saved}${r.reset ? ` · رجع ${r.reset} للأصل` : ""}. الموقع يبدّل في التحميل الجاي.`);
+    loadTexts();
+  } catch (e) { fail(e); }
+}
+
 /* ---------- view switch ---------- */
 let view = "overview";
 const VIEWS = { overview: loadOverview, queue: loadQueue, products: loadProducts, bundles: loadBundles,
   deals: loadDeals, categories: loadCategories, customers: loadCustomers, warranty: loadWarranty,
-  stock: loadStock, sales: loadSales, sellers: loadSellers, settings: loadSettings };
+  stock: loadStock, sales: loadSales, sellers: loadSellers, settings: loadSettings, texts: loadTexts };
 const VIEW_IDS = Object.keys(VIEWS);
 function showView(v) {
   view = v;
@@ -2401,7 +2583,7 @@ $("#back").onclick = () => {
 
 /* the module scope is not global; the browser tests drive these */
 Object.assign(window, { showView, loadOverview, loadQueue, loadProducts, openEditor,
-  loadStock, loadSales, loadWarranty, loadCustomers, loadSettings });
+  loadStock, loadSales, loadWarranty, loadCustomers, loadSettings, loadTexts, parseI18N });
 
 if (session?.access_token) showApp(session?.user?.email);
 </script>

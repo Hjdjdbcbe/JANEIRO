@@ -102,6 +102,8 @@ async function rest(url, res) {
   try {
     if (table === "store_settings")
       return send(res, 200, await asAnon("select key, value from store_settings"));
+    if (table === "site_texts")
+      return send(res, 200, await asAnon("select key, lang, value from site_texts order by key, lang"));
     if (table === "categories")
       return send(res, 200, await asAnon(
         "select id,name,slug,icon,icon_path,accent_color from categories where is_active order by sort_order"));

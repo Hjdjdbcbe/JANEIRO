@@ -54,6 +54,7 @@ const QUERIES = [
   queryFromApi("payment_methods"),
   queryFromApi("public_daily_deals"),
   queryFromApi("public_bundles"),
+  queryFromApi("site_texts"),
 ];
 
 const MIME = { ".webp":"image/webp", ".png":"image/png", ".jpg":"image/jpeg",

@@ -1845,6 +1845,15 @@ const I18N = {
   not_configured: { ar:"المتجر مازال ما تضبطش — زيد SUPABASE_URL و SUPABASE_ANON_KEY.", fr:"La boutique n'est pas encore configurée — ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.", en:"The store isn't configured yet — add SUPABASE_URL and SUPABASE_ANON_KEY." },
 };
 let LANG = "ar";
+/* Lays the owner's edits (dashboard → نصوص الموقع) over the built-in
+   wording. Only keys and languages the page already knows are taken, so
+   a stale row for a removed key changes nothing. */
+function applySiteTexts(rows){
+  for(const r of rows || []){
+    if(I18N[r.key] && ["ar","fr","en"].includes(r.lang) && typeof r.value === "string" && r.value.trim())
+      I18N[r.key][r.lang] = r.value;
+  }
+}
 function t(key){ return (I18N[key] && I18N[key][LANG]) || (I18N[key] && I18N[key].ar) || key; }
 
 /* Refreshes every static [data-i18n*] node and the dynamic sections
@@ -3294,14 +3303,18 @@ async function boot(){
   }
   showSkeletons();
   try{
-    const [settings, cats, prods, pays, deals, bundles] = await Promise.all([
+    const [settings, cats, prods, pays, deals, bundles, texts] = await Promise.all([
       API.loadStoreSettings(),
       API.loadCategories(),
       API.loadProducts(),
       API.loadPaymentMethods(),
       API.loadDailyDeals(),
       API.loadBundles(),
+      /* the owner's edits to the wording; a store without them (or a
+         database before 036) simply keeps the built-in text */
+      API.loadSiteTexts().catch(() => []),
     ]);
+    applySiteTexts(texts);
 
     SETTINGS = settings;
     CONFIG = {
