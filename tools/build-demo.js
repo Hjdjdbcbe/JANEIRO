@@ -37,7 +37,9 @@ function queryFromApi(table) {
   const src = fs.readFileSync(path.join(ROOT, "js/janeiro-api.js"), "utf8");
   const at = src.indexOf(`"${table}?select=`);
   if (at < 0) throw new Error(`build-demo: no ${table} query in janeiro-api.js`);
-  const call = src.slice(at, src.indexOf(");", at));
+  /* comments go first: one in the products query quotes a string of
+     its own, which would otherwise be read as part of the query */
+  const call = src.slice(at, src.indexOf(");", at)).replace(/\/\*[\s\S]*?\*\//g, "");
   const parts = call.match(/"(?:[^"\\]|\\.)*"/g) || [];
   const joined = parts.map(x => JSON.parse(x)).join("");
   const rest = call.replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/[\s+,]/g, "");
