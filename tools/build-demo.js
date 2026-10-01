@@ -137,6 +137,17 @@ const dataUri = (file) => {
     return { order: { order_number: o.order_number, status: o.status,
                       created_at: o.created_at, total: o.total, items: [] } };
   }
+  if (name === "translate-content") {
+    /* no DeepL here: answer from the baked table, and leave anything
+       it does not cover in the owner's Arabic, as the real one would
+       on a failed call */
+    const translations = {};
+    for (const it of body.items) {
+      const tr = DEMO_TRANSLATIONS[it.text];
+      if (tr && tr[body.lang]) translations[it.type + ":" + it.id] = tr[body.lang];
+    }
+    return { translations };
+  }
   throw new Error("demo: unhandled function " + name);
 }`);
 
@@ -172,7 +183,9 @@ const dataUri = (file) => {
     `const DEMO_WHATSAPP = ${JSON.stringify(settings.whatsapp_number || "213000000000")};\n` +
     `const DEMO_PRODUCTS_KEY = ${JSON.stringify(QUERIES[2])};\n` +
     `const DEMO_DATA = ${JSON.stringify(data)};\n` +
-    `const DEMO_MEDIA = ${JSON.stringify(media)};\n`;
+    `const DEMO_MEDIA = ${JSON.stringify(media)};\n` +
+    `const DEMO_TRANSLATIONS = ${JSON.stringify(
+      JSON.parse(fs.readFileSync(path.join(__dirname, "demo-translations.json"), "utf8")))};\n`;
 
   /* A FUNCTION replacement, never a string: $&, $\` and $' are special in a
      replacement string, and the code being injected is full of `${...}`. */
@@ -180,7 +193,7 @@ const dataUri = (file) => {
     `/* ---- demo build: the api module, inlined, with its transports swapped ---- */\n` +
     preamble + api + `\nconst API = { isConfigured, loadStoreSettings, loadCategories, loadProducts,\n` +
     `  loadProduct, loadPaymentMethods, loadDailyDeals, loadBundles, mediaUrl, newIdempotencyKey,\n` +
-    `  createOrder, uploadReceipt, submitOrder, buildWhatsAppUrl, trackOrder, revalidateCart };\n`;
+    `  createOrder, uploadReceipt, submitOrder, buildWhatsAppUrl, trackOrder, getCertificate, translateContent, revalidateCart };\n`;
   html = html.replace('import * as API from "../js/janeiro-api.js";', () => injected);
   html = html.replace(/^\s*export (async function|function|const)/gm, "$1");
 

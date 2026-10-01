@@ -1424,7 +1424,57 @@ const P  = id  => PRODUCTS.find(p=>p.id===id);
 const C  = key => CATEGORIES.find(c=>c.slug===key||c.id===key) || {name:"",accent:"#7357FF"};
 const PS = slug => PRODUCTS.find(p=>p.slug===slug);
 const fmt = n => Number(n).toLocaleString("en-US");
-const money = n => fmt(n) + " " + CONFIG.currency;
+/* the currency as the visitor reads it: the store's own "دج" in Arabic,
+   the usual "DA" in French and English */
+const curr = () => LANG === "ar" ? CONFIG.currency : "DA";
+const money = n => fmt(n) + " " + curr();
+
+/* ---- server text the store did not type itself ----
+   A few strings arrive already written in Arabic by janeiro-api.js or by
+   the database (plan durations, warranty, delivery, order status). They
+   follow fixed patterns, so they are rendered in FR/EN here; anything
+   that does not match a pattern is the owner's own wording and is shown
+   as typed. */
+const PERIOD = {
+  month: { fr:["mois","mois"], en:["month","months"] },
+  year:  { fr:["an","ans"],    en:["year","years"] },
+  week:  { fr:["semaine","semaines"], en:["week","weeks"] },
+  day:   { fr:["jour","jours"], en:["day","days"] },
+  hour:  { fr:["heure","heures"], en:["hour","hours"] },
+  minute:{ fr:["minute","minutes"], en:["minute","minutes"] },
+};
+const AR_UNIT = [
+  [/^(شهر|شهرا|شهراً|أشهر|اشهر|شهور)$/, "month"], [/^(شهران|شهرين)$/, "month", 2],
+  [/^(سنة|سنوات|سنين|عام|أعوام)$/, "year"], [/^(سنتان|سنتين|عامان|عامين)$/, "year", 2],
+  [/^(أسبوع|اسبوع|أسابيع|اسابيع)$/, "week"], [/^(يوم|يوماً|يوما|أيام|ايام)$/, "day"], [/^(يومان|يومين)$/, "day", 2],
+  [/^(ساعة|ساعات)$/, "hour"], [/^(دقيقة|دقائق)$/, "minute"],
+];
+const toLatin = d => String(d).replace(/[٠-٩]/g, c => "٠١٢٣٤٥٦٧٨٩".indexOf(c));
+function period(n, unit){
+  const w = PERIOD[unit][LANG]; return `${n} ${n === 1 ? w[0] : w[1]}`;
+}
+/* "شهر واحد", "3 أشهر", "12 شهراً", "سنة", "2–4 ساعة" ... */
+function durationText(str){
+  if(LANG === "ar" || !str) return str;
+  const m = toLatin(String(str).trim()).match(/^(?:(\d+)(?:\s*[–-]\s*(\d+))?\s+)?(\S+)(?:\s+(واحد|واحدة))?$/);
+  if(!m) return str;
+  const hit = AR_UNIT.find(u => u[0].test(m[3]));
+  if(!hit) return str;
+  if(m[2]) return `${m[1]}–${m[2]} ${PERIOD[hit[1]][LANG][1]}`;
+  return period(Number(m[1] || hit[2] || 1), hit[1]);
+}
+function serverText(str){
+  if(LANG === "ar" || !str) return str;
+  if(str === "ضمان طوال مدة الاشتراك") return t("war_full");
+  if(str === "ضمان التفعيل") return t("war_activation");
+  if(str === "يُحدَّد عند الطلب") return t("deliv_on_order");
+  const w = String(str).match(/^ضمان (\d+) يوم$/);
+  if(w) return `${LANG === "fr" ? "Garantie :" : "Warranty:"} ${period(Number(w[1]), "day")}`;
+  return durationText(str);
+}
+const STATUS_KEYS = ["pending_payment_review","payment_confirmed","activating","needs_info","completed","cancelled","refunded"];
+const statusText = o => LANG === "ar" || !STATUS_KEYS.includes(o.status) ? o.status_label : t("st_" + o.status);
+const channelText = c => c === "واتساب" ? t("ch_whatsapp") : c === "إنستغرام" ? t("ch_instagram") : c;
 const minPrice = p => p.plans.length ? Math.min(...p.plans.map(x=>x.p)) : 0;
 const BADGES = () => ({ hot:[t("badge_hot"),"hot"], new:[t("badge_new"),"new"], off:[t("badge_off"),"off"] });
 
@@ -1740,6 +1790,18 @@ const I18N = {
                fr:"Nous ne collectons que le nécessaire pour traiter votre commande : le nom, le moyen de contact et les informations d'activation du produit. Nous ne demandons ni ne conservons les mots de passe de vos comptes.",
                en:"We only collect what's needed to complete your order: your name, how to reach you, and the product's activation details. We never ask for or keep your account passwords." },
 
+  /* ---- server wording, rendered for FR/EN ---- */
+  war_full:       { ar:"ضمان طوال مدة الاشتراك", fr:"Garantie sur toute la durée de l'abonnement", en:"Covered for the whole subscription" },
+  war_activation: { ar:"ضمان التفعيل", fr:"Garantie d'activation", en:"Activation guarantee" },
+  deliv_on_order: { ar:"يُحدَّد عند الطلب", fr:"Précisé à la commande", en:"Confirmed when you order" },
+  st_pending_payment_review: { ar:"مراجعة الدفع", fr:"Paiement en vérification", en:"Payment under review" },
+  st_payment_confirmed: { ar:"تم تأكيد الدفع", fr:"Paiement confirmé", en:"Payment confirmed" },
+  st_activating:  { ar:"جاري التفعيل", fr:"Activation en cours", en:"Activating" },
+  st_needs_info:  { ar:"نحتاج معلومات إضافية", fr:"Informations requises", en:"We need more information" },
+  st_completed:   { ar:"مكتمل", fr:"Terminée", en:"Completed" },
+  st_cancelled:   { ar:"ملغي", fr:"Annulée", en:"Cancelled" },
+  st_refunded:    { ar:"تم الاسترجاع", fr:"Remboursée", en:"Refunded" },
+
   /* ---- loading + errors ---- */
   load_failed:    { ar:"ما قدرناش نجيبو المنتجات.", fr:"Impossible de charger les produits.", en:"Couldn't load the products." },
   check_conn:     { ar:"شوف الكونيكسيون وعاود جرّب.", fr:"Vérifiez votre connexion puis réessayez.", en:"Check your connection and try again." },
@@ -1772,6 +1834,7 @@ function applyLang(){
   if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); }
   renderStoreInfo();
   renderCart();
+  if(cur) fillDetail();
   /* the checkout step label: relabel in place rather than re-running
      step(), which would rebuild the activation fields and could wipe
      out whatever the customer already typed mid-checkout */
@@ -1832,6 +1895,7 @@ async function translateCatalog(){
     renderCats();
     if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); }
     renderCart();
+    if(cur) fillDetail();
     return;
   }
 
@@ -1878,6 +1942,7 @@ async function translateCatalog(){
   renderCats();
   if(PRODUCTS.length){ renderHome(); renderShop(); renderBundles(); }
   renderCart();
+  if(cur) fillDetail();
 }
 
 function hex2rgba(hex,a){
@@ -1991,7 +2056,7 @@ function artHTML(p, opts={}){
    yet -- its button already says قريباً */
 function fromPrice(p){
   if(!p.plans.length) return "";
-  return `<small>${t("from_word")}</small><b>${fmt(minPrice(p))}</b> <em>${esc(CONFIG.currency)}</em>${
+  return `<small>${t("from_word")}</small><b>${fmt(minPrice(p))}</b> <em>${esc(curr())}</em>${
     p.oldFrom ? `<s class="old">${fmt(p.oldFrom)}</s>` : ""}`;
 }
 
@@ -2196,7 +2261,7 @@ function renderStack(){
     + `<span class="card-img f">${artInner(f, true)}</span>
        <div class="stack-cta">
          <div class="price"><small><span class="ltr">${esc(f.name)}</span> · ${t("from_word")}</small>${
-           f.plans.length ? `<b>${fmt(minPrice(f))}</b> <em>${esc(CONFIG.currency)}</em>` : `<b>${t("coming_soon")}</b>`}</div>
+           f.plans.length ? `<b>${fmt(minPrice(f))}</b> <em>${esc(curr())}</em>` : `<b>${t("coming_soon")}</b>`}</div>
          <button type="button" class="btn btn-primary" onclick="openDetail('${f.id}')">${t("buy_now")}</button>
        </div>`;
   box.hidden = false;
@@ -2228,7 +2293,7 @@ function offerPick(){
    plus the one promise that is true of every order */
 function offerFacts(p){
   const facts = [];
-  if(p.warranty && p.warranty !== "—") facts.push(["i-shield", p.warranty]);
+  if(p.warranty && p.warranty !== "—") facts.push(["i-shield", serverText(p.warranty)]);
   if(p.actType) facts.push(["i-bolt", p.actType]);
   facts.push(["i-chat", t("chk_support")]);
   return facts;
@@ -2247,7 +2312,7 @@ function renderOffer(){
   const { p, deal } = o;
   const facts = offerFacts(p);
   const price = deal
-    ? `<small>${esc(deal.planName)}</small><b>${fmt(deal.price)}</b> <em>${esc(CONFIG.currency)}</em><s class="old">${fmt(deal.originalPrice)}</s><span class="disc" dir="ltr">−${deal.percentOff}%</span>`
+    ? `<small>${esc(durationText(deal.planName))}</small><b>${fmt(deal.price)}</b> <em>${esc(curr())}</em><s class="old">${fmt(deal.originalPrice)}</s><span class="disc" dir="ltr">−${deal.percentOff}%</span>`
     : fromPrice(p);
   const plan = deal ? `'${deal.planId}'` : "undefined";
   box.setAttribute("aria-label", `${t("offer_tag")}: ${p.name}`);
@@ -2405,12 +2470,18 @@ let cur=null,curPlan=0;
 function openDetail(id, planId){
   cur=P(id);
   curPlan = planId ? Math.max(0, cur.plans.findIndex(pl=>pl.id===planId)) : 0;
+  fillDetail();
+  go("detail");
+}
+/* everything on the product page that has words in it; re-run on a
+   language switch so an open product page follows it, plan kept */
+function fillDetail(){
   $("#dPoster").innerHTML=artHTML(cur,{eager:true});
-  $("#dCat").textContent=cur.catName || C(cur.cat).name;
+  $("#dCat").textContent=C(cur.cat).name || cur.catName;
   $("#dName").textContent=cur.name;
   $("#dDesc").textContent=cur.desc;
-  $("#dDeliv").textContent=cur.delivery;
-  $("#dWar").textContent=cur.warranty;
+  $("#dDeliv").textContent=serverText(cur.delivery);
+  $("#dWar").textContent=serverText(cur.warranty);
   /* نوع التفعيل is something the store decides per product and the
      buyer is told. A product the owner has not set one for simply
      does not show the row. */
@@ -2422,11 +2493,10 @@ function openDetail(id, planId){
   $("#dFeat").closest(".card").classList.toggle("hidden", !cur.features.length);
   $("#dPlans").innerHTML=cur.plans.length
     ? cur.plans.map((pl,i)=>`<button class="opt" role="radio" aria-checked="${i===curPlan}" onclick="setPlan(${i})">
-        <span class="rad"></span><span class="nm">${esc(pl.n)}</span>
+        <span class="rad"></span><span class="nm">${esc(durationText(pl.n))}</span>
         <span class="pr">${money(pl.p)}${pl.old?` <s>${money(pl.old)}</s>`:""}</span></button>`).join("")
     : `<p style="color:var(--muted);font-size:14.5px">${t("plans_soon")}</p>`;
   setPlan(curPlan);
-  go("detail");
 }
 function setPlan(i){
   if(!cur.plans.length){ $("#dTotal").textContent="—"; return; }
@@ -2501,7 +2571,7 @@ function openBundle(id){
       <span class="bm" style="background:${hex2rgba(i.accent,.12)}">${
         i.icon ? `<img src="${esc(i.icon)}" alt="" loading="lazy" onerror="this.remove()">`
                : `<b>${esc(i.name[0])}</b>`}</span>
-      <span class="n"><b>${esc(i.name)}</b><span>${esc(i.planName)}</span></span>
+      <span class="n"><b>${esc(i.name)}</b><span>${esc(durationText(i.planName))}</span></span>
       <b class="mono">${money(i.price)}</b>
     </div>`).join("");
   $("#bList").textContent=money(b.listTotal);
@@ -2645,7 +2715,7 @@ function renderCart(){
     return `<div class="citem">
       <div class="cthumb" aria-hidden="true">${artInner(p)}</div>
       <div class="cinfo">
-        <b>${esc(p.name)}</b><div class="pl">${esc(pl.n)}${p.actType?` · ${esc(p.actType)}`:""}</div>
+        <b>${esc(p.name)}</b><div class="pl">${esc(durationText(pl.n))}${p.actType?` · ${esc(p.actType)}`:""}</div>
         <div class="pr">${money(unit*c.qty)}</div>
         ${c.bundle?"":`<div class="qty"><button onclick="chQty(${i},-1)" aria-label="${t("qty_less")}">−</button><span>${c.qty}</span><button onclick="chQty(${i},1)" aria-label="${t("qty_more")}">+</button></div>`}
       </div>
@@ -2906,7 +2976,7 @@ function orderMessage(o){
   m+=`${t("order_number_label")}: ${o.id ?? t("issued_on_confirm")}\n`;
   m+=`———————————\n`;
   o.items.forEach(it=>{
-    m+=`• ${it.name} — ${it.plan}${it.qty>1?` ×${it.qty}`:""}\n`;
+    m+=`• ${it.name} — ${durationText(it.plan)}${it.qty>1?` ×${it.qty}`:""}\n`;
     if(it.act) m+=`  ${t("activation_type_label")}: ${it.act}\n`;
     m+=`  ${t("price_label")}: ${money(it.price)}\n`;
     it.data.forEach(d=>{ m+=`  ${d.l}: ${d.v}\n`; });
@@ -2920,17 +2990,17 @@ function orderMessage(o){
   m+=`${t("name_only_label")}: ${o.name}\n`;
   m+=`${t("phone_only_label")}: ${o.phone}\n`;
   if(o.wilaya) m+=`${t("wilaya_only_label")}: ${o.wilaya}\n`;
-  m+=`${t("channel_only_label")}: ${o.channel}\n`;
+  m+=`${t("channel_only_label")}: ${channelText(o.channel)}\n`;
   return m;
 }
 function buildReview(){
   const o=collectOrder();
   $("#orderSummary").innerHTML =
-    o.items.map(it=>`<div class="r"><span>${esc(it.name)} — ${esc(it.plan)}${it.act?` · ${esc(it.act)}`:""}${it.qty>1?` ×${it.qty}`:""}</span><b class="mono">${money(it.price)}</b></div>`).join("")
+    o.items.map(it=>`<div class="r"><span>${esc(it.name)} — ${esc(durationText(it.plan))}${it.act?` · ${esc(it.act)}`:""}${it.qty>1?` ×${it.qty}`:""}</span><b class="mono">${money(it.price)}</b></div>`).join("")
     + `<div class="r"><span>${t("pay_method_label")}</span><b>${o.pay}</b></div>`
     + (o.ref?`<div class="r"><span>${t("ref_label")}</span><b class="mono">${o.ref}</b></div>`:"")
     + `<div class="r"><span>${t("receipt_photo_label")}</span><b>${o.receipt?t("receipt_selected"):t("receipt_not_uploaded")}</b></div>`
-    + `<div class="r"><span>${t("channel_only_label")}</span><b>${o.channel}</b></div>`
+    + `<div class="r"><span>${t("channel_only_label")}</span><b>${esc(channelText(o.channel))}</b></div>`
     + `<div class="r"><span>${t("name_only_label")}</span><b>${o.name}</b></div>`
     + `<div class="r"><span>${t("phone_only_label")}</span><b class="mono">${o.phone}</b></div>`
     + (cartSaving()>0 ? `<div class="r"><span>${t("bundle_saving_label")}</span><b class="mono">− ${money(cartSaving())}</b></div>` : "")
@@ -3058,11 +3128,11 @@ async function runTrack(){
     out.innerHTML=`<div class="card" style="text-align:start">
       <div class="dl">
         <div><span>${t("order_number_label")}</span><b class="mono">${esc(o.order_number)}</b></div>
-        <div><span>${t("status_label")}</span><b>${esc(o.status_label)}</b></div>
+        <div><span>${t("status_label")}</span><b>${esc(statusText(o))}</b></div>
         <div><span>${t("order_date_label")}</span><b class="mono">${new Date(o.created_at).toLocaleDateString("en-GB")}</b></div>
       </div>
       ${o.items&&o.items.length?`<div class="summary" style="margin-top:16px">${
-        o.items.map(i=>`<div class="r"><span>${esc(i.name)} — ${esc(i.plan)}${i.quantity>1?` ×${i.quantity}`:""}</span></div>${
+        o.items.map(i=>`<div class="r"><span>${esc(i.name)} — ${esc(durationText(i.plan))}${i.quantity>1?` ×${i.quantity}`:""}</span></div>${
           i.certificate_code?`<button class="btn btn-soft" style="margin-top:8px;width:100%"
             onclick="openCertificate('${i.certificate_code}')">${t("cert_view")}</button>`:""}`).join("")
       }</div>`:""}
@@ -3115,8 +3185,8 @@ function renderCertificate(c){
           <div><span>${t("cert_customer")}</span><b>${c.customer_name}</b></div>
           ${(c.activation_fields||[]).map(f=>`<div><span>${f.label}</span><b>${f.value}</b></div>`).join("")}
           <div><span>${t("cert_product")}</span><b>${c.product_name}</b></div>
-          <div><span>${t("cert_plan")}</span><b>${c.plan_name}</b></div>
-          ${c.warranty_label?`<div><span>${t("warranty_label")}</span><b>${c.warranty_label}</b></div>`:""}
+          <div><span>${t("cert_plan")}</span><b>${esc(durationText(c.plan_name))}</b></div>
+          ${c.warranty_label?`<div><span>${t("warranty_label")}</span><b>${esc(serverText(c.warranty_label))}</b></div>`:""}
           <div><span>${t("cert_starts")}</span><b class="mono">${starts}</b></div>
           ${ends?`<div><span>${t("cert_ends")}</span><b class="mono">${ends}</b></div>`:""}
           <div><span>${t("cert_code")}</span><b class="mono">${c.certificate_code}</b></div>
