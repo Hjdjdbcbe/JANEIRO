@@ -1019,9 +1019,9 @@ h1 .h1a,h2 .h2a{color:inherit}
       </div>
       <div class="stats">
         <div class="stat"><b class="ltr">+1000</b><span data-i18n="stat1">زبون خدمناهم</span></div>
-        <div class="stat"><b class="ltr" id="statProducts"></b><span data-i18n="stat2">اشتراك ومنتج رقمي تقدر تطلبهم دركا</span></div>
-        <div class="stat"><b class="ltr">7/7</b><span data-i18n="stat3">نردّو عليك كل يوم، من 9 الصباح حتى 11 الليل</span></div>
-        <div class="stat"><b class="ltr">100%</b><span data-i18n="stat4">ترجعلك دراهمك إذا ما قدرناش نفعّلو</span></div>
+        <div class="stat"><b class="ltr">+30</b><span data-i18n="stat2">منتج واشتراك رقمي</span></div>
+        <div class="stat"><b class="ltr">7/7</b><span data-i18n="stat3">دعم مستمر</span></div>
+        <div class="stat"><b class="ltr">100%</b><span data-i18n="stat4">ضمان على كل طلب</span></div>
       </div>
     </div>
   </section>
@@ -1584,9 +1584,9 @@ const I18N = {
   stats_h1: { ar:"ناس وثقو فينا،", fr:"Des gens nous font confiance,", en:"People trust us," },
   stats_h2: { ar:"وكل يوم يزيدو.", fr:"et chaque jour un peu plus.", en:"and more every day." },
   stat1: { ar:"زبون خدمناهم", fr:"clients servis", en:"customers served" },
-  stat2: { ar:"اشتراك ومنتج رقمي تقدر تطلبهم دركا", fr:"abonnements et produits à commander dès maintenant", en:"subscriptions and products you can order now" },
-  stat3: { ar:"نردّو عليك كل يوم، من 9 الصباح حتى 11 الليل", fr:"on vous répond tous les jours, de 9h à 23h", en:"we reply every day, 9am to 11pm" },
-  stat4: { ar:"ترجعلك دراهمك إذا ما قدرناش نفعّلو", fr:"remboursé si nous ne pouvons pas activer", en:"refunded if we can't activate it" },
+  stat2: { ar:"منتج واشتراك رقمي", fr:"produits et abonnements numériques", en:"digital products and subscriptions" },
+  stat3: { ar:"دعم مستمر", fr:"support continu", en:"ongoing support" },
+  stat4: { ar:"ضمان على كل طلب", fr:"de commandes garanties", en:"of orders guaranteed" },
 
   /* ---- FAQ ---- */
   faq_eyebrow: { ar:"الأسئلة", fr:"Questions", en:"Questions" },
@@ -2342,10 +2342,6 @@ function renderOffer(){
 }
 
 function renderHome(){
-  /* a number the catalogue proves: what can be ordered right now */
-  const live = PRODUCTS.filter(p => p.available).length;
-  $("#statProducts").textContent = live || "";
-  $("#statProducts").closest(".stat").hidden = !live;
   renderStack();
   renderMarquee();
   renderOffer();
