@@ -249,6 +249,18 @@ async function adminRpc(name, req, res) {
         [body.p_order_id, body.p_new_status, body.p_note ?? null], uid, "admin_update_order_status");
       return send(res, 200, rows[0].r);
     }
+    /* The console added in 035 calls more admin_* functions. Rather
+       than one branch per function, they go through named-argument
+       notation and Postgres resolves the types from the signature --
+       the function's own is_admin() still decides, as in production. */
+    if (/^admin_[a-z_]+$/.test(name)) {
+      const keys = Object.keys(body);
+      if (!keys.every(k => /^p_[a-z_]+$/.test(k))) return send(res, 400, { message: "bad args" });
+      const vals = keys.map(k => body[k] !== null && typeof body[k] === "object" ? JSON.stringify(body[k]) : body[k]);
+      const args = keys.map((k, i) => `${k} => $${i + 1}`).join(", ");
+      const rows = await asUser(`select ${name}(${args}) as r`, vals, uid, name);
+      return send(res, 200, rows[0].r);
+    }
     return send(res, 404, { message: `no rpc ${name}` });
   } catch (e) {
     const raw = String(e.message || "");

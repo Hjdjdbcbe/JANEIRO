@@ -20,6 +20,9 @@ bash tests/local/run-tests.sh
 # 2. store config the browser tests need: a WhatsApp number, payment
 #    account details, two category icon paths and two live deals
 psql -d janeiro_test -f tests/frontend/fixtures.sql
+#    and the Telegram bot's side for the dashboard: an owner, a seller,
+#    a product with codes and prices, two sales with warranties
+psql -d janeiro_test -f tests/frontend/bot-fixtures.sql
 
 # 3. one-off tooling
 npm i pg playwright
@@ -31,12 +34,14 @@ PGUSER="$(whoami)" node tests/frontend/mock-supabase.js &
 node tests/frontend/e2e.test.js   # catalogue, cart, order, tracking
 node tests/frontend/ui.test.js    # icons, deals, motion, narrow viewports
 node tests/frontend/theme.test.js # light/dark theme + measured contrast
+node tests/frontend/admin.test.js   # dashboard: login, overview, order queue
+node tests/frontend/console.test.js # dashboard: bot stock, sales, warranties, sellers, settings
 ```
 
-Both exit non-zero on the first failed check.
+Each exits non-zero on the first failed check.
 
 `run-tests.sh` drops and recreates the database, so re-apply
-`fixtures.sql` after every backend run or the deals section will
+`fixtures.sql` (then `bot-fixtures.sql`) after every backend run or the deals section will
 correctly render as hidden and the deal assertions will fail.
 
 ## What ui.test.js covers
