@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#09080D">
 <title>لوحة Janeiro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- keys live outside the tracked tree; see config.example.js -->
 <script src="config.js" onerror="/* not configured yet */"></script>
 <!-- أنواع التفعيل: الملف الوحيد الذي يعدّله صاحب المتجر. مكانه هنا لا
@@ -16,139 +17,183 @@
 <script src="activation-types.js" onerror="/* falls back to the built-in pair */"></script>
 <style>
 /* ============================================================
-   لوحة الطلبات — أداة تشغيل، لا واجهة متجر.
-   نفس خطوط Janeiro وبنفسجه، لكن السطح أكثف: هذه شاشة تُقرأ
+   لوحة Janeiro — أداة تشغيل، لا واجهة متجر.
+   نفس أسود المتجر وبنفسجه وخطوطه، لكن السطح أكثف: شاشة تُقرأ
    بسرعة ويُضغط فيها، غالباً من الهاتف أثناء تنفيذ طلب.
    ألوان الحالة دلالية ومنفصلة عن لون الهوية.
    ============================================================ */
 :root{
-  --bg:#101018; --surface:#191926; --surface-2:#212132; --line:#2E2E42;
-  --ink:#ECEAF4; --ink-2:#A6A2B8; --muted:#7E7995;
-  --accent:#9B85FF; --accent-soft:rgba(155,133,255,.14);
+  --bg:#09080D; --surface:#121019; --surface-2:#1A1724; --line:#262133; --line-2:#3A3349;
+  --ink:#F3F1F8; --ink-2:#CFCADB; --muted:#A8A3B8;
+  --accent:#7C3AED; --accent-hover:#6D28D9; --accent-fg:#B9A2FF; --accent-soft:rgba(139,92,246,.15);
+  --glow:rgba(124,58,237,.45);
   --wait:#F0AE4A;      /* ينتظرك */
   --work:#5AA9FF;      /* قيد العمل */
   --done:#45D7AC;      /* منتهٍ بخير */
   --dead:#FF7391;      /* ملغى أو مسترجع */
-  --f-display:"Alexandria",system-ui,sans-serif;
+  --f-display:"Alexandria","IBM Plex Sans Arabic",system-ui,sans-serif;
   --f-body:"IBM Plex Sans Arabic",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
-body{font-family:var(--f-body);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%}
+body{font-family:var(--f-body);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%;overflow-x:clip}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-input,select,textarea{font:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+button:disabled{cursor:not-allowed}
+input,select,textarea{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent-fg);outline-offset:2px;border-radius:8px}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate;display:inline-block}
 .hidden{display:none!important}
+h1,h2,h3{font-family:var(--f-display);font-synthesis:none}
 
-.wrap{max-width:940px;margin:0 auto;padding:0 16px 64px}
-
-/* ---------- top bar ---------- */
-header{position:sticky;top:0;z-index:20;background:rgba(16,16,24,.92);
-  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+/* ---------- shell ---------- */
+header{position:sticky;top:0;z-index:30;background:rgba(9,8,13,.88);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 /* the top bar. Do not reuse this class name -- a later .bar rule for
    the chart columns once overrode flex-direction here and stacked it. */
-.bar{max-width:940px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px}
-.bar h1{font-family:var(--f-display);font-size:16px;font-weight:700;margin:0;flex:1;white-space:nowrap}
-/* on a narrow phone the email is the first thing to give way */
-@media(max-width:420px){.bar .who{display:none}}
-.bar .who{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:40vw;white-space:nowrap}
-.linkbtn{font-size:13px;color:var(--accent);padding:6px 10px;border-radius:9px}
-.linkbtn:hover{background:var(--accent-soft)}
+.bar{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+.logo{width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;
+  font-family:var(--f-display);font-weight:800;font-size:17px;
+  background:radial-gradient(circle at 35% 30%,#B79BFF 0%,#7C3AED 55%,#3B1680 100%);box-shadow:0 0 18px var(--glow)}
+.bar h1{font-size:16px;font-weight:700;margin:0;flex:1;white-space:nowrap}
+.bar h1 small{font-family:var(--f-body);font-weight:500;font-size:12px;color:var(--muted);margin-inline-start:6px}
+@media(max-width:520px){.bar .who,.bar h1 small{display:none}}
+.bar .who{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:30vw;white-space:nowrap}
+.linkbtn{font-size:13px;color:var(--accent-fg);padding:7px 11px;border-radius:10px;border:1px solid transparent}
+.linkbtn:hover{background:var(--accent-soft);border-color:var(--line)}
 
-/* ---------- queue filter chips ---------- */
+.shell{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:232px minmax(0,1fr);gap:24px;padding:0 16px}
+.side{position:sticky;top:57px;align-self:start;height:calc(100vh - 57px);overflow-y:auto;padding:18px 0 40px;
+  display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
+.side .grp{font-size:11.5px;font-weight:700;letter-spacing:.3px;color:var(--muted);margin:16px 12px 6px}
+.side .grp:first-child{margin-top:4px}
+.tab{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:9px 12px;border-radius:11px;
+  font-size:14px;font-weight:600;color:var(--ink-2);transition:background .15s,color .15s}
+.tab svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.tab:hover{background:var(--surface);color:var(--ink)}
+.tab[aria-current="true"]{background:var(--accent-soft);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(139,92,246,.35)}
+.tab[aria-current="true"] svg{color:var(--accent-fg);opacity:1}
+.tab .cnt{margin-inline-start:auto;font-family:var(--f-mono);font-size:11px;min-width:20px;height:20px;padding:0 6px;
+  border-radius:999px;background:var(--wait);color:#1A1205;display:grid;place-items:center;font-weight:600}
+.wrap{min-width:0;padding:4px 0 72px}
+@media(max-width:980px){
+  .shell{display:block;padding:0}
+  .side{position:sticky;top:57px;z-index:20;height:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;
+    padding:8px 16px;gap:6px;background:rgba(9,8,13,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+    scrollbar-width:none}
+  .side::-webkit-scrollbar{display:none}
+  .side .grp{display:none}
+  .tab{width:auto;flex:none;padding:7px 12px;font-size:13.5px;white-space:nowrap;border:1px solid var(--line)}
+  .tab svg{display:none}
+  .wrap{padding:4px 16px 72px}
+}
+
+.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0 4px}
+.pagehead h2{font-size:22px;font-weight:700;margin:0}
+.pagehead p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+
+/* ---------- filter chips ---------- */
 .chips{display:flex;gap:8px;overflow-x:auto;padding:14px 0 4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;display:inline-flex;align-items:center;gap:7px;padding:7px 13px;
-  border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-2);
+  border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-2);background:var(--surface);
   white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
 .chip:hover{border-color:var(--accent)}
-.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip .n{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
-.chip[aria-pressed="true"] .n{color:var(--accent)}
+.chip[aria-pressed="true"] .n{color:#EDE6FF}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.search{flex:1 1 240px;min-width:0;position:relative}
+.search input{width:100%;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);
+  padding:0 40px 0 12px;outline:0}
+.search input:focus,.ed input:focus,.ed select:focus,.ed textarea:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search svg{position:absolute;top:50%;inset-inline-start:13px;transform:translateY(-50%);width:17px;height:17px;
+  fill:none;stroke:var(--muted);stroke-width:1.9;pointer-events:none}
+.toolbar select{height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:0 12px}
 
 /* ---------- order rows ---------- */
 .rows{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .row{display:flex;align-items:center;gap:12px;width:100%;text-align:start;
-  background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px 15px;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 15px;
   border-inline-start:3px solid var(--tone,var(--muted));transition:border-color .15s,transform .12s}
-.row:hover{border-color:var(--accent)}
-.row:active{transform:scale(.995)}
-.row .main{flex:1;min-width:0}
-.row .num{font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+button.row:hover{border-color:var(--accent)}
+button.row:active{transform:scale(.995)}
+.row .main{flex:1;min-width:0;display:flex;flex-direction:column}
+.row .num{align-self:flex-start;font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
 .row .name{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .money{font-family:var(--f-mono);font-size:14px;font-weight:600;flex:none}
+.row .side-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:600px){.row.wrapme{flex-wrap:wrap}.row.wrapme .side-acts{width:100%;justify-content:flex-start}}
 .pill{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;flex:none;
   color:var(--tone);background:color-mix(in srgb,var(--tone) 15%,transparent);
   border:1px solid color-mix(in srgb,var(--tone) 32%,transparent);white-space:nowrap}
 .t-wait{--tone:var(--wait)} .t-work{--tone:var(--work)}
-.t-done{--tone:var(--done)} .t-dead{--tone:var(--dead)}
+.t-done{--tone:var(--done)} .t-dead{--tone:var(--dead)} .t-muted{--tone:var(--muted)}
 
-.empty{text-align:center;padding:56px 20px;color:var(--muted);font-size:14px}
+.empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
 .empty b{display:block;font-family:var(--f-display);color:var(--ink);font-size:16px;margin-bottom:6px}
 
-/* ---------- detail ---------- */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:15px;
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;
   padding:18px;display:flex;flex-direction:column;gap:14px;margin-top:14px}
-.card h2{font-family:var(--f-display);font-size:15px;font-weight:600;margin:0}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px}
+.card h2{font-size:15.5px;font-weight:700;margin:0}
+.card h3{font-size:14.5px;font-weight:700;margin:0}
+.cardhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cardhead h2{flex:1}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px;margin:0}
 .kv dt{color:var(--muted);font-size:13px}
 .kv dd{margin:0;overflow-wrap:anywhere}
-.item{border:1px solid var(--line);border-radius:11px;padding:13px;background:var(--surface-2);
+.item{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--surface-2);
   display:flex;flex-direction:column;gap:9px}
 .item .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .item b{font-size:14.5px}
 .item .plan{font-size:12.5px;color:var(--muted)}
 /* activation data is what you actually need to do the job */
-.act{display:grid;gap:7px;background:var(--bg);border:1px dashed var(--line);
+.act{display:grid;gap:7px;background:var(--bg);border:1px dashed var(--line-2);
   border-radius:10px;padding:11px}
 .act .r{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;align-items:baseline}
 .act .r span{color:var(--muted);flex:none}
 .act .r b{font-family:var(--f-mono);font-weight:500;overflow-wrap:anywhere;text-align:end}
-/* On a phone a long email breaks mid-word against the label. Give the
-   value its own line instead -- this is the field the owner copies. */
 @media(max-width:440px){
   .act .r{flex-wrap:wrap;gap:2px 10px}
   .act .r b{width:100%;text-align:start;order:3}
   .act .r .copy{margin-inline-start:auto}
 }
-.copy{font-size:11px;color:var(--accent);padding:2px 7px;border-radius:7px;flex:none}
+.copy{font-size:11.5px;color:var(--accent-fg);padding:3px 8px;border-radius:7px;flex:none}
 .copy:hover{background:var(--accent-soft)}
 
 .timeline{display:flex;flex-direction:column;gap:0}
 .tl{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
 .tl:last-child{border-bottom:0}
-.tl .dot{width:8px;height:8px;border-radius:50%;background:var(--tone,var(--muted));
-  flex:none;margin-top:8px}
+.tl .dot{width:8px;height:8px;border-radius:50%;background:var(--tone,var(--muted));flex:none;margin-top:8px}
 .tl .txt{flex:1}
 .tl .when{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
 .tl .note{font-size:12.5px;color:var(--ink-2);margin-top:2px}
 
 /* ---------- actions ---------- */
 .acts{display:flex;flex-wrap:wrap;gap:9px}
-.btn{padding:11px 16px;border-radius:11px;font-size:14px;font-weight:600;
-  border:1px solid var(--line);background:var(--surface-2);transition:transform .12s,background .15s}
-.btn:hover{background:var(--line)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;border-radius:12px;
+  font-size:14px;font-weight:600;border:1px solid var(--line);background:var(--surface-2);text-decoration:none;
+  transition:transform .12s,background .15s,border-color .15s}
+.btn:hover{border-color:var(--line-2);background:#211D2D}
 .btn:active{transform:scale(.97)}
-.btn[disabled]{opacity:.5;cursor:not-allowed}
-.btn.go{background:var(--accent);color:#12101c;border-color:transparent}
-.btn.go:hover{filter:brightness(1.08)}
+.btn[disabled]{opacity:.5}
+.btn.go{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 8px 22px -12px var(--glow)}
+.btn.go:hover{background:var(--accent-hover)}
 .btn.warn{color:var(--dead);border-color:color-mix(in srgb,var(--dead) 34%,transparent)}
-textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;
-  padding:11px;color:var(--ink);resize:vertical;min-height:62px;font-size:14px}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:10px}
+textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;
+  padding:11px;color:var(--ink);resize:vertical;min-height:62px;font-size:14px;outline:0}
 label.fl{font-size:12.5px;color:var(--muted)}
 
-/* ---------- view switch ---------- */
-.tabs{display:flex;gap:6px;padding:14px 0 0}
-.tab{padding:8px 15px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted)}
-.tab[aria-current="true"]{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
-
 /* ---------- overview ---------- */
-/* What needs the owner comes first and is the loudest thing on screen;
-   everything below it is context. */
 .attention{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-top:14px}
-.att{background:var(--surface);border:1px solid var(--line);border-radius:13px;
+.att{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;
   padding:14px;text-align:start;border-inline-start:3px solid var(--tone,var(--muted));
   display:flex;flex-direction:column;gap:2px;transition:border-color .15s,transform .12s}
 .att:hover{border-color:var(--accent)}
@@ -156,31 +201,29 @@ label.fl{font-size:12.5px;color:var(--muted)}
 .att b{font-family:var(--f-mono);font-size:25px;font-weight:600;color:var(--tone,var(--ink));
   font-variant-numeric:tabular-nums;line-height:1.2}
 .att span{font-size:12.5px;color:var(--muted)}
-.allclear{background:var(--surface);border:1px solid var(--line);border-radius:13px;
+.allclear{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;
   padding:20px;text-align:center;color:var(--muted);font-size:14px;margin-top:14px}
 .allclear b{display:block;color:var(--done);font-family:var(--f-display);font-size:16px;margin-bottom:4px}
 
 .tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.tile{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:15px;
-  display:flex;flex-direction:column;gap:3px}
+.tile{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:15px;
+  display:flex;flex-direction:column;gap:3px;text-align:start}
+button.tile:hover{border-color:var(--accent)}
 .tile .lbl{font-size:12.5px;color:var(--muted)}
 .tile .v{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
 .delta{font-size:12px;font-family:var(--f-mono);display:inline-flex;align-items:center;gap:3px}
 .delta.up{color:var(--done)} .delta.down{color:var(--dead)} .delta.flat{color:var(--muted)}
+.twocol{display:grid;gap:0 14px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media(max-width:860px){.twocol{grid-template-columns:minmax(0,1fr)}}
 
 /* seven-day bars: drawn from the daily rows, no library */
 .chart{display:flex;align-items:flex-end;gap:6px;height:104px;padding-top:8px}
-/* min-width:0 matters: a flex item will not shrink below its content's
-   width by default, so the day labels were forcing the chart wider than
-   the phone and pushing the whole page sideways. */
 .daybar{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;height:100%}
 .daybar i{display:block;background:var(--accent-soft);border:1px solid var(--accent);
   border-radius:5px 5px 3px 3px;min-height:3px;transition:height .3s}
 .daybar.today i{background:var(--accent)}
-.daybar em{font-style:normal;font-size:10.5px;color:var(--muted);text-align:center;
-  font-family:var(--f-mono)}
-.daybar b{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-2);text-align:center;
-  font-variant-numeric:tabular-nums}
+.daybar em{font-style:normal;font-size:10.5px;color:var(--muted);text-align:center;font-family:var(--f-mono)}
+.daybar b{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-2);text-align:center;font-variant-numeric:tabular-nums}
 
 .toplist{display:flex;flex-direction:column;gap:0}
 .top{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
@@ -190,81 +233,129 @@ label.fl{font-size:12.5px;color:var(--muted)}
 .top .rev{font-family:var(--f-mono);font-weight:600;font-size:13.5px;flex:none}
 
 /* ---------- products ---------- */
-.plist{display:grid;gap:10px;margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.plist{display:grid;gap:10px;margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
 .prow{display:flex;gap:12px;align-items:center;text-align:start;width:100%;
-  background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:11px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:11px;
   transition:border-color .15s,transform .12s}
 .prow:hover{border-color:var(--accent)}
 .prow:active{transform:scale(.995)}
 /* 3:4, the same ratio the shop uses, so what you see here is the crop
    the customer gets */
 .pthumb{width:48px;aspect-ratio:3/4;border-radius:8px;flex:none;overflow:hidden;
-  background:var(--surface-2);display:grid;place-items:center;
+  background:var(--bg);display:grid;place-items:center;
   font-family:var(--f-display);font-weight:700;color:var(--muted);font-size:16px}
 .pthumb img{width:100%;height:100%;object-fit:cover;display:block}
 .prow .pi{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .prow b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prow .meta{font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+.prow .meta,.meta{font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
 
 /* ---------- editor ---------- */
 .ed{display:flex;flex-direction:column;gap:8px}
 .ed label{font-size:12.5px;color:var(--muted)}
 .ed input,.ed select,.ed textarea{width:100%;background:var(--bg);border:1px solid var(--line);
-  border-radius:10px;padding:10px;color:var(--ink);font-size:14px}
+  border-radius:11px;padding:10px;color:var(--ink);font-size:14px;outline:0}
 .ed input:disabled{opacity:.55}
+.ed input[type=checkbox]{width:auto}
 .two{display:grid;gap:8px;grid-template-columns:1fr 1fr}
 .three{display:grid;gap:8px;grid-template-columns:1fr 1fr auto}
-/* one repeating row: a plan, a feature, an activation field */
-.rep{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+.rep{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;
   padding:11px;display:flex;flex-direction:column;gap:8px}
 .rep .hd{display:flex;align-items:center;gap:8px}
 .rep .hd b{flex:1;font-size:13px}
-.del{font-size:11.5px;color:var(--dead);padding:4px 9px;border-radius:8px;flex:none}
+.del{font-size:12px;color:var(--dead);padding:4px 9px;border-radius:8px;flex:none}
 .del:hover{background:color-mix(in srgb,var(--dead) 14%,transparent)}
-.addrow{border:1px dashed var(--line);border-radius:11px;padding:11px;width:100%;
-  color:var(--accent);font-size:13.5px;font-weight:600;transition:border-color .15s}
+.addrow{border:1px dashed var(--line-2);border-radius:12px;padding:11px;width:100%;
+  color:var(--accent-fg);font-size:13.5px;font-weight:600;transition:border-color .15s}
 .addrow:hover{border-color:var(--accent);background:var(--accent-soft)}
 .inactive{opacity:.6}
-.hint{font-size:12px;color:var(--muted);line-height:1.6}
-.drop{border:1px dashed var(--line);border-radius:12px;padding:16px;text-align:center;
+.hint{font-size:12.5px;color:var(--muted);line-height:1.7;margin:0}
+.drop{border:1px dashed var(--line-2);border-radius:12px;padding:16px;text-align:center;
   cursor:pointer;display:block;transition:border-color .15s}
 .drop:hover{border-color:var(--accent)}
 .drop b{display:block;font-size:13.5px;margin-bottom:3px}
 .drop span{font-size:12px;color:var(--muted)}
-.posterprev{width:96px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex:none;
-  background:var(--surface-2)}
+.posterprev{width:96px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex:none;background:var(--surface-2)}
 .posterprev img{width:100%;height:100%;object-fit:cover;display:block}
-/* the icon preview is round and on a light ground, matching the orbit
-   tile -- a white-on-white mark has to look wrong here too */
 .iconprev{width:72px;height:72px;border-radius:50%;overflow:hidden;flex:none;
   background:#fff;border:1px solid var(--line);display:grid;place-items:center;
-  font-family:var(--f-display);font-weight:700;font-size:26px;color:var(--muted)}
+  font-family:var(--f-display);font-weight:700;font-size:26px;color:#6F6A80}
 .iconprev img{width:76%;height:76%;object-fit:contain;display:block}
-.lnk{color:var(--accent);font-size:12px;text-decoration:underline;padding:0}
-/* the missing-icon marker on a product row */
+.lnk{color:var(--accent-fg);font-size:12px;text-decoration:underline;padding:0}
 .noicon{font-size:11px;font-weight:600;color:var(--wait);flex:none;
-  border:1px solid color-mix(in srgb,var(--wait) 40%,transparent);
-  border-radius:999px;padding:2px 8px}
+  border:1px solid color-mix(in srgb,var(--wait) 40%,transparent);border-radius:999px;padding:2px 8px}
 .notice{background:color-mix(in srgb,var(--wait) 12%,transparent);
   border:1px solid color-mix(in srgb,var(--wait) 34%,transparent);
-  border-radius:11px;padding:11px 13px;font-size:12.5px;line-height:1.7;margin:12px 0 0}
-.notice b{display:block;font-size:13px;margin-bottom:3px}
+  border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.7;margin:0}
+.notice b{display:block;font-size:13.5px;margin-bottom:3px}
 .notice .who{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);word-break:break-word}
 .sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);
-  padding:14px 0 0;display:flex;gap:9px;flex-wrap:wrap;z-index:5}
+  padding:14px 0 calc(8px + env(safe-area-inset-bottom,0px));display:flex;gap:9px;flex-wrap:wrap;z-index:5}
+
+/* ---------- site texts ---------- */
+.tgrp{font-size:15px;margin:22px 2px 8px;color:var(--accent-fg)}
+.trow{margin-top:8px;padding:12px 14px;gap:6px}
+.trow.edited{border-inline-start:3px solid var(--accent)}
+.trh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:22px}
+.tcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(max-width:900px){.tcols{grid-template-columns:minmax(0,1fr)}}
+.tcell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tcell span{font-size:11.5px;color:var(--muted)}
+.tcell textarea{min-height:40px;resize:vertical;font-size:13.5px;line-height:1.55;padding:8px 10px}
+.tcell textarea.dirty{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.tcell textarea.bad{border-color:var(--dead);box-shadow:0 0 0 3px color-mix(in srgb,var(--dead) 25%,transparent)}
+.savebar{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:9px;
+  margin-top:14px;padding:10px 12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--accent);
+  box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.savebar span{flex:1;font-weight:600;font-size:13.5px}
+
+/* ---------- bot stock ---------- */
+.vtable{display:flex;flex-direction:column;gap:8px}
+.vrow{display:grid;grid-template-columns:minmax(0,1.3fr) auto minmax(0,1.6fr) auto;gap:10px 14px;align-items:center;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+@media(max-width:760px){.vrow{grid-template-columns:minmax(0,1fr)}.vrow .vn b{display:inline;margin-inline-end:6px}}
+.vrow .vn b{display:block;font-size:14px}
+.vrow .vn span{font-size:12px;color:var(--muted)}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+.cnt-av{--tone:var(--done)} .cnt-rs{--tone:var(--wait)} .cnt-sd{--tone:var(--work)} .cnt-ds{--tone:var(--muted)}
+.prices{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.prices label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.prices input{width:96px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--bg);padding:0 8px;
+  font-family:var(--f-mono);direction:ltr;outline:0}
+.prices input:focus{border-color:var(--accent)}
+.vacts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.panel-in{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px dashed var(--line)}
+.codes{display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));max-height:340px;overflow:auto}
+.code{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
+.code .mono{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tagx{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:999px;background:var(--accent-soft);
+  color:var(--accent-fg);font-size:12.5px;font-weight:600}
+.tagx button{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2)}
+.tagx button:hover{background:rgba(255,255,255,.08);color:var(--dead)}
+.inl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.inl input,.inl select{height:38px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 10px;outline:0;min-width:0}
+.inl input:focus,.inl select:focus{border-color:var(--accent)}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.switch input{width:auto}
+.linkbox{display:flex;gap:8px;align-items:center;background:var(--bg);border:1px dashed var(--accent);border-radius:10px;padding:8px 10px}
+.linkbox .mono{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.more{margin-top:12px;width:100%}
 
 /* ---------- login ---------- */
-.login{max-width:360px;margin:14vh auto;padding:0 16px;display:flex;flex-direction:column;gap:16px}
-.login h1{font-family:var(--f-display);font-size:22px;margin:0}
+.login{max-width:380px;margin:12vh auto;padding:0 16px;display:flex;flex-direction:column;gap:16px}
+.login .logo{width:52px;height:52px;font-size:24px}
+.login h1{font-size:24px;margin:0}
 .login p{color:var(--muted);font-size:13.5px;margin:0}
 .field{display:flex;flex-direction:column;gap:6px}
-.field input{background:var(--surface);border:1px solid var(--line);border-radius:11px;
-  padding:12px;color:var(--ink)}
+.field input{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--ink);outline:0}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .err{color:var(--dead);font-size:13.5px;min-height:20px}
 
 #toast{position:fixed;inset-block-end:18px;inset-inline-start:50%;transform:translateX(50%) translateY(20px);
-  background:var(--surface-2);border:1px solid var(--line);border-radius:11px;
-  padding:10px 16px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60}
+  background:var(--ink);color:var(--bg);border-radius:12px;font-weight:600;
+  padding:10px 16px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;
+  max-width:calc(100% - 32px)}
 #toast.on{opacity:1;transform:translateX(50%) translateY(0)}
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -274,8 +365,9 @@ label.fl{font-size:12.5px;color:var(--muted)}
 
 <!-- ===================== LOGIN ===================== -->
 <section id="login" class="login">
+  <span class="logo" aria-hidden="true">J</span>
   <div>
-    <h1>لوحة الطلبات</h1>
+    <h1>لوحة Janeiro</h1>
     <p>ادخل بحساب الأدمن الخاص بالمتجر.</p>
   </div>
   <div class="field"><label class="fl" for="email">البريد الإلكتروني</label>
@@ -290,44 +382,72 @@ label.fl{font-size:12.5px;color:var(--muted)}
 <div id="app" class="hidden">
   <header>
     <div class="bar">
-      <h1>لوحة Janeiro</h1>
+      <span class="logo" aria-hidden="true">J</span>
+      <h1>لوحة Janeiro <small>المتجر والبوت</small></h1>
       <span class="who" id="who"></span>
       <button class="linkbtn" id="refresh">تحديث</button>
       <button class="linkbtn" id="logout">خروج</button>
     </div>
   </header>
 
-  <main class="wrap">
-    <nav class="tabs" id="tabs">
-      <button class="tab" data-v="overview" aria-current="true">نظرة عامة</button>
-      <button class="tab" data-v="queue" aria-current="false">الطلبات</button>
-      <button class="tab" data-v="products" aria-current="false">المنتجات</button>
-      <button class="tab" data-v="bundles" aria-current="false">الباقات</button>
+  <div class="shell">
+    <nav class="side" id="tabs" aria-label="أقسام اللوحة">
+      <span class="grp">المتجر</span>
+      <button class="tab" data-v="overview" aria-current="true"><svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8"/><path d="M5 10v10h14V10"/></svg>نظرة عامة</button>
+      <button class="tab" data-v="queue" aria-current="false"><svg viewBox="0 0 24 24"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>الطلبات<span class="cnt hidden" id="cntQueue"></span></button>
+      <button class="tab" data-v="products" aria-current="false"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="9" rx="1.5"/><rect x="3" y="15" width="18" height="6" rx="1.5"/></svg>المنتجات</button>
+      <button class="tab" data-v="deals" aria-current="false"><svg viewBox="0 0 24 24"><path d="M20 12 12 20 4 12V4h8z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg>العروض</button>
+      <button class="tab" data-v="bundles" aria-current="false"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5z"/><path d="m3 8v8l9 5 9-5V8"/></svg>الباقات</button>
+      <button class="tab" data-v="categories" aria-current="false"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>الأقسام</button>
+      <span class="grp">الزبائن والضمان</span>
+      <button class="tab" data-v="customers" aria-current="false"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>الزبائن</button>
+      <button class="tab" data-v="warranty" aria-current="false"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>وثائق الضمان</button>
+      <span class="grp">بوت التليغرام</span>
+      <button class="tab" data-v="stock" aria-current="false"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>المخزون والأكواد</button>
+      <button class="tab" data-v="sales" aria-current="false"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>المبيعات<span class="cnt hidden" id="cntSales"></span></button>
+      <button class="tab" data-v="sellers" aria-current="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>البائعين</button>
+      <span class="grp">الإعدادات</span>
+      <button class="tab" data-v="texts" aria-current="false"><svg viewBox="0 0 24 24"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>نصوص الموقع</button>
+      <button class="tab" data-v="settings" aria-current="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>الإعدادات</button>
     </nav>
 
-    <!-- products -->
-    <section id="products" class="hidden"></section>
-    <section id="editor" class="hidden"></section>
+    <main class="wrap">
+      <!-- products -->
+      <section id="products" class="hidden"></section>
+      <section id="editor" class="hidden"></section>
 
-    <!-- bundles -->
-    <section id="bundles" class="hidden"></section>
-    <section id="bundleEditor" class="hidden"></section>
+      <!-- bundles -->
+      <section id="bundles" class="hidden"></section>
+      <section id="bundleEditor" class="hidden"></section>
 
-    <!-- overview -->
-    <section id="overview"></section>
+      <!-- overview -->
+      <section id="overview"></section>
 
-    <!-- queue -->
-    <section id="queue" class="hidden">
-      <div class="chips" id="chips" role="group" aria-label="تصفية الطلبات"></div>
-      <div class="rows" id="rows"></div>
-    </section>
+      <!-- queue -->
+      <section id="queue" class="hidden">
+        <div class="pagehead"><div><h2>الطلبات</h2><p>طابور الطلبات بحسب ما يحتاجك أولاً.</p></div></div>
+        <div class="chips" id="chips" role="group" aria-label="تصفية الطلبات"></div>
+        <div class="rows" id="rows"></div>
+      </section>
 
-    <!-- detail -->
-    <section id="detail" class="hidden">
-      <div class="chips"><button class="chip" id="back">→ رجوع للقائمة</button></div>
-      <div id="detailBody"></div>
-    </section>
-  </main>
+      <!-- detail -->
+      <section id="detail" class="hidden">
+        <div class="chips"><button class="chip" id="back">→ رجوع للقائمة</button></div>
+        <div id="detailBody"></div>
+      </section>
+
+      <!-- the sections added with 035 -->
+      <section id="deals" class="hidden"></section>
+      <section id="categories" class="hidden"></section>
+      <section id="customers" class="hidden"></section>
+      <section id="warranty" class="hidden"></section>
+      <section id="stock" class="hidden"></section>
+      <section id="sales" class="hidden"></section>
+      <section id="sellers" class="hidden"></section>
+      <section id="settings" class="hidden"></section>
+      <section id="texts" class="hidden"></section>
+    </main>
+  </div>
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -469,6 +589,7 @@ async function loadOverview() {
   const hours = st.oldest_waiting_hours;
 
   $("#overview").innerHTML = `
+    ${head("نظرة عامة", "الموقع والبوت في صفحة وحدة.")}
     <div class="card" style="margin-top:14px">
       <h2>يحتاجك الآن</h2>
       ${waiting.length ? `
@@ -534,6 +655,10 @@ async function loadOverview() {
 
   /* the attention tiles are the fast path into the work */
   $$("[data-goq]").forEach(b => b.onclick = () => { filter = b.dataset.goq; showView("queue"); });
+
+  /* the bot's side of the business, below the site's */
+  $("#overview").insertAdjacentHTML("beforeend", await botOverviewCard());
+  wireGo($("#overview"));
 }
 
 /* ---------- products ---------- */
@@ -1288,19 +1413,958 @@ async function archiveProduct() {
   } catch (e) { toast(e.message); }
 }
 
+/* ================================================================
+   035 — the rest of the store and the Telegram bot
+
+   Every write below goes through an admin_* function that checks
+   is_admin() on the server. The bot's own actions are reached through
+   admin_bot(action, args), which runs the bot's existing functions as
+   the bot's owner -- so the dashboard and the bot obey one set of
+   rules and return the same error codes.
+   ================================================================ */
+const bot = (action, args) => rpc("admin_bot", { p_action: action, p_args: args || {} });
+
+/* the error codes the server raises, said as a person would */
+const ERR = {
+  NOT_ADMIN: "هذا الحساب ليس أدمن.",
+  NO_BOT_OWNER: "البوت ما عندوش مالك مسجّل بعد. افتح البوت مرة بحساب المالك، ومن بعد ارجع هنا.",
+  UNKNOWN_ACTION: "عملية غير معروفة.",
+  CARD_IN_USE: "هذا الكود محجوز عند بائع ولا مباع، ما يتوقّفش.",
+  CARD_NOT_FOUND: "الكود ما كانش.",
+  PRODUCT_EXISTS: "كاين منتج بنفس الكود.", VARIANT_EXISTS: "كاينة مدة بنفس الكود في هذا المنتج.",
+  TEXT_TOO_LONG: "نص طويل بزاف (4000 حرف على الأكثر).", INVALID_KEY: "مفتاح نص غير معروف.", TOO_MANY_ITEMS: "تعديلات بزاف في مرة وحدة — احفظ على دفعات.",
+  INVALID_CODE: "الكود: حروف لاتينية وأرقام بلا فراغ.",
+  INVALID_UNIT: "وحدة المدة غير صالحة.", DURATION_RANGE: "المدة خارج المجال المسموح.",
+  INVALID_DURATION: "المدة لازم تكون أكبر من صفر.",
+  MARKET_NOT_FOUND: "السوق ما كانش.", INVALID_PRICE: "السعر غير صالح.",
+  ADMIN_EXISTS: "هذا البائع موجود من قبل.", ADMIN_NOT_FOUND: "البائع ما كانش.",
+  CANNOT_REMOVE_OWNER: "ما تقدرش تنحّي مالك البوت.", CANNOT_REMOVE_SELF: "ما تقدرش تنحّي روحك.",
+  ISSUE_NOT_FOUND: "البيعة ما كانتش.", ISSUE_ALREADY_SETTLED: "هذه البيعة تحسمت من قبل.",
+  PLATFORM_REQUIRED: "اختار المنصّة قبل ما تصنع الوثيقة.", DURATION_REQUIRED: "حدّد مدة هذا الاشتراك في المخزون قبل الوثيقة.",
+  PLATFORM_NOT_FOR_PRODUCT: "هذه المنصّة ما راهيش مربوطة بهذا المنتج.", PLATFORM_NOT_FOUND: "المنصّة ما كانتش.",
+  PLATFORM_EXISTS: "المنصّة موجودة من قبل.", PLATFORM_IN_USE: "المنصّة مستعملة في وثائق، ما تتنحّاش.",
+  CERTIFICATE_NOT_FOUND: "الوثيقة ما كانتش.", ALREADY_REVOKED: "الوثيقة ملغاة من قبل.",
+  ALREADY_CLAIMED: "الزبون عمّر الوثيقة من قبل، ما يلزمش رابط جديد.", CERTIFICATE_REVOKED: "الوثيقة ملغاة.",
+  CERTIFICATE_EXISTS: "لهذه البيعة وثيقة من قبل.", ISSUE_NOT_CONFIRMED: "البيعة مازال ما تأكّدتش.",
+  FIELD_EXISTS: "الحقل موجود من قبل.", FIELD_NOT_FOUND: "الحقل ما كانش.",
+  CONTACT_EXISTS: "كاين رابط بنفس الاسم.", CONTACT_NOT_FOUND: "الرابط ما كانش.",
+  TOO_MANY_LINES: "12 سطر على الأكثر.", LINE_TOO_LONG: "سطر طويل بزاف (400 حرف على الأكثر).",
+  UNKNOWN_SETTING: "إعداد غير معروف.", INVALID_WHATSAPP: "رقم الواتساب غير صالح.",
+  INVALID_USERNAME: "اسم المستخدم: حروف لاتينية وأرقام ونقطة وشرطة سفلية.",
+  INVALID_SITE_URL: "رابط الموقع لازم يبدا بـ https://", INVALID_MAX_ACTIVE_ORDERS: "عدد الطلبات المفتوحة: رقم من 1 لـ 99.",
+  INVALID_STORE_NAME: "اسم المتجر مطلوب.", SETTING_TOO_LONG: "النص طويل بزاف.",
+  INVALID_NAME: "الاسم مطلوب.", INVALID_SLUG: "المعرّف: حروف لاتينية صغيرة وأرقام وشرطات.",
+  INVALID_COLOR: "اللون بصيغة #RRGGBB.", SLUG_TAKEN: "المعرّف مستعمل من قبل.", CATEGORY_NOT_FOUND: "القسم ما كانش.",
+  INVALID_LABEL: "اسم طريقة الدفع مطلوب.", PAYMENT_METHOD_NOT_FOUND: "طريقة الدفع ما كانتش.",
+  DEAL_INVALID_WINDOW: "تاريخ النهاية لازم يكون بعد البداية.", DEAL_INVALID_PRICE: "سعر العرض غير صالح.",
+  DEAL_PRICE_NOT_LOWER: "سعر العرض لازم يكون أقل من سعر الخطة.", DEAL_NOT_FOUND: "العرض ما كانش.",
+  DEAL_PLAN_NOT_FOUND: "الخطة ما كانتش.", DEAL_PLAN_PRODUCT_MISMATCH: "الخطة ما تخصّش هذا المنتج.",
+};
+const errText = e => ERR[String(e.message || e).split(":")[0].trim()] || e.message || String(e);
+const fail = e => toast(errText(e));
+const day = t => t ? new Date(t).toLocaleDateString("en-GB") : "—";
+
+/* the store's own address: links to warranty pages are built on it */
+async function siteBase() {
+  const s = await siteUrl();
+  return (s || "").replace(/\/+$/, "");
+}
+
+async function copyText(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg || "نُسخ"); }
+  catch { toast("ما قدرناش ننسخو — انسخ يدوياً."); }
+}
+function wireCopies(root) {
+  root.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy));
+}
+const searchBox = (id, ph, val) => `<label class="search"><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden">${esc(ph)}</span>
+  <input id="${id}" type="search" placeholder="${esc(ph)}" value="${esc(val || "")}" autocomplete="off">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></label>`;
+/* type-to-search without a request per keystroke */
+function onSearch(el, fn) {
+  let t; el.oninput = () => { clearTimeout(t); t = setTimeout(() => fn(el.value.trim()), 260); };
+}
+const head = (title, sub, actions) => `<div class="pagehead"><div><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ""}</div>${actions || ""}</div>`;
+
+/* ---------------- overview: the bot, next to the store ---------------- */
+async function botOverviewCard() {
+  let b;
+  try { b = await rpc("admin_bot_summary"); } catch { return ""; }
+  if (!b.has_owner) return `<div class="card"><h2>بوت التليغرام</h2>
+    <div class="notice"><b>البوت مازال ما تربطش</b>${esc(ERR.NO_BOT_OWNER)}</div></div>`;
+  const rev = Object.entries(b.revenue_month || {}).map(([c, v]) => `${money0(v)} ${esc(c)}`).join(" · ") || "0";
+  setCount("cntSales", b.pending);
+  return `<div class="card">
+    <div class="cardhead"><h2>بوت التليغرام</h2><button class="btn sm" data-gov="sales">المبيعات</button></div>
+    <div class="tiles">
+      <button class="tile" data-gov="sales"><span class="lbl">بيعت اليوم</span><span class="v">${b.sold_today}</span></button>
+      <button class="tile" data-gov="sales"><span class="lbl">هذا الشهر</span><span class="v">${b.sold_month}</span></button>
+      <div class="tile"><span class="lbl">دخل الشهر</span><span class="v" style="font-size:17px">${rev}</span></div>
+      <button class="tile" data-gov="stock"><span class="lbl">أكواد متاحة</span><span class="v">${b.available}</span></button>
+      ${b.pending ? `<button class="tile" data-gov="sales" data-pending="1" style="border-inline-start:3px solid var(--wait)">
+        <span class="lbl">بيعات معلّقة</span><span class="v" style="color:var(--wait)">${b.pending}</span></button>` : ""}
+      <button class="tile" data-gov="warranty" data-bot="1"><span class="lbl">وثائق سارية</span><span class="v">${b.certificates_active}</span></button>
+      ${b.expiring_7d ? `<button class="tile" data-gov="warranty" data-bot="1"><span class="lbl">تنتهي في 7 أيام</span>
+        <span class="v" style="color:var(--wait)">${b.expiring_7d}</span></button>` : ""}
+    </div>
+    ${(b.low_stock || []).length ? `<div class="notice"><b>مخزون ناقص</b>${b.low_stock.map(x =>
+      `${esc(x.product)} — ${esc(x.variant)}: <span class="mono">${x.available}</span>`).join(" · ")}</div>` : ""}
+  </div>`;
+}
+function wireGo(root) {
+  root.querySelectorAll("[data-gov]").forEach(b => b.onclick = () => {
+    if (b.dataset.pending) salesState.status = "pending";
+    if (b.dataset.bot) warrantyState.tab = "bot";
+    showView(b.dataset.gov);
+  });
+}
+function setCount(id, n) {
+  const el = $("#" + id); if (!el) return;
+  el.textContent = n || ""; el.classList.toggle("hidden", !n);
+}
+
+/* ---------------- warranty ---------------- */
+const warrantyState = { tab: "site", q: "", status: "", offset: 0 };
+const ENG_STATUS = {
+  pending: ["بانتظار الزبون", "t-wait"], active: ["سارية", "t-done"],
+  expired: ["منتهية", "t-muted"], revoked: ["ملغاة", "t-dead"],
+};
+async function loadWarranty() {
+  const s = warrantyState;
+  $("#warranty").innerHTML = head("وثائق الضمان", "ضمانات طلبات الموقع ووثائق الالتزام اللي يصنعها البوت، في بلاصة وحدة.") + `
+    <div class="chips" role="group" aria-label="المصدر">
+      <button class="chip" data-wt="site" aria-pressed="${s.tab === "site"}">طلبات الموقع</button>
+      <button class="chip" data-wt="bot" aria-pressed="${s.tab === "bot"}">بوت التليغرام</button>
+    </div>
+    <div class="toolbar">${searchBox("wq", s.tab === "site" ? "الكود، رقم الطلب، الاسم ولا الهاتف" : "الكود، الاسم، الإنستغرام ولا الهاتف", s.q)}
+      ${s.tab === "bot" ? `<select id="wst" aria-label="الحالة"><option value="">كل الحالات</option>${
+        Object.entries(ENG_STATUS).map(([k, v]) => `<option value="${k}" ${s.status === k ? "selected" : ""}>${v[0]}</option>`).join("")}</select>` : ""}
+    </div>
+    <div class="rows" id="wrows"><div class="empty">…</div></div>
+    <button class="btn more hidden" id="wmore">عرض المزيد</button>`;
+  $$("[data-wt]").forEach(b => b.onclick = () => { s.tab = b.dataset.wt; s.q = ""; s.status = ""; s.offset = 0; loadWarranty(); });
+  onSearch($("#wq"), q => { s.q = q; s.offset = 0; fillWarranty(); });
+  if ($("#wst")) $("#wst").onchange = e => { s.status = e.target.value; s.offset = 0; fillWarranty(); };
+  $("#wmore").onclick = () => { s.offset += 50; fillWarranty(true); };
+  await fillWarranty();
+}
+async function fillWarranty(append) {
+  const s = warrantyState, box = $("#wrows"), base = await siteBase();
+  try {
+    let res, html;
+    if (s.tab === "site") {
+      res = await rpc("admin_site_certificates", { p_query: s.q || null, p_limit: 50, p_offset: s.offset });
+      html = res.rows.map(c => `<div class="row wrapme ${c.active ? "t-done" : "t-muted"}">
+        <span class="main">
+          <span class="num mono">${esc(c.code)} · #${esc(c.order_number)}</span>
+          <span class="name">${esc(c.customer_name)} <span class="mono" style="font-size:12.5px;color:var(--muted)">${esc(c.customer_phone)}</span></span>
+          <span class="sub">${esc(c.product_name)} — ${esc(c.plan_name)}${c.ends_at ? ` · حتى ${day(c.ends_at)}` : ""}</span>
+        </span>
+        <span class="side-acts">
+          <span class="pill">${c.active ? "سارية" : "منتهية"}</span>
+          ${base ? `<a class="btn sm" target="_blank" rel="noopener" href="${esc(base)}/?cert=${encodeURIComponent(c.code)}">فتح</a>` : ""}
+          <button class="btn sm" data-copy="${esc(c.code)}">نسخ الكود</button>
+        </span></div>`).join("");
+    } else {
+      res = await bot("engagements", { query: s.q || null, status: s.status || null, limit: 50, offset: s.offset });
+      html = res.rows.map(c => {
+        const st = ENG_STATUS[c.status] || [c.status, "t-muted"];
+        return `<div class="row wrapme ${st[1]}">
+        <span class="main">
+          <span class="num mono">${esc(c.code)}${c.ref_code ? ` · ${esc(c.ref_code)}` : ""}</span>
+          <span class="name">${esc(c.holder_name || "— مازال ما عمّرش —")}${c.whatsapp ? ` <span class="mono" style="font-size:12.5px;color:var(--muted)">${esc(c.whatsapp)}</span>` : ""}</span>
+          <span class="sub">${esc(c.platform || "")}${c.instagram ? ` · @${esc(c.instagram)}` : ""}${c.ends_at ? ` · حتى ${day(c.ends_at)}` : ""}${
+            c.days_left != null && c.status === "active" ? ` · بقات ${c.days_left} يوم` : ""} · ${esc(c.seller || "")}</span>
+        </span>
+        <span class="side-acts">
+          <span class="pill">${c.ending_soon ? "تنتهي قريب" : st[0]}</span>
+          ${base ? `<a class="btn sm" target="_blank" rel="noopener" href="${esc(base)}/warranty/${encodeURIComponent(c.code)}">الوثيقة</a>` : ""}
+          ${c.status === "pending" ? `<button class="btn sm" data-relink="${esc(c.code)}">رابط للزبون</button>` : ""}
+          ${c.status !== "revoked" ? `<button class="btn sm warn" data-revoke="${esc(c.code)}">إلغاء</button>` : ""}
+        </span></div>`; }).join("");
+    }
+    if (!append) box.innerHTML = "";
+    box.insertAdjacentHTML("beforeend", html || (append ? "" : `<div class="empty"><b>ما كاين والو</b>${s.q ? "جرّب بحث آخر." : "الوثائق تبان هنا كي تتصنع."}</div>`));
+    $("#wmore").classList.toggle("hidden", s.offset + 50 >= res.total);
+    wireCopies(box);
+    box.querySelectorAll("[data-revoke]").forEach(b => b.onclick = async () => {
+      if (!confirm(`إلغاء الوثيقة ${b.dataset.revoke}؟ الزبون يشوفها ملغاة.`)) return;
+      try { await bot("revoke", { code: b.dataset.revoke }); toast("أُلغيت الوثيقة."); s.offset = 0; fillWarranty(); } catch (e) { fail(e); }
+    });
+    box.querySelectorAll("[data-relink]").forEach(b => b.onclick = async () => {
+      try {
+        const r = await bot("relink", { code: b.dataset.relink, hours: 72 });
+        const url = base ? `${base}/warranty/claim/${r.token}` : r.token;
+        b.closest(".row").insertAdjacentHTML("afterend", `<div class="linkbox"><span class="mono">${esc(url)}</span>
+          <button class="btn sm" data-copy="${esc(url)}">نسخ</button></div>`);
+        wireCopies(box); b.remove(); copyText(url, "الرابط تنسخ — ابعثو للزبون. صالح 72 ساعة.");
+      } catch (e) { fail(e); }
+    });
+  } catch (e) { box.innerHTML = `<div class="empty"><b>ما قدرناش نجيبو الوثائق</b>${esc(errText(e))}</div>`; }
+}
+
+/* ---------------- customers ---------------- */
+const custState = { q: "", offset: 0 };
+async function loadCustomers() {
+  $("#customers").innerHTML = head("الزبائن", "كل من طلب من الموقع، مجموعين بالرقم: شحال طلب وشحال خلّص.") + `
+    <div class="toolbar">${searchBox("cq", "الاسم ولا رقم الهاتف", custState.q)}</div>
+    <div class="rows" id="crows"><div class="empty">…</div></div>
+    <button class="btn more hidden" id="cmore">عرض المزيد</button>`;
+  onSearch($("#cq"), q => { custState.q = q; custState.offset = 0; fillCustomers(); });
+  $("#cmore").onclick = () => { custState.offset += 50; fillCustomers(true); };
+  await fillCustomers();
+}
+async function fillCustomers(append) {
+  const box = $("#crows");
+  try {
+    const res = await rpc("admin_customers", { p_query: custState.q || null, p_limit: 50, p_offset: custState.offset });
+    const html = res.rows.map(c => {
+      const local = String(c.phone || "").replace(/^213/, "0");
+      return `<div class="row wrapme t-work">
+        <span class="main">
+          <span class="name">${esc(c.name)}</span>
+          <span class="sub"><span class="mono">${esc(local)}</span>${c.wilaya ? ` · ${esc(c.wilaya)}` : ""} · آخر طلب ${day(c.last_order_at)}</span>
+        </span>
+        <span class="side-acts">
+          <span class="pill t-muted">${c.orders} طلب</span>
+          <span class="money mono">${money(c.spent)}</span>
+          <a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${esc(c.phone)}">واتساب</a>
+          <button class="btn sm" data-copy="${esc(local)}">نسخ الرقم</button>
+          <button class="btn sm" data-orders="${esc(c.phone)}">طلباتو</button>
+        </span></div>`; }).join("");
+    if (!append) box.innerHTML = "";
+    box.insertAdjacentHTML("beforeend", html || (append ? "" : `<div class="empty"><b>ما كاين حتى زبون</b>${custState.q ? "جرّب بحث آخر." : "الزبائن يبانو هنا بعد أول طلب."}</div>`));
+    $("#cmore").classList.toggle("hidden", custState.offset + 50 >= res.total);
+    wireCopies(box);
+    box.querySelectorAll("[data-orders]").forEach(b => b.onclick = async () => {
+      const row = b.closest(".row");
+      if (row.nextElementSibling?.classList.contains("rows")) { row.nextElementSibling.remove(); return; }
+      try {
+        const list = await rest("orders?select=id,order_number,status,total,currency,created_at" +
+          `&normalized_phone=eq.${encodeURIComponent(b.dataset.orders)}&order=created_at.desc&limit=30`);
+        row.insertAdjacentHTML("afterend", `<div class="rows" style="margin:0 0 6px;padding-inline-start:18px">${list.map(o => `
+          <button class="row ${tone(o.status)}" data-oid="${o.id}">
+            <span class="main"><span class="num mono">${esc(o.order_number)}</span><span class="sub">${when(o.created_at)}</span></span>
+            <span class="money mono">${money(o.total, o.currency)}</span><span class="pill">${label(o.status)}</span>
+          </button>`).join("")}</div>`);
+        row.nextElementSibling.querySelectorAll("[data-oid]").forEach(x => x.onclick = () => openOrder(x.dataset.oid));
+      } catch (e) { fail(e); }
+    });
+  } catch (e) { box.innerHTML = `<div class="empty"><b>ما قدرناش نجيبو الزبائن</b>${esc(errText(e))}</div>`; }
+}
+
+/* ---------------- bot: stock and codes ---------------- */
+const UNIT = { day: "يوم", week: "أسبوع", month: "شهر", year: "سنة" };
+let BOT_MARKETS = [], BOT_PLATFORMS = [];
+async function loadStock() {
+  const box = $("#stock");
+  box.innerHTML = head("المخزون والأكواد", "منتجات البوت، مدّاتها، أسعارها لكل سوق، والأكواد اللي فيها.") + `<div class="empty">…</div>`;
+  let cat;
+  try {
+    [cat, BOT_MARKETS, BOT_PLATFORMS] = await Promise.all([
+      rpc("admin_bot_catalog"), bot("markets"), bot("platforms")]);
+  } catch (e) {
+    box.innerHTML = head("المخزون والأكواد") + `<div class="card"><div class="notice"><b>ما قدرناش نوصلو للبوت</b>${esc(errText(e))}</div></div>`;
+    return;
+  }
+  const markets = BOT_MARKETS.filter(m => m.is_active);
+  box.innerHTML = head("المخزون والأكواد", "منتجات البوت، مدّاتها، أسعارها لكل سوق، والأكواد اللي فيها.",
+    `<button class="btn go" id="newBotProd">+ منتج جديد</button>`) + `
+    <div class="card hidden" id="newProdCard">
+      <h2>منتج جديد في البوت</h2>
+      <div class="inl">
+        <input id="npCode" placeholder="الكود (لاتيني) — مثلاً netflix" dir="ltr" style="flex:1 1 160px">
+        <input id="npName" placeholder="الاسم — مثلاً نتفليكس" style="flex:2 1 200px">
+        <button class="btn go" id="npSave">زيد</button>
+      </div>
+      <p class="hint">الكود يستعملو البوت في الأوامر، ما يتبدّلش من بعد.</p>
+    </div>
+    ${cat.length ? cat.map(p => productCard(p, markets)).join("") : `<div class="card"><div class="empty"><b>ما كاين حتى منتج في البوت</b>زيد أول منتج من الزر الفوق.</div></div>`}`;
+
+  $("#newBotProd").onclick = () => $("#newProdCard").classList.toggle("hidden");
+  $("#npSave").onclick = async () => {
+    try { await bot("add_product", { code: $("#npCode").value.trim(), name: $("#npName").value.trim() }); toast("تزاد المنتج."); loadStock(); }
+    catch (e) { fail(e); }
+  };
+  wireStock(box);
+}
+function productCard(p, markets) {
+  const total = p.variants.reduce((s, v) => s + Number(v.available), 0);
+  return `<div class="card ${p.is_active ? "" : "inactive"}" data-prod="${esc(p.product_id)}" data-pcode="${esc(p.code)}">
+    <div class="cardhead">
+      <h2>${esc(p.name)} <span class="meta">${esc(p.code)}</span></h2>
+      <span class="pill ${total ? "t-done" : "t-dead"}">${total} متاح</span>
+      <label class="switch"><input type="checkbox" data-pactive ${p.is_active ? "checked" : ""}> مفعّل</label>
+    </div>
+    <div class="vtable">${p.variants.map(v => `
+      <div class="vrow ${v.is_active ? "" : "inactive"}" data-var="${esc(v.variant_id)}">
+        <div class="vn"><b>${esc(v.name)} <span class="meta">${esc(v.code)}</span></b>
+          <span>${v.duration_value ? `${v.duration_value} ${UNIT[v.duration_unit] || esc(v.duration_unit)}` : "بلا مدة — لازمة للوثيقة"}</span></div>
+        <div class="counts">
+          <span class="pill cnt-av">${v.available} متاح</span>
+          ${Number(v.reserved) ? `<span class="pill cnt-rs">${v.reserved} محجوز</span>` : ""}
+          <span class="pill cnt-sd">${v.sold} مباع</span>
+          ${Number(v.disabled) ? `<span class="pill cnt-ds">${v.disabled} موقوف</span>` : ""}
+        </div>
+        <div class="prices">${markets.map(m => `<label>${esc(m.name)}
+          <input type="number" inputmode="decimal" data-price="${esc(m.code)}" value="${v.prices?.[m.code] ?? ""}" placeholder="${esc(m.currency)}"></label>`).join("")}</div>
+        <div class="vacts">
+          <button class="btn sm go" data-vpanel="add">شحن أكواد</button>
+          <button class="btn sm" data-vpanel="codes">الأكواد</button>
+          <button class="btn sm" data-vpanel="dur">المدة</button>
+          <button class="btn sm" data-vtoggle>${v.is_active ? "إيقاف" : "تفعيل"}</button>
+        </div>
+      </div>`).join("")}
+      <div class="inl">
+        <input data-nv="code" placeholder="كود المدة — y1" dir="ltr" style="flex:1 1 110px">
+        <input data-nv="name" placeholder="اسم المدة — سنة" style="flex:2 1 160px">
+        <button class="btn sm" data-addvar>+ مدة جديدة</button>
+      </div>
+    </div>
+    <div class="twocol">
+      <div class="ed"><label>المنصّات (تبان في وثيقة الضمان)</label>
+        <div class="tags">${p.platforms.map(x => `<span class="tagx">${esc(x)}<button data-rmplat="${esc(x)}" aria-label="نحّي ${esc(x)}">×</button></span>`).join("") || `<span class="hint">ما كاين حتى منصّة.</span>`}
+          <select data-addplat><option value="">+ زيد منصّة</option>${BOT_PLATFORMS.filter(x => !p.platforms.includes(x.name))
+            .map(x => `<option>${esc(x.name)}</option>`).join("")}</select></div></div>
+      <div class="ed"><label>معلومات يعمّرها الزبون</label>
+        <div class="tags">${p.fields.map(f => `<span class="tagx">${esc(f.label)}${f.is_required ? "" : " (اختياري)"}<button data-rmfield="${esc(f.label)}" aria-label="نحّي">×</button></span>`).join("") || `<span class="hint">ما كاين حتى حقل.</span>`}</div>
+        <div class="inl"><input data-nf placeholder="مثلاً البريد الإلكتروني" style="flex:1"><button class="btn sm" data-addfield>زيد</button></div></div>
+    </div>
+  </div>`;
+}
+function wireStock(box) {
+  box.querySelectorAll("[data-prod]").forEach(card => {
+    const pid = card.dataset.prod, pcode = card.dataset.pcode;
+    card.querySelector("[data-pactive]").onchange = async e => {
+      try { await bot("set_active", { kind: "product", id: pid, active: e.target.checked }); toast(e.target.checked ? "المنتج مفعّل." : "المنتج موقوف."); loadStock(); }
+      catch (err) { fail(err); e.target.checked = !e.target.checked; }
+    };
+    card.querySelector("[data-addvar]").onclick = async () => {
+      try {
+        await bot("add_variant", { product_code: pcode, code: card.querySelector('[data-nv="code"]').value.trim(),
+                                   name: card.querySelector('[data-nv="name"]').value.trim() });
+        toast("تزادت المدة."); loadStock();
+      } catch (e) { fail(e); }
+    };
+    const addPlat = card.querySelector("[data-addplat]");
+    addPlat.onchange = async () => {
+      if (!addPlat.value) return;
+      try { await bot("add_product_platform", { product_id: pid, platform: addPlat.value }); loadStock(); } catch (e) { fail(e); }
+    };
+    card.querySelectorAll("[data-rmplat]").forEach(b => b.onclick = async () => {
+      try { await bot("remove_product_platform", { product_id: pid, platform: b.dataset.rmplat }); loadStock(); } catch (e) { fail(e); }
+    });
+    card.querySelector("[data-addfield]").onclick = async () => {
+      const label = card.querySelector("[data-nf]").value.trim();
+      if (!label) return;
+      try { await bot("add_field", { product_code: pcode, label, required: true }); loadStock(); } catch (e) { fail(e); }
+    };
+    card.querySelectorAll("[data-rmfield]").forEach(b => b.onclick = async () => {
+      try { await bot("remove_field", { product_code: pcode, label: b.dataset.rmfield }); loadStock(); } catch (e) { fail(e); }
+    });
+  });
+
+  box.querySelectorAll("[data-var]").forEach(row => {
+    const vid = row.dataset.var;
+    row.querySelectorAll("[data-price]").forEach(inp => inp.onchange = async () => {
+      if (inp.value === "") return;
+      try { await bot("set_price", { variant_id: vid, market: inp.dataset.price, price: Number(inp.value) }); toast("تحفظ السعر."); }
+      catch (e) { fail(e); }
+    });
+    row.querySelector("[data-vtoggle]").onclick = async () => {
+      const on = row.classList.contains("inactive");
+      try { await bot("set_active", { kind: "variant", id: vid, active: on }); loadStock(); } catch (e) { fail(e); }
+    };
+    row.querySelectorAll("[data-vpanel]").forEach(b => b.onclick = () => variantPanel(row, vid, b.dataset.vpanel));
+  });
+}
+async function variantPanel(row, vid, kind) {
+  row.querySelector(".panel-in")?.remove();
+  if (row.dataset.open === kind) { row.dataset.open = ""; return; }
+  row.dataset.open = kind;
+  const p = document.createElement("div");
+  p.className = "panel-in";
+  row.appendChild(p);
+  if (kind === "add") {
+    p.innerHTML = `<label class="fl">الأكواد — كل كود في سطر</label>
+      <textarea rows="5" data-codes dir="ltr" placeholder="ABCD-1234&#10;EFGH-5678"></textarea>
+      <div class="inl"><input data-note placeholder="ملاحظة (اختياري) — مثلاً رقم الفاتورة" style="flex:1">
+        <button class="btn go" data-ship>شحن</button></div>
+      <p class="hint">المكرّر (موجود من قبل) يتجاهل وحدو.</p>`;
+    p.querySelector("[data-ship]").onclick = async () => {
+      const codes = p.querySelector("[data-codes]").value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+      if (!codes.length) return toast("اكتب كود واحد على الأقل.");
+      try {
+        const r = await bot("add_cards", { variant_id: vid, codes, note: p.querySelector("[data-note]").value.trim() || null });
+        toast(`تزاد ${r.added}${r.duplicates ? ` · ${r.duplicates} مكرّر` : ""} · المتاح دركا ${r.available}`);
+        loadStock();
+      } catch (e) { fail(e); }
+    };
+  } else if (kind === "dur") {
+    const cur = (row.querySelector(".vn span")?.textContent || "");
+    p.innerHTML = `<div class="inl"><input type="number" min="1" data-dv placeholder="العدد" style="width:110px">
+      <select data-du>${Object.entries(UNIT).map(([k, v]) => `<option value="${k}" ${k === "month" ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <button class="btn go sm" data-dsave>حفظ المدة</button><button class="btn sm" data-dclear>بلا مدة</button></div>
+      <p class="hint">المدة تحسب تاريخ نهاية وثيقة الضمان. الحالية: ${esc(cur)}</p>`;
+    const save = async (value, unit) => {
+      try { await bot("set_duration", { variant_id: vid, value, unit }); toast("تحفظت المدة."); loadStock(); } catch (e) { fail(e); }
+    };
+    p.querySelector("[data-dsave]").onclick = () => save(p.querySelector("[data-dv]").value, p.querySelector("[data-du]").value);
+    p.querySelector("[data-dclear]").onclick = () => save("", "");
+  } else {
+    p.innerHTML = `<div class="chips" style="padding-top:0" data-cst>
+      ${[["", "الكل"], ["available", "متاح"], ["reserved", "محجوز"], ["sold", "مباع"], ["disabled", "موقوف"]]
+        .map(([k, l]) => `<button class="chip" data-cs="${k}" aria-pressed="${k === ""}">${l}</button>`).join("")}</div>
+      <div class="codes" data-list><div class="empty">…</div></div>`;
+    const fill = async st => {
+      const list = p.querySelector("[data-list]");
+      try {
+        const cards = await rpc("admin_bot_cards", { p_variant_id: vid, p_status: st || null, p_limit: 300 });
+        list.innerHTML = cards.map(c => `<div class="code">
+          <span class="pill ${c.status === "available" ? "cnt-av" : c.status === "reserved" ? "cnt-rs" : c.status === "sold" ? "cnt-sd" : "cnt-ds"}">${
+            { available: "متاح", reserved: "محجوز", sold: "مباع", disabled: "موقوف" }[c.status] || c.status}</span>
+          <span class="mono" title="${esc(c.code)}">${esc(c.code)}</span>
+          <button class="copy" data-copy="${esc(c.code)}">نسخ</button>
+          ${c.status === "available" ? `<button class="copy" data-dis="${c.id}">إيقاف</button>` : ""}
+          ${c.status === "disabled" ? `<button class="copy" data-en="${c.id}">إرجاع</button>` : ""}
+        </div>`).join("") || `<div class="empty" style="grid-column:1/-1;padding:20px">ما كاين حتى كود هنا.</div>`;
+        wireCopies(list);
+        list.querySelectorAll("[data-dis],[data-en]").forEach(b => b.onclick = async () => {
+          try { await rpc("admin_bot_card_set", { p_card_id: b.dataset.dis || b.dataset.en, p_disabled: !!b.dataset.dis }); fill(st); }
+          catch (e) { fail(e); }
+        });
+      } catch (e) { list.innerHTML = `<div class="empty">${esc(errText(e))}</div>`; }
+    };
+    p.querySelectorAll("[data-cs]").forEach(b => b.onclick = () => {
+      p.querySelectorAll("[data-cs]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      fill(b.dataset.cs);
+    });
+    fill("");
+  }
+}
+
+/* ---------------- bot: sales ---------------- */
+const salesState = { status: "", seller: "", q: "", offset: 0 };
+const SALE_STATUS = { pending: ["معلّقة", "t-wait"], confirmed: ["مؤكّدة", "t-done"], cancelled: ["ملغاة", "t-dead"] };
+let SELLERS = [];
+async function loadSales() {
+  const s = salesState;
+  try { SELLERS = await bot("sellers"); } catch (e) {
+    $("#sales").innerHTML = head("مبيعات البوت") + `<div class="card"><div class="notice"><b>ما قدرناش نوصلو للبوت</b>${esc(errText(e))}</div></div>`;
+    return;
+  }
+  $("#sales").innerHTML = head("مبيعات البوت", "كل بيعة دارها بائع من البوت: الكود، الزبون، السعر، والوثيقة.") + `
+    <div class="chips" role="group" aria-label="الحالة">${[["", "الكل"], ...Object.entries(SALE_STATUS).map(([k, v]) => [k, v[0]])]
+      .map(([k, l]) => `<button class="chip" data-ss="${k}" aria-pressed="${s.status === k}">${l}</button>`).join("")}</div>
+    <div class="toolbar">${searchBox("sq", "الزبون، الكود ولا المنتج", s.q)}
+      <select id="sseller" aria-label="البائع"><option value="">كل البائعين</option>${SELLERS.map(x =>
+        `<option value="${x.telegram_id}" ${String(s.seller) === String(x.telegram_id) ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
+    <div class="rows" id="srows"><div class="empty">…</div></div>
+    <button class="btn more hidden" id="smore">عرض المزيد</button>`;
+  $$("[data-ss]").forEach(b => b.onclick = () => { s.status = b.dataset.ss; s.offset = 0; loadSales(); });
+  onSearch($("#sq"), q => { s.q = q; s.offset = 0; fillSales(); });
+  $("#sseller").onchange = e => { s.seller = e.target.value; s.offset = 0; fillSales(); };
+  $("#smore").onclick = () => { s.offset += 50; fillSales(true); };
+  await fillSales();
+}
+async function fillSales(append) {
+  const s = salesState, box = $("#srows"), base = await siteBase();
+  try {
+    const res = await rpc("admin_bot_sales", { p_status: s.status || null, p_telegram_id: s.seller ? Number(s.seller) : null,
+      p_query: s.q || null, p_limit: 50, p_offset: s.offset });
+    const html = res.rows.map(r => {
+      const st = SALE_STATUS[r.status] || [r.status, "t-muted"];
+      return `<div class="row wrapme ${st[1]}" data-issue="${esc(r.issue_id)}" data-product="${esc(r.product_name)}">
+        <span class="main">
+          <span class="num mono">${esc(r.card_code)}</span>
+          <span class="name">${esc(r.product_name)} — ${esc(r.variant_name)}</span>
+          <span class="sub">${esc(r.customer_ref || "بلا زبون")} · ${esc(r.seller)} · ${when(r.requested_at)}${r.platform ? ` · ${esc(r.platform)}` : ""}</span>
+        </span>
+        <span class="side-acts">
+          ${r.price != null ? `<span class="money mono">${money0(r.price)} ${esc(r.currency || "")}</span>` : ""}
+          <span class="pill">${st[0]}</span>
+          ${r.status === "pending" ? `<button class="btn sm go" data-confirm>تأكيد</button><button class="btn sm warn" data-cancel>إلغاء</button>` : ""}
+          ${r.certificate_code ? (base ? `<a class="btn sm" target="_blank" rel="noopener" href="${esc(base)}/warranty/${encodeURIComponent(r.certificate_code)}">الوثيقة</a>` : `<span class="meta">${esc(r.certificate_code)}</span>`)
+            : r.status === "confirmed" ? `<button class="btn sm" data-cert>وثيقة ضمان</button>` : ""}
+          <button class="copy" data-copy="${esc(r.card_code)}">نسخ الكود</button>
+        </span></div>`; }).join("");
+    if (!append) box.innerHTML = "";
+    box.insertAdjacentHTML("beforeend", html || (append ? "" : `<div class="empty"><b>ما كاين حتى بيعة</b>البيعات تبان هنا كي يبيع بائع من البوت.</div>`));
+    $("#smore").classList.toggle("hidden", s.offset + 50 >= res.total);
+    wireCopies(box);
+    box.querySelectorAll("[data-issue]").forEach(row => {
+      const id = row.dataset.issue;
+      const act = async (action, msg) => {
+        try { await bot(action, { issue_id: id }); toast(msg); s.offset = 0; fillSales(); refreshCounts(); } catch (e) { fail(e); }
+      };
+      row.querySelector("[data-confirm]")?.addEventListener("click", () => act("confirm_issue", "تأكّدت البيعة."));
+      row.querySelector("[data-cancel]")?.addEventListener("click", () => {
+        if (confirm("إلغاء البيعة؟ الكود يرجع للمخزون.")) act("cancel_issue", "تلغات البيعة والكود رجع للمخزون.");
+      });
+      row.querySelector("[data-cert]")?.addEventListener("click", () => certForm(row, id, base));
+    });
+  } catch (e) { box.innerHTML = `<div class="empty"><b>ما قدرناش نجيبو المبيعات</b>${esc(errText(e))}</div>`; }
+}
+/* a warranty for a bot sale: the platform first (the bot needs it), then
+   a one-time link the customer opens to fill their own details */
+async function certForm(row, issueId, base) {
+  if (row.nextElementSibling?.dataset?.certform) { row.nextElementSibling.remove(); return; }
+  let plats = [];
+  try {
+    const cat = await rpc("admin_bot_catalog");
+    plats = (cat.find(p => p.name === row.dataset.product) || {}).platforms || [];
+  } catch {}
+  row.insertAdjacentHTML("afterend", `<div class="card" data-certform style="margin-top:0">
+    <h3>وثيقة ضمان لهذه البيعة</h3>
+    <div class="inl">
+      <select data-plat><option value="">المنصّة…</option>${plats.map(x => `<option>${esc(x)}</option>`).join("")}</select>
+      <input type="number" min="0" data-bonus placeholder="أيام زيادة (اختياري)" style="width:170px">
+      <button class="btn go sm" data-make>اصنع رابط الزبون</button>
+    </div>
+    <p class="hint">${plats.length ? "الزبون يفتح الرابط ويعمّر اسمو ورقمو، والوثيقة تتصنع وحدها." : "هذا المنتج ما عندوش منصّات — زيدها من «المخزون والأكواد»."}</p>
+  </div>`);
+  const f = row.nextElementSibling;
+  f.querySelector("[data-make]").onclick = async () => {
+    const plat = f.querySelector("[data-plat]").value;
+    try {
+      if (plat) await bot("set_issue_platform", { issue_id: issueId, platform: plat });
+      const r = await bot("from_issue", { issue_id: issueId, bonus_days: Number(f.querySelector("[data-bonus]").value || 0), hours: 72 });
+      const url = base ? `${base}/warranty/claim/${r.token}` : r.token;
+      f.insertAdjacentHTML("beforeend", `<div class="linkbox"><span class="mono">${esc(url)}</span><button class="btn sm" data-copy="${esc(url)}">نسخ</button></div>
+        <p class="hint">الوثيقة ${esc(r.code)} · صالح 72 ساعة.</p>`);
+      wireCopies(f);
+      copyText(url, "الرابط تنسخ — ابعثو للزبون.");
+    } catch (e) { fail(e); }
+  };
+}
+
+/* ---------------- bot: sellers ---------------- */
+async function loadSellers() {
+  const box = $("#sellers");
+  let list, markets;
+  try { [list, markets] = await Promise.all([bot("sellers"), bot("markets")]); }
+  catch (e) { box.innerHTML = head("البائعين") + `<div class="card"><div class="notice"><b>ما قدرناش نوصلو للبوت</b>${esc(errText(e))}</div></div>`; return; }
+  box.innerHTML = head("البائعين", "شكون يبيع من البوت، وشحال باع.") + `
+    <div class="card">
+      <h2>بائع جديد</h2>
+      <div class="inl">
+        <input id="nsId" type="number" inputmode="numeric" placeholder="Telegram ID — أرقام برك" dir="ltr" style="flex:1 1 180px">
+        <input id="nsName" placeholder="الاسم" style="flex:1 1 160px">
+        <button class="btn go" id="nsAdd">زيد</button>
+      </div>
+      <p class="hint">البائع يقدر يعرف الرقم تاعو من بوت مثل @userinfobot، ومن بعد يفتح بوت المتجر ويبدا يبيع.</p>
+    </div>
+    <div class="rows">${list.map(a => `
+      <div class="row wrapme ${a.is_active ? "t-done" : "t-muted"}">
+        <span class="main">
+          <span class="name">${esc(a.name)} ${a.role === "owner" ? `<span class="pill t-work">المالك</span>` : ""}</span>
+          <span class="sub"><span class="mono">${a.telegram_id}</span> · اليوم ${a.today} · هذا الشهر ${a.this_month} · الكل ${a.confirmed}${a.pending ? ` · <b style="color:var(--wait)">${a.pending} معلّقة</b>` : ""}</span>
+        </span>
+        <span class="side-acts">
+          ${markets.length > 1 ? `<select data-mkt="${a.telegram_id}" aria-label="السوق" class="btn sm">${markets.map(m =>
+            `<option value="${esc(m.code)}" ${a.market === m.code ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>` : ""}
+          <button class="btn sm" data-sales="${a.telegram_id}">مبيعاتو</button>
+          ${a.role !== "owner" && a.is_active ? `<button class="btn sm warn" data-rm="${a.telegram_id}">نحّي</button>` : ""}
+        </span>
+      </div>`).join("")}</div>`;
+  $("#nsAdd").onclick = async () => {
+    try { await bot("add_admin", { telegram_id: Number($("#nsId").value), name: $("#nsName").value.trim() || null }); toast("تزاد البائع."); loadSellers(); }
+    catch (e) { fail(e); }
+  };
+  box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
+    if (!confirm("تنحية هذا البائع من البوت؟ مبيعاتو تبقى محسوبة.")) return;
+    try { await bot("remove_admin", { telegram_id: Number(b.dataset.rm) }); toast("تنحّى البائع."); loadSellers(); } catch (e) { fail(e); }
+  });
+  box.querySelectorAll("[data-mkt]").forEach(s => s.onchange = async () => {
+    try { await bot("set_admin_market", { telegram_id: Number(s.dataset.mkt), market: s.value }); toast("تبدّل السوق."); } catch (e) { fail(e); }
+  });
+  box.querySelectorAll("[data-sales]").forEach(b => b.onclick = () => {
+    salesState.seller = b.dataset.sales; salesState.status = ""; salesState.offset = 0; showView("sales");
+  });
+}
+
+/* ---------------- store: deals ---------------- */
+async function loadDeals() {
+  const box = $("#deals");
+  let cfg;
+  try { [cfg, PRODUCTS] = await Promise.all([rpc("admin_store_config"), rpc("admin_list_products")]); }
+  catch (e) { box.innerHTML = head("العروض") + `<div class="empty">${esc(errText(e))}</div>`; return; }
+  const plans = planChoices();
+  const local = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 16); };
+  const inWeek = new Date(Date.now() + 7 * 864e5);
+  box.innerHTML = head("العروض اليومية", "تخفيض على خطة لمدة محدّدة. يبان في «عرض الشهر» وفي السلة بنفس السعر.") + `
+    <div class="card">
+      <h2>عرض جديد</h2>
+      <div class="ed">
+        <select id="dPlan"><option value="">اختار المنتج والخطة…</option>${plans.map(c =>
+          `<option value="${esc(c.product_id)}|${esc(c.plan_id)}">${esc(c.product_name)} — ${esc(c.plan_name)} · ${money0(c.price)}</option>`).join("")}</select>
+        <div class="two">
+          <div><label for="dPrice">سعر العرض</label><input id="dPrice" type="number" inputmode="numeric" placeholder="أقل من سعر الخطة"></div>
+          <div><label for="dEnd">ينتهي في</label><input id="dEnd" type="datetime-local" value="${local(inWeek)}"></div>
+        </div>
+        <div><label for="dStart">يبدا في</label><input id="dStart" type="datetime-local" value="${local(new Date())}"></div>
+      </div>
+      <div class="acts"><button class="btn go" id="dSave">زيد العرض</button></div>
+    </div>
+    <div class="card">
+      <h2>العروض <span class="meta">(${cfg.deals.length})</span></h2>
+      <div class="rows" style="margin-top:0">${cfg.deals.map(d => `
+        <div class="row wrapme ${d.live ? "t-done" : "t-muted"}">
+          <span class="main"><span class="name">${esc(d.product_name)} — ${esc(d.plan_name)}</span>
+            <span class="sub">${when(d.starts_at)} ← ${when(d.ends_at)}</span></span>
+          <span class="side-acts">
+            <span class="money mono">${money0(d.deal_price)} <s style="color:var(--muted)">${money0(d.list_price)}</s></span>
+            <span class="pill">${d.live ? "حيّ دركا" : new Date(d.ends_at) < new Date() ? "انتهى" : !d.is_active ? "موقوف" : "مبرمج"}</span>
+            <button class="btn sm warn" data-ddel="${esc(d.id)}">حذف</button>
+          </span></div>`).join("") || `<div class="empty">ما كاين حتى عرض.</div>`}</div>
+    </div>`;
+  $("#dSave").onclick = async () => {
+    const [pid, plid] = ($("#dPlan").value || "|").split("|");
+    if (!pid) return toast("اختار الخطة.");
+    try {
+      await rpc("admin_upsert_deal", { p: { product_id: pid, plan_id: plid, deal_price: Number($("#dPrice").value),
+        starts_at: new Date($("#dStart").value).toISOString(), ends_at: new Date($("#dEnd").value).toISOString(), is_active: true } });
+      toast("تزاد العرض."); loadDeals();
+    } catch (e) { fail(e); }
+  };
+  box.querySelectorAll("[data-ddel]").forEach(b => b.onclick = async () => {
+    if (!confirm("حذف هذا العرض؟")) return;
+    try { await rpc("admin_delete_deal", { p_id: b.dataset.ddel }); toast("تحذف العرض."); loadDeals(); } catch (e) { fail(e); }
+  });
+}
+
+/* ---------------- store: categories ---------------- */
+async function loadCategories() {
+  const box = $("#categories");
+  let cfg;
+  try { cfg = await rpc("admin_store_config"); } catch (e) { box.innerHTML = head("الأقسام") + `<div class="empty">${esc(errText(e))}</div>`; return; }
+  const row = c => `<div class="rep" data-cat="${esc(c.id || "")}">
+    <div class="hd"><b>${c.id ? esc(c.name) : "قسم جديد"}</b>${c.id ? `<span class="meta">${c.products} منتج</span>` : ""}</div>
+    <div class="two">
+      <input data-k="name" value="${esc(c.name || "")}" placeholder="الاسم">
+      <input data-k="slug" value="${esc(c.slug || "")}" placeholder="المعرّف — ai-tools" dir="ltr" ${c.id ? "disabled" : ""}>
+    </div>
+    <div class="two">
+      <input data-k="accent_color" value="${esc(c.accent_color || "#7C3AED")}" placeholder="#7C3AED" dir="ltr">
+      <input data-k="sort_order" type="number" value="${c.sort_order ?? 0}" placeholder="الترتيب">
+    </div>
+    <div class="inl"><label class="switch"><input type="checkbox" data-k="is_active" ${c.is_active !== false ? "checked" : ""}> يبان في المتجر</label>
+      <button class="btn sm go" data-csave style="margin-inline-start:auto">حفظ</button></div>
+  </div>`;
+  box.innerHTML = head("الأقسام", "تبويبات المتجر. المعرّف ما يتبدّلش من بعد الحفظ.") + `
+    <div class="card"><div class="ed">${cfg.categories.map(row).join("")}${row({ is_active: true })}</div></div>`;
+  box.querySelectorAll("[data-cat]").forEach(el => el.querySelector("[data-csave]").onclick = async () => {
+    const v = k => el.querySelector(`[data-k="${k}"]`);
+    try {
+      await rpc("admin_upsert_category", { p: { id: el.dataset.cat || null, name: v("name").value, slug: v("slug").value,
+        accent_color: v("accent_color").value, sort_order: Number(v("sort_order").value || 0), is_active: v("is_active").checked } });
+      toast("تحفظ القسم."); loadCategories();
+    } catch (e) { fail(e); }
+  });
+}
+
+/* ---------------- settings: store, payments, bot ---------------- */
+const SETTING_FIELDS = [
+  ["store_name", "اسم المتجر", "Janeiro Store"],
+  ["whatsapp_number", "رقم الواتساب", "0661 23 45 67"],
+  ["instagram_username", "حساب الإنستغرام", "janeiro_service"],
+  ["telegram_username", "حساب التيليغرام", "janeiro_store"],
+  ["support_hours", "وقت الرد", "كل يوم من 9 الصباح حتى 11 الليل"],
+  ["support_message", "رسالة الدعم", "نردّو عليك في أسرع وقت."],
+  ["site_url", "رابط الموقع", "https://janeiro-store.com"],
+  ["max_active_orders", "أقصى طلبات مفتوحة لنفس الزبون", "2"],
+];
+async function loadSettings() {
+  const box = $("#settings");
+  let cfg;
+  try { cfg = await rpc("admin_store_config"); } catch (e) { box.innerHTML = head("الإعدادات") + `<div class="empty">${esc(errText(e))}</div>`; return; }
+  const st = cfg.settings || {};
+  box.innerHTML = head("الإعدادات", "معلومات المتجر، طرق الدفع، وإعدادات البوت.") + `
+    <div class="card">
+      <h2>المتجر</h2>
+      <div class="ed">${SETTING_FIELDS.map(([k, l, ph]) => `<div><label for="s_${k}">${l}</label>
+        <input id="s_${k}" data-set="${k}" value="${esc(k === "whatsapp_number" ? String(st[k] || "").replace(/^213/, "0") : st[k] || "")}" placeholder="${esc(ph)}"
+          ${["whatsapp_number", "site_url", "instagram_username", "telegram_username", "max_active_orders"].includes(k) ? 'dir="ltr"' : ""}></div>`).join("")}</div>
+      <div class="acts"><button class="btn go" id="setSave">حفظ</button></div>
+    </div>
+    <div class="card">
+      <h2>طرق الدفع</h2>
+      <div class="ed">${cfg.payment_methods.map(m => `<div class="rep" data-pm="${esc(m.id)}">
+        <div class="hd"><b>${esc(m.label)}</b><span class="meta">${esc(m.type)}</span></div>
+        <div class="two"><input data-k="label" value="${esc(m.label)}" placeholder="الاسم الظاهر">
+          <input data-k="account_holder" value="${esc(m.account_holder || "")}" placeholder="صاحب الحساب"></div>
+        <div class="two"><input data-k="account_number" value="${esc(m.account_number || "")}" placeholder="رقم الحساب / RIP / الفليكسي" dir="ltr">
+          <input data-k="extra_info" value="${esc(m.extra_info || "")}" placeholder="معلومة زايدة (اختياري)"></div>
+        <input data-k="instructions" value="${esc(m.instructions || "")}" placeholder="تعليمات للزبون (اختياري)">
+        <div class="inl"><label class="switch"><input type="checkbox" data-k="is_active" ${m.is_active ? "checked" : ""}> تبان في الطلب</label>
+          <button class="btn sm go" data-pmsave style="margin-inline-start:auto">حفظ</button></div>
+      </div>`).join("")}</div>
+    </div>
+    <div id="botSettings"><div class="card"><h2>البوت</h2><div class="empty">…</div></div></div>`;
+
+  $("#setSave").onclick = async () => {
+    const values = {};
+    box.querySelectorAll("[data-set]").forEach(i => values[i.dataset.set] = i.value);
+    try { await rpc("admin_save_settings", { p_values: values }); SITE_URL = null; toast("تحفظت الإعدادات."); } catch (e) { fail(e); }
+  };
+  box.querySelectorAll("[data-pm]").forEach(el => el.querySelector("[data-pmsave]").onclick = async () => {
+    const p = { id: el.dataset.pm };
+    el.querySelectorAll("[data-k]").forEach(i => p[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value);
+    try { await rpc("admin_upsert_payment_method", { p }); toast("تحفظت طريقة الدفع."); } catch (e) { fail(e); }
+  });
+  loadBotSettings();
+}
+async function loadBotSettings() {
+  const box = $("#botSettings");
+  let markets, plats, contacts, terms;
+  try { [markets, plats, contacts, terms] = await Promise.all([bot("markets"), bot("platforms"), bot("contacts"), bot("terms", {})]); }
+  catch (e) { box.innerHTML = `<div class="card"><h2>البوت</h2><div class="notice"><b>ما قدرناش نوصلو للبوت</b>${esc(errText(e))}</div></div>`; return; }
+  const lines = l => (terms.own?.[l] || terms.effective?.[l] || []).join("\n");
+  box.innerHTML = `
+    <div class="card">
+      <h2>الأسواق والعملات</h2>
+      <div class="tags">${markets.map(m => `<label class="switch tagx" style="padding:6px 12px"><input type="checkbox" data-mk="${esc(m.code)}" ${m.is_active ? "checked" : ""}> ${esc(m.name)} · ${esc(m.currency)}</label>`).join("")}</div>
+      <p class="hint">السوق يحدّد العملة والسعر اللي يبيع بيه كل بائع.</p>
+    </div>
+    <div class="card">
+      <h2>المنصّات</h2>
+      <div class="tags">${plats.map(p => `<span class="tagx">${esc(p.name)}<button data-rp="${esc(p.name)}" aria-label="نحّي">×</button></span>`).join("")}</div>
+      <div class="inl"><input id="npl" placeholder="اسم منصّة — مثلاً Netflix" style="flex:1"><button class="btn sm" id="nplAdd">زيد</button></div>
+    </div>
+    <div class="card">
+      <h2>روابط التواصل في الوثيقة</h2>
+      <div class="rows" style="margin-top:0">${contacts.map(c => `<div class="row"><span class="main"><span class="name">${esc(c.label)}</span>
+        <span class="sub mono">${esc(c.value)}${c.url ? ` · ${esc(c.url)}` : ""}</span></span>
+        <button class="btn sm warn" data-rc="${esc(c.label)}">نحّي</button></div>`).join("") || `<p class="hint">ما كاين حتى رابط.</p>`}</div>
+      <div class="inl"><input id="ncl" placeholder="الاسم — واتساب" style="flex:1 1 120px"><input id="ncv" placeholder="القيمة — 0661…" style="flex:1 1 140px">
+        <input id="ncu" placeholder="الرابط (اختياري)" dir="ltr" style="flex:2 1 180px"><button class="btn sm" id="nclAdd">زيد</button></div>
+    </div>
+    <div class="card">
+      <h2>شروط وثيقة الضمان</h2>
+      <p class="hint">كل سطر شرط. تبان في كل وثيقة يصنعها البوت (12 سطر على الأكثر).</p>
+      <div class="chips" style="padding-top:0">${["ar", "fr", "en"].map((l, i) => `<button class="chip" data-tl="${l}" aria-pressed="${i === 0}">${{ ar: "العربية", fr: "Français", en: "English" }[l]}</button>`).join("")}</div>
+      ${["ar", "fr", "en"].map((l, i) => `<textarea rows="6" data-terms="${l}" ${i ? 'class="hidden"' : ""} ${l === "ar" ? "" : 'dir="ltr"'}>${esc(lines(l))}</textarea>`).join("")}
+      <div class="acts"><button class="btn go" id="termsSave">حفظ الشروط</button></div>
+    </div>`;
+  box.querySelectorAll("[data-mk]").forEach(c => c.onchange = async () => {
+    try { await bot("set_market_active", { market: c.dataset.mk, active: c.checked }); toast("تحفظ."); } catch (e) { fail(e); c.checked = !c.checked; }
+  });
+  $("#nplAdd").onclick = async () => { try { await bot("add_platform", { name: $("#npl").value.trim() }); loadBotSettings(); } catch (e) { fail(e); } };
+  box.querySelectorAll("[data-rp]").forEach(b => b.onclick = async () => {
+    if (!confirm(`تنحية «${b.dataset.rp}»؟`)) return;
+    try { await bot("remove_platform", { name: b.dataset.rp }); loadBotSettings(); } catch (e) { fail(e); }
+  });
+  $("#nclAdd").onclick = async () => {
+    try { await bot("add_contact", { label: $("#ncl").value.trim(), value: $("#ncv").value.trim(), url: $("#ncu").value.trim() || null }); loadBotSettings(); }
+    catch (e) { fail(e); }
+  };
+  box.querySelectorAll("[data-rc]").forEach(b => b.onclick = async () => {
+    try { await bot("remove_contact", { label: b.dataset.rc }); loadBotSettings(); } catch (e) { fail(e); }
+  });
+  box.querySelectorAll("[data-tl]").forEach(b => b.onclick = () => {
+    box.querySelectorAll("[data-tl]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    box.querySelectorAll("[data-terms]").forEach(t => t.classList.toggle("hidden", t.dataset.terms !== b.dataset.tl));
+  });
+  $("#termsSave").onclick = async () => {
+    try {
+      for (const l of ["ar", "fr", "en"]) {
+        const lines = box.querySelector(`[data-terms="${l}"]`).value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+        await bot("set_terms", { platform: null, lang: l, lines });
+      }
+      toast("تحفظت الشروط.");
+    } catch (e) { fail(e); }
+  };
+}
+
+/* the two counters in the side menu: orders waiting on review, bot sales
+   waiting on a decision */
+async function refreshCounts() {
+  try {
+    const c = await rpc("admin_order_counts");
+    setCount("cntQueue", (c.pending_payment_review || 0) + (c.payment_confirmed || 0) + (c.needs_info || 0));
+  } catch {}
+  try { const b = await rpc("admin_bot_summary"); setCount("cntSales", b.pending); } catch {}
+}
+
+/* ---------------- store: every text on the site ----------------
+   The storefront's wording lives in its I18N dictionary, three languages
+   per key. That dictionary stays the source; site_texts (036) holds only
+   the owner's edits, which the storefront lays over it at load. So this
+   page reads the defaults from the live storefront itself -- never a
+   copy that could drift -- and the edits from the table. */
+const TEXT_GROUPS = {
+  "header, menus, footer": "الرأس والقوائم والتذييل", "hero": "الواجهة الأولى", "shop + product cards": "المتجر وبطاقات المنتجات",
+  "how it works": "كيفاش تطلب", "numbers": "الأرقام", "FAQ": "الأسئلة", "WhatsApp band": "شريط الواتساب",
+  "cart": "السلة", "product page": "صفحة المنتج", "bundles (page kept, no longer in the menus)": "الباقات",
+  "checkout": "إتمام الطلب", "order received": "الطلب وصل", "tracking": "تتبّع الطلب",
+  "warranty certificate": "وثيقة الضمان", "about": "شكون حنا", "policies": "الشروط والسياسات",
+  "server wording, rendered for FR/EN": "حالات الطلب (من السيرفر)", "loading + errors": "التحميل والأخطاء",
+};
+const TEXT_LANGS = [["ar", "العربية"], ["fr", "Français"], ["en", "English"]];
+const textsState = { group: "", q: "", onlyEdited: false };
+let TEXT_DEFAULTS = null;       // [{ key, group, ar, fr, en }]
+let TEXT_SAVED = {};            // "key|lang" -> value (the owner's edits)
+
+/* Reads the I18N object literal out of the storefront's source with a
+   small scanner -- no eval. Keys look like  name: { ar:"…", fr:"…", en:"…" },
+   and the dashed section comments above them ("---- hero ----") name the
+   groups. */
+function parseI18N(html) {
+  const at = html.indexOf("const I18N = {");
+  if (at < 0) throw new Error("ما لقيناش قاموس النصوص في صفحة الموقع.");
+  const src = html.slice(at + "const I18N = {".length);
+  const out = []; let group = "", i = 0, depth = 0, cur = null, key = null, pendingKey = null;
+  const readString = () => {
+    let j = i + 1, s = "";
+    while (j < src.length && src[j] !== '"') { if (src[j] === "\\") { s += src[j] + src[j + 1]; j += 2; } else s += src[j++]; }
+    i = j + 1; return JSON.parse('"' + s + '"');
+  };
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2), body = src.slice(i + 2, end);
+      const m = body.match(/^\s*-{3,}\s*(.+?)\s*-{3,}\s*$/);
+      if (m && depth === 0) group = m[1];
+      i = end + 2; continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") { i = src.indexOf("\n", i); continue; }
+    if (ch === '"') { const v = readString(); if (cur && key) { cur[key] = v; key = null; } continue; }
+    if (ch === "{") { depth++; if (depth === 1) cur = { key: pendingKey, group }; i++; continue; }
+    if (ch === "}") {
+      if (depth === 0) break;                 // the end of I18N itself
+      depth--; if (depth === 0 && cur) { out.push(cur); cur = null; } i++; continue;
+    }
+    const m = /^[A-Za-z_][A-Za-z0-9_]*(?=\s*:)/.exec(src.slice(i, i + 80));
+    if (m) { if (depth === 0) pendingKey = m[0]; else key = m[0]; i += m[0].length; continue; }
+    i++;
+  }
+  return out.filter(e => e.key && typeof e.ar === "string");
+}
+
+const tokensOf = s => (String(s || "").match(/\{[a-z_]+\}/g) || []).sort().join(",");
+
+async function loadTexts() {
+  const box = $("#texts");
+  box.innerHTML = head("نصوص الموقع", "كل كتابة في الموقع، بثلاث لغات.") + `<div class="empty">…</div>`;
+  try {
+    if (!TEXT_DEFAULTS) {
+      const r = await fetch(new URL("../", location.href), { cache: "no-store" });
+      if (!r.ok) throw new Error(`ما قدرناش نقراو صفحة الموقع (${r.status}).`);
+      TEXT_DEFAULTS = parseI18N(await r.text());
+    }
+    const rows = await rest("site_texts?select=key,lang,value");
+    TEXT_SAVED = Object.fromEntries(rows.map(x => [`${x.key}|${x.lang}`, x.value]));
+  } catch (e) {
+    const missing = /site_texts|PGRST205|404/.test(String(e.message || e));
+    box.innerHTML = head("نصوص الموقع") + `<div class="card"><div class="notice"><b>ما قدرناش نحمّلو النصوص</b>${
+      missing ? "طبّق supabase/migrations/036_site_texts.sql في Supabase، ومن بعد ارجع هنا." : esc(errText(e))}</div></div>`;
+    return;
+  }
+  const s = textsState, groups = [...new Set(TEXT_DEFAULTS.map(e => e.group))];
+  const edited = new Set(Object.keys(TEXT_SAVED).map(k => k.split("|")[0]));
+  box.innerHTML = head("نصوص الموقع",
+      `كل كتابة في الموقع بثلاث لغات — ${TEXT_DEFAULTS.length} نص. بدّل واش تحب واضغط «حفظ». خانة فارغة ترجع للنص الأصلي.`,
+      `<a class="btn sm" id="txView" target="_blank" rel="noopener">شوف الموقع ↗</a>`) + `
+    <div class="toolbar">${searchBox("tq", "قلّب في النصوص — كلمة ولا اسم المفتاح", s.q)}
+      <select id="tgroup" aria-label="القسم"><option value="">كل الأقسام</option>${groups.map(g =>
+        `<option value="${esc(g)}" ${s.group === g ? "selected" : ""}>${esc(TEXT_GROUPS[g] || g)}</option>`).join("")}</select>
+      <label class="switch"><input type="checkbox" id="tedited" ${s.onlyEdited ? "checked" : ""}> المبدّلة برك (${edited.size})</label>
+    </div>
+    <p class="hint">الكلمات بين { } مثل <span class="mono">{n}</span> يعمّرها الموقع وحدو (عدد، اسم...) — خلّيها كيما راهي.</p>
+    <div id="tlist"></div>
+    <div class="savebar hidden" id="tbar"><span id="tbarN"></span>
+      <button class="btn" id="tUndo">تراجع</button><button class="btn go" id="tSave">حفظ</button></div>`;
+  siteBase().then(b => { const a = $("#txView"); if (b) a.href = b; else a.href = new URL("../", location.href).href; });
+  onSearch($("#tq"), q => { s.q = q; fillTexts(); });
+  $("#tgroup").onchange = e => { s.group = e.target.value; fillTexts(); };
+  $("#tedited").onchange = e => { s.onlyEdited = e.target.checked; fillTexts(); };
+  $("#tUndo").onclick = () => fillTexts();
+  $("#tSave").onclick = saveTexts;
+  fillTexts();
+}
+
+function fillTexts() {
+  const s = textsState, q = s.q.toLowerCase();
+  const list = TEXT_DEFAULTS.filter(e =>
+    (!s.group || e.group === s.group) &&
+    (!s.onlyEdited || TEXT_LANGS.some(([l]) => `${e.key}|${l}` in TEXT_SAVED)) &&
+    (!q || e.key.includes(q) || TEXT_LANGS.some(([l]) =>
+      String(TEXT_SAVED[`${e.key}|${l}`] ?? e[l] ?? "").toLowerCase().includes(q))));
+  const shown = list.slice(0, 120);
+  let lastGroup = null;
+  $("#tlist").innerHTML = shown.map(e => {
+    const gh = !s.group && e.group !== lastGroup ? `<h3 class="tgrp">${esc(TEXT_GROUPS[e.group] || e.group)}</h3>` : "";
+    lastGroup = e.group;
+    const isEdited = TEXT_LANGS.some(([l]) => `${e.key}|${l}` in TEXT_SAVED);
+    return gh + `<div class="card trow ${isEdited ? "edited" : ""}" data-tkey="${esc(e.key)}">
+      <div class="trh"><span class="mono meta">${esc(e.key)}</span>
+        ${isEdited ? `<span class="pill t-work">مبدّل</span><button class="copy" data-treset>رجّع الأصل</button>` : ""}</div>
+      <div class="tcols">${TEXT_LANGS.map(([l, name]) => {
+        const def = e[l] ?? "", cur = TEXT_SAVED[`${e.key}|${l}`] ?? def;
+        return `<label class="tcell"><span>${name}${`${e.key}|${l}` in TEXT_SAVED ? " •" : ""}</span>
+          <textarea rows="${Math.min(6, Math.max(1, Math.ceil(def.length / 52)))}" dir="${l === "ar" ? "rtl" : "ltr"}"
+            data-tlang="${l}" data-def="${esc(def)}" data-cur="${esc(cur)}" placeholder="${esc(def)}">${esc(cur)}</textarea></label>`;
+      }).join("")}</div>
+    </div>`;
+  }).join("") + (list.length > shown.length
+      ? `<p class="hint" style="text-align:center">يبانو ${shown.length} من ${list.length} — قلّب ولا اختار قسم باش تلقى الباقي.</p>`
+      : list.length ? "" : `<div class="empty"><b>ما كاين حتى نص</b>جرّب كلمة أخرى.</div>`);
+
+  $$("#tlist textarea").forEach(ta => ta.oninput = () => { ta.classList.toggle("dirty", ta.value !== ta.dataset.cur); textsBar(); });
+  $$("#tlist [data-treset]").forEach(b => b.onclick = () => {
+    b.closest("[data-tkey]").querySelectorAll("textarea").forEach(ta => {
+      ta.value = ta.dataset.def; ta.classList.toggle("dirty", ta.value !== ta.dataset.cur); });
+    textsBar();
+  });
+  textsBar();
+}
+
+function textChanges() {
+  return $$("#tlist textarea.dirty").map(ta => ({
+    ta, key: ta.closest("[data-tkey]").dataset.tkey, lang: ta.dataset.tlang,
+    /* typing the original back is the same as clearing it: no row */
+    value: ta.value.trim() === ta.dataset.def.trim() ? "" : ta.value.trim(),
+  }));
+}
+function textsBar() {
+  const n = textChanges().length;
+  $("#tbar").classList.toggle("hidden", !n);
+  $("#tbarN").textContent = `${n} تعديل ما تحفظش`;
+}
+async function saveTexts() {
+  const items = textChanges();
+  /* a dropped {n} would print a raw "{n}" or lose the number on the site */
+  const broken = items.filter(x => x.value && tokensOf(x.value) !== tokensOf(x.ta.dataset.def));
+  $$("#tlist textarea.bad").forEach(t => t.classList.remove("bad"));
+  if (broken.length) {
+    broken.forEach(x => x.ta.classList.add("bad"));
+    broken[0].ta.focus();
+    return toast(`لازم تخلّي ${tokensOf(broken[0].ta.dataset.def) || "الكلمات بين { }"} كيما راهي في «${broken[0].key}».`);
+  }
+  try {
+    const r = await rpc("admin_set_site_texts", { p_items: items.map(({ key, lang, value }) => ({ key, lang, value })) });
+    toast(`تحفظ ${r.saved}${r.reset ? ` · رجع ${r.reset} للأصل` : ""}. الموقع يبدّل في التحميل الجاي.`);
+    loadTexts();
+  } catch (e) { fail(e); }
+}
+
 /* ---------- view switch ---------- */
 let view = "overview";
-const VIEWS = { overview: loadOverview, queue: loadQueue, products: loadProducts, bundles: loadBundles };
+const VIEWS = { overview: loadOverview, queue: loadQueue, products: loadProducts, bundles: loadBundles,
+  deals: loadDeals, categories: loadCategories, customers: loadCustomers, warranty: loadWarranty,
+  stock: loadStock, sales: loadSales, sellers: loadSellers, settings: loadSettings, texts: loadTexts };
+const VIEW_IDS = Object.keys(VIEWS);
 function showView(v) {
   view = v;
-  for (const id of ["overview", "queue", "products", "bundles"])
+  for (const id of VIEW_IDS)
     $("#" + id).classList.toggle("hidden", id !== v);
   $("#detail").classList.add("hidden");
   $("#editor").classList.add("hidden");
   $("#bundleEditor").classList.add("hidden");
   $$("#tabs .tab").forEach(t => t.setAttribute("aria-current", String(t.dataset.v === v)));
   window.scrollTo({ top: 0, behavior: "instant" });
-  (VIEWS[v] || loadOverview)().catch(e => toast(e.message));
+  (VIEWS[v] || loadOverview)().catch(fail);
+  refreshCounts();
 }
 /* ---------- queue ---------- */
 let filter = "pending_payment_review";
@@ -1457,9 +2521,7 @@ async function openOrder(id) {
     }
   });
 
-  $("#queue").classList.add("hidden");
-  $("#overview").classList.add("hidden");
-  $("#products").classList.add("hidden");
+  for (const id of VIEW_IDS) $("#" + id).classList.add("hidden");
   $("#detail").classList.remove("hidden");
   window.scrollTo({ top: 0, behavior: "instant" });
 }
@@ -1520,7 +2582,8 @@ $("#back").onclick = () => {
 };
 
 /* the module scope is not global; the browser tests drive these */
-Object.assign(window, { showView, loadOverview, loadQueue, loadProducts, openEditor });
+Object.assign(window, { showView, loadOverview, loadQueue, loadProducts, openEditor,
+  loadStock, loadSales, loadWarranty, loadCustomers, loadSettings, loadTexts, parseI18N });
 
 if (session?.access_token) showApp(session?.user?.email);
 </script>

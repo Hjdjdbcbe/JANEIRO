@@ -10,7 +10,7 @@
 #        -> bot.test.sql -> bot-concurrency.test.sh
 #        -> engagement.test.sql -> order-data.test.sql
 #        -> engagement-from-issue.test.sql -> terms.test.sql
-#        -> dashboard.test.sql
+#        -> dashboard.test.sql -> admin-console.test.sql
 #        -> forbidden-text.test.sh
 #        -> qr.test.js -> duration.test.js -> bot-e2e.test.js
 #        -> vercel-proxy.test.js
@@ -127,6 +127,24 @@ set -o pipefail
 if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/dashboard.test.sql" 2>&1 \
      | grep -E 'PASS|FAIL|ERROR|=====' ; then
   red "FAIL: dashboard.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> admin-console.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/admin-console.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: admin-console.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
+bold "==> site-texts.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/site-texts.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: site-texts.test.sql did not run to completion (see the ERROR above)"
   exit 1
 fi
 set +o pipefail

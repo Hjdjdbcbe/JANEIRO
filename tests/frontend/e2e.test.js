@@ -43,10 +43,11 @@ const check = (c, m) => c ? ok(m) : bad(m);
   const chips = await page.locator("#catGrid .category-chip").count();
   check(chips === 7, `category chips: ${chips} (الكل + 6 categories)`);
 
-  const chipHasIcon = await page.locator("#catGrid .category-chip").nth(1).locator("svg path, svg circle, svg rect").count();
+  /* the redesign made the category tabs text only */
+  const chipIcons = await page.locator("#catGrid .category-chip svg, #catGrid .category-chip img").count();
   await page.evaluate(() => window.go("shop"));
   await page.waitForSelector("#shop:not(.hidden)");
-  check(chipHasIcon > 0, "category chips still carry their designed glyphs");
+  check(chipIcons === 0, "category tabs are text only, with no icons");
 
   const noStatics = await page.evaluate(() => typeof window.PRODUCTS === "undefined");
   check(noStatics, "no global PRODUCTS array leaks into the page");
@@ -122,8 +123,9 @@ const check = (c, m) => c ? ok(m) : bad(m);
   }));
   check(empty.stillHere, "an empty step 1 does not advance");
   check(empty.chan && empty.chanMsg !== "hidden", "قناة المتابعة is flagged and its message shows");
-  check(empty.name && empty.nameMsg === "الاسم مطلوب", `name message: ${empty.nameMsg}`);
-  check(empty.phone && empty.phoneMsg === "رقم الهاتف يجب أن يتكون من 10 أرقام ويبدأ بـ 05 أو 06 أو 07",
+  // the store's copy is in darija throughout, checkout included
+  check(empty.name && empty.nameMsg === "لازم تكتب اسمك", `name message: ${empty.nameMsg}`);
+  check(empty.phone && empty.phoneMsg === "الرقم لازم يكون 10 أرقام ويبدا بـ 05 ولا 06 ولا 07",
         `phone message: ${empty.phoneMsg}`);
 
   /* the phone rule, measured on blur -- not only on submit */

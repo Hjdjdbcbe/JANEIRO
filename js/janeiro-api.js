@@ -71,6 +71,14 @@ export async function loadStoreSettings() {
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
+/**
+ * نصوص الموقع اللي بدّلها المالك من اللوحة — التعديلات فقط، فوق
+ * قاموس I18N اللي في الصفحة. [{ key, lang, value }]
+ */
+export async function loadSiteTexts() {
+  return rest("site_texts?select=key,lang,value");
+}
+
 export async function loadCategories() {
   return rest(
     "categories?select=id,name,slug,icon,icon_path,accent_color&is_active=eq.true&order=sort_order",

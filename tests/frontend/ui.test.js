@@ -1,4 +1,7 @@
-/* Covers the category icons, the deals section and the motion rules.
+/* The storefront's layout and behaviour against the design reference
+   (design-reference/storefront-mockup.html): header, hero card stack,
+   platforms strip, category tabs, عرض الشهر, product cards, motion,
+   page switches, the phone layout and the three languages.
    Runs against mock-supabase.js like e2e.test.js. */
 const { chromium } = require("playwright");
 const BASE = process.env.BASE || "http://127.0.0.1:8808";
@@ -19,97 +22,268 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     await p.addInitScript(b => { window.JANEIRO_CONFIG = { SUPABASE_URL: b, SUPABASE_ANON_KEY: "k" }; }, BASE);
     return p;
   };
+  const ready = p => p.waitForFunction(() => document.querySelectorAll("#homeGrid .pcard:not(.sk)").length > 0, { timeout: 10000 });
+  const fromDb = async (q) => (await (await fetch(`${BASE}/rest/v1/${q}`)).json());
 
   const page = await newPage({ viewport: { width: 1280, height: 1000 } });
   await page.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await page.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0, { timeout: 10000 });
+  await ready(page);
 
-  // ---------- category icons ----------
-  const tiles = await page.locator("#catGrid .cticon").count();
-  check(tiles === 7, `every chip carries an icon tile: ${tiles}`);
-  check(await page.locator("#menuCats .cticon").count() === 6, "side-menu categories use the same tile");
-  const tinted = await page.evaluate(() => {
-    const t = document.querySelectorAll("#catGrid .category-chip")[1].querySelector(".cticon");
-    return { cat: t.style.getPropertyValue("--cat") };
+  // ---------- category tabs: text only, from the categories table ----------
+  const cats = await fromDb("categories?select=id,name,slug&is_active=eq.true&order=sort_order");
+  const tabs = await page.evaluate(() => [...document.querySelectorAll("#catGrid .category-chip")].map(b => ({
+    text: b.textContent.trim(), pressed: b.getAttribute("aria-pressed"),
+    glyphs: b.querySelectorAll("svg,img").length,
+  })));
+  check(tabs.length === cats.length + 1, `one tab per category plus "الكل": ${tabs.length}`);
+  check(tabs[0].text === "الكل" && tabs[0].pressed === "true", `"الكل" leads and starts selected: ${tabs[0].text}`);
+  check(tabs.every(t => t.glyphs === 0), "the tabs carry no icons");
+  check(tabs.slice(1).map(t => t.text).join("|") === cats.map(c => c.name).join("|"),
+        "tab names and order come from the database");
+  check(await page.locator("#menuCats .mcat svg, #menuCats .mcat img").count() === 0,
+        "the side menu's categories are text only too");
+
+  // a home tab filters the grid in place: no page switch
+  const products = await fromDb("products?select=id,slug");
+  const allCards = await page.locator("#homeGrid .pcard").count();
+  check(allCards === products.length, `the home grid holds every product (${allCards} of ${products.length})`);
+  await page.locator("#catGrid .category-chip", { hasText: "التصميم والإبداع" }).click();
+  await page.waitForTimeout(200);
+  const filtered = await page.evaluate(() => ({
+    onHome: !document.querySelector("#home").classList.contains("hidden"),
+    n: document.querySelectorAll("#homeGrid .pcard").length,
+    pressed: document.querySelector('#catGrid .category-chip[aria-pressed="true"]').textContent.trim(),
+  }));
+  check(filtered.onHome && filtered.n > 0 && filtered.n < allCards,
+        `a tab narrows the home grid without leaving the page (${filtered.n} cards)`);
+  check(filtered.pressed === "التصميم والإبداع", `the chosen tab is marked: ${filtered.pressed}`);
+  await page.fill("#homeSearch", "canva");
+  await page.waitForTimeout(150);
+  check(await page.locator("#homeGrid .pcard").count() === 1, "the search narrows it further, by slug as well as name");
+  await page.fill("#homeSearch", "zzzz");
+  await page.waitForTimeout(150);
+  check(await page.locator("#homeGrid .empty").count() === 1, "no match shows the empty state, with the WhatsApp way out");
+  await page.fill("#homeSearch", "");
+  await page.locator("#catGrid .category-chip").first().click();
+  await page.waitForTimeout(150);
+
+  // ---------- product card ----------
+  const card = await page.evaluate(() => {
+    const c = [...document.querySelectorAll("#homeGrid .pcard")];
+    const withPoster = c.find(x => x.querySelector("img.pimg"));
+    const without = c.find(x => x.querySelector(".ph"));
+    const ratio = el => { const r = el.getBoundingClientRect(); return +(r.width / r.height).toFixed(3); };
+    return {
+      poster: withPoster && {
+        src: withPoster.querySelector("img.pimg").getAttribute("src"),
+        ratio: ratio(withPoster.querySelector(".art")),
+        fit: getComputedStyle(withPoster.querySelector("img.pimg")).objectFit,
+      },
+      ph: without && {
+        ratio: ratio(without.querySelector(".art")),
+        hidden: [...without.querySelectorAll(".ph > *")].every(e => e.getAttribute("aria-hidden") === "true"),
+        label: without.querySelector(".ph").getAttribute("aria-label"),
+        name: without.querySelector(".pname").textContent,
+        c1: without.querySelector(".ph").style.getPropertyValue("--c1"),
+        foot: without.querySelector(".ph-foot").textContent.includes("janeiro-store.com"),
+      },
+      parts: c.slice(0, 4).map(x => ({
+        name: !!x.querySelector(".pname"), desc: !!x.querySelector(".pdesc"),
+        from: (x.querySelector(".pprice small") || {}).textContent,
+        buy: (x.querySelector(".pbody .btn") || {}).textContent,
+      })),
+    };
   });
-  check(/^#|rgb/.test(tinted.cat.trim()), `tile tinted from the category accent: ${tinted.cat}`);
-  // "الإنتاجية والعمل" has no icon_path in the fixture
-  const plainTile = page.locator("#catGrid .category-chip", { hasText: "الإنتاجية والعمل" }).locator(".cticon");
-  check(await plainTile.locator("svg").count() === 1, "no uploaded asset -> designed fallback glyph renders");
-  check(await plainTile.locator("img").count() === 0, "no asset -> no image request at all");
+  check(!!card.poster && /product-media\/products\/.+\.webp$/.test(card.poster.src),
+        `a product's card artwork comes from poster_path: ${card.poster && card.poster.src.split("/public/")[1]}`);
+  check(!!card.poster && Math.abs(card.poster.ratio - 600 / 832) < 0.01 && card.poster.fit === "cover",
+        `shown whole at 3:4 (${card.poster && card.poster.ratio})`);
+  check(!!card.ph && Math.abs(card.ph.ratio - 600 / 832) < 0.01, "a product without one gets a stand-in of the same shape");
+  check(!!card.ph && card.ph.hidden && card.ph.label === card.ph.name,
+        "the stand-in is announced once by name; its pieces are decoration");
+  check(!!card.ph && /^#/.test(card.ph.c1.trim()) && card.ph.foot,
+        `drawn from the product's accent_color (${card.ph && card.ph.c1}) with the janeiro-store.com strip`);
+  check(card.parts.every(p => p.name && p.desc && p.from === "يبدا من" && p.buy === "اشري دركا"),
+        "every card: name, short description, يبدا من + price, اشري دركا");
 
-  // ---------- an uploaded icon_path renders as an image ----------
-  // Driven through the database and the storage bucket, not by poking
-  // page internals: this is the path a real upload takes.
-  const pageIcons = await newPage({ viewport: { width: 1280, height: 900 } });
-  await pageIcons.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await pageIcons.waitForFunction(() => document.querySelectorAll("#catGrid .cticon").length > 1);
-  await pageIcons.waitForTimeout(900);
+  /* + only on a product with exactly one plan, and it adds straight to
+     the cart; everything else has a plan to choose on the product page */
+  const plusInfo = await page.evaluate(async () => {
+    const cards = [...document.querySelectorAll("#homeGrid .pcard")];
+    return cards.map(c => !!c.querySelector(".plus"));
+  });
+  const plans = await fromDb("products?select=id,product_plans(id,is_active),status");
+  const single = plans.filter(p => p.status === "published" && p.product_plans.filter(x => x.is_active).length === 1).length;
+  check(plusInfo.filter(Boolean).length === single,
+        `the + button shows only on single-plan products (${plusInfo.filter(Boolean).length}, expected ${single})`);
+  /* make one single-plan product in the page's own data and check what + does */
+  const plusAdds = await page.evaluate(() => {
+    const id = document.querySelector("#homeGrid .pcard .btn").getAttribute("onclick").match(/'(.+?)'/)[1];
+    window.addQuick(id);
+    return !document.querySelector("#detail").classList.contains("hidden");
+  });
+  check(plusAdds, "a multi-plan product sends its quick-add to the product page instead");
+  await page.evaluate(() => window.go("home"));
 
-  const uploaded = pageIcons.locator("#catGrid .category-chip", { hasText: "الذكاء الاصطناعي" }).locator(".cticon img");
-  const imgAttrs = await uploaded.evaluate(e => ({
-    w: e.getAttribute("width"), h: e.getAttribute("height"), l: e.loading,
-    src: e.getAttribute("src"), painted: e.naturalWidth > 0,
-  })).catch(() => null);
-  check(imgAttrs && imgAttrs.w === "128" && imgAttrs.h === "128" && imgAttrs.l === "lazy",
-        `uploaded icon is lazy with a fixed 128x128 box: ${JSON.stringify({ w: imgAttrs?.w, h: imgAttrs?.h, l: imgAttrs?.l })}`);
-  check(imgAttrs && /product-media\/categories\/ai\.png$/.test(imgAttrs.src),
-        `icon URL built from icon_path via the public bucket: ${imgAttrs?.src?.split("/public/")[1]}`);
-  check(imgAttrs && imgAttrs.painted, "the uploaded icon actually loaded");
+  // ---------- عرض الشهر: the first live deal ----------
+  const offer = await page.evaluate(() => {
+    const o = document.querySelector("#offer");
+    return {
+      shown: !o.hidden,
+      tag: (o.querySelector(".tag") || {}).textContent,
+      name: (o.querySelector("h3") || {}).textContent,
+      price: (o.querySelector(".price b") || {}).textContent,
+      old: (o.querySelector(".price .old") || {}).textContent,
+      disc: o.querySelector('.disc[dir="ltr"]') ? o.querySelector(".disc").textContent : null,
+      before: o.compareDocumentPosition(document.querySelector("#homeGrid")) & Node.DOCUMENT_POSITION_FOLLOWING,
+      gridTop: document.querySelector("#homeGrid").getBoundingClientRect().top,
+      offerTop: o.getBoundingClientRect().top,
+    };
+  });
+  check(offer.shown && offer.tag === "عرض الشهر", "عرض الشهر is shown");
+  check(/Spotify Premium/.test(offer.name || ""), `it is the first live daily deal: ${offer.name}`);
+  check((offer.price || "").includes("770") && (offer.old || "").includes("1,100"),
+        `deal price ${offer.price}, list price ${offer.old} struck`);
+  check(!!offer.disc && offer.disc.includes("30"), `discount chip, bidi-isolated: ${offer.disc}`);
+  check(offer.offerTop < offer.gridTop, "on a desktop it sits above the grid");
 
-  // the category whose asset 404s must show the glyph, never an empty tile
-  const brokenTile = pageIcons.locator("#catGrid .category-chip", { hasText: "التصميم والإبداع" }).locator(".cticon");
-  await pageIcons.waitForTimeout(700);
-  check(await brokenTile.locator("svg").count() === 1, "a missing asset still shows the designed glyph");
-  check(await brokenTile.locator("img").count() === 0, "the failed <img> removes itself via onerror");
-  // and the glyph is underneath a WORKING image too, so a lazy asset
-  // that has not arrived yet never leaves a blank tile
-  const layered = pageIcons.locator("#catGrid .category-chip", { hasText: "الذكاء الاصطناعي" }).locator(".cticon");
-  check(await layered.locator("svg").count() === 1, "the fallback glyph sits behind a loaded image, not instead of it");
-  await pageIcons.close();
-
-  // ---------- deals ----------
-  check(!(await page.locator("#dealsSec").isHidden()), "deals section is shown when the server has live deals");
-  const dealCards = await page.locator("#dealsRail .pcard").count();
-  check(dealCards === 2, `two live deals rendered: ${dealCards}`);
-
-  const first = page.locator("#dealsRail .pcard").first();
-  check((await first.locator(".pprice b").innerText()).includes("770"), "deal price shown");
-  check((await first.locator(".pprice .old").innerText()).includes("1,100"), "original price struck through");
-  const disc = await first.locator(".pprice .disc").innerText();
-  check(disc.includes("30"), "discount percentage computed by the server data");
-  // inside an RTL row "-30%" reorders to "30%-" without isolation
-  check(await first.locator('.pprice .disc[dir="ltr"]').count() === 1,
-        `discount chip is bidi-isolated so the sign stays on the left: "${disc}"`);
-
-  const t1 = await page.locator("#dealsTimer").innerText();
-  await page.waitForTimeout(2200);
-  const t2 = await page.locator("#dealsTimer").innerText();
-  check(/\d{2}:\d{2}:\d{2}/.test(t1) && t1 !== t2, `countdown is live and counting: "${t1}" -> "${t2}"`);
-
-  // the discounted price must follow into the detail page and the cart,
-  // or the cart total disagrees with what create_order charges
-  await first.locator(".pbody .btn").click();
+  await page.locator("#offer .btn-primary").click();
   await page.waitForSelector("#detail:not(.hidden)");
-  check((await page.locator("#dName").innerText()) === "Spotify Premium", "deal card opens its product");
-  check((await page.locator("#dTotal").innerText()).includes("770"), "detail page shows the deal price");
+  check((await page.locator("#dName").innerText()) === "Spotify Premium", "its button opens the product");
+  check((await page.locator("#dTotal").innerText()).includes("770"), "on the deal's plan, at the deal price");
   const checked = await page.locator('#dPlans .opt[aria-checked="true"] .nm').innerText();
   check(checked === "شهر واحد", `the discounted plan is preselected: ${checked}`);
-
   await page.locator("#detail .btn-primary").first().click();
   await page.waitForTimeout(300);
-  check((await page.locator("#cartTotal").innerText()).includes("770"), "cart total uses the deal price");
+  // textContent: the closed drawer is visibility:hidden, so innerText reads ""
+  check((await page.locator("#cartTotal").textContent()).includes("770"), "and the cart charges the deal price");
 
-  // ---------- deals hidden when none are live ----------
+  // no live deal -> a hot product takes the slot, at its plain price
   const page2 = await newPage({ viewport: { width: 1280, height: 900 } });
   await page2.route("**/rest/v1/public_daily_deals*", r => r.fulfill({ status: 200, body: "[]" }));
   await page2.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await page2.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
-  check(await page2.locator("#dealsSec").isHidden(), "no live deals -> section hidden entirely, no empty state");
-  check((await page2.locator("#dealsRail").innerText()).trim() === "", "no placeholder deal invented");
+  await ready(page2);
+  const hot = await fromDb("products?select=name,badge_type,status&order=sort_order");
+  const firstHot = hot.find(p => p.badge_type === "hot" && p.status === "published");
+  const fallback = await page2.evaluate(() => ({
+    shown: !document.querySelector("#offer").hidden,
+    name: document.querySelector("#offer h3").textContent,
+    disc: document.querySelectorAll("#offer .disc").length,
+  }));
+  check(fallback.shown && fallback.name.includes(firstHot.name) && fallback.disc === 0,
+        `no deal -> the first hot product, no discount chip: ${fallback.name}`);
   await page2.close();
 
+  // ---------- the hero ----------
+  await page.evaluate(() => { window.go("home"); window.scrollTo(0, 0); });
+  await page.waitForTimeout(400);
+  const all = await fromDb("products?select=name,poster_path,badge_type,status&order=sort_order");
+  const hero = await page.evaluate(() => {
+    const el = document.querySelector(".hero");
+    const h1 = el.querySelector("h1");
+    const lh = parseFloat(getComputedStyle(h1).lineHeight);
+    return {
+      badge: el.querySelector(".eyebrow.pill").textContent.trim(),
+      lines: Math.round(h1.getBoundingClientRect().height / lh),
+      line2: getComputedStyle(h1.querySelector("span:not(.h1a)")).color,
+      line1: getComputedStyle(h1.querySelector(".h1a")).color,
+      lead: !!el.querySelector(".lead"),
+      buttons: [...el.querySelectorAll(".btns > *")].map(b => b.textContent.trim()),
+      checks: el.querySelectorAll(".hero-copy .checks > span").length,
+      cards: [...el.querySelectorAll(".stack .card-img")].map(c => ({
+        cls: c.className, src: (c.querySelector("img.pimg") || {}).getAttribute?.("src") || null,
+        rot: getComputedStyle(c).transform,
+      })),
+      cta: el.querySelector(".stack-cta")?.textContent.replace(/\s+/g, " ").trim(),
+      ctaBtn: !!el.querySelector(".stack-cta .btn"),
+    };
+  });
+  check(hero.badge === "+1000 زبون وثقو فينا", `badge: ${hero.badge}`);
+  check(hero.lines === 2, `the heading sits on two lines (${hero.lines})`);
+  check(hero.line1 !== hero.line2, `its second line is violet (${hero.line2})`);
+  check(hero.lead && hero.buttons.length === 2 && hero.checks === 3,
+        `lead, two buttons (${hero.buttons.join(" / ")}) and three ticks`);
+  check(hero.cards.length === 3 && hero.cards.every(c => c.rot !== "none"), "three cards, fanned");
+  const withPosters = all.filter(p => p.poster_path).length;
+  check(hero.cards.filter(c => c.src).length === Math.min(3, withPosters),
+        "products that have card artwork are the ones fanned out");
+  const front = hero.cards.find(c => /\bf\b/.test(c.cls));
+  check(!!front && !!front.src, "the front card is real artwork");
+  check(hero.ctaBtn && /يبدا من/.test(hero.cta) && /\d/.test(hero.cta),
+        `the pill under it: name, price and اشري دركا (${hero.cta})`);
+  await page.locator(".stack-cta .btn").click();
+  await page.waitForSelector("#detail:not(.hidden)");
+  check(true, "and its button opens the product page");
+  await page.evaluate(() => window.go("home"));
+
+  // ---------- platforms strip ----------
+  const strip = await page.evaluate(() => {
+    const spans = [...document.querySelectorAll("#platTrack span")];
+    return {
+      names: spans.filter(s => !s.hasAttribute("aria-hidden")).map(s => s.textContent),
+      copies: spans.filter(s => s.getAttribute("aria-hidden") === "true").length,
+      anim: getComputedStyle(document.querySelector("#platTrack")).animationName,
+    };
+  });
+  check(strip.names.length === all.length && strip.copies === all.length,
+        `every product's name, once for reading and once aria-hidden for the loop (${strip.names.length})`);
+  check(strip.anim === "slide", `it scrolls: ${strip.anim}`);
+
+  // ---------- header ----------
+  const head = await page.evaluate(() => {
+    const h = document.querySelector("#hd");
+    return {
+      pos: getComputedStyle(h).position,
+      nav: [...h.querySelectorAll(".nav button")].map(b => b.textContent.trim()),
+      navShown: getComputedStyle(h.querySelector(".nav")).display !== "none",
+      burgerShown: getComputedStyle(h.querySelector(".menu-btn")).display !== "none",
+      langs: [...h.querySelectorAll(".langs button")].map(b => `${b.textContent}:${b.getAttribute("aria-pressed")}`),
+      cartBg: getComputedStyle(h.querySelector(".sq.cart")).backgroundColor,
+      badge: !!h.querySelector("#cartBadge"),
+      theme: !!h.querySelector("#themeBtn"),
+      bundlesLinked: [...document.querySelectorAll("#hd button, #menu button, footer button")]
+        .some(b => /bundles/.test(b.getAttribute("onclick") || "")),
+    };
+  });
+  check(head.pos === "sticky", "the header stays on top");
+  check(head.nav.join(" ") === "الرئيسية المنتجات كيفاش تطلب الأسئلة", `nav reads: ${head.nav.join(" / ")}`);
+  check(head.navShown && !head.burgerShown, "a desktop column shows the links, not the burger");
+  check(head.langs.join(" ") === "ع:true FR:false EN:false", `language pills: ${head.langs.join(" ")}`);
+  check(head.cartBg === "rgb(124, 58, 237)" && head.badge, "the cart is the violet button with its count");
+  check(head.theme, "the sun/moon button is there");
+  check(!head.bundlesLinked, "the bundles page is not linked from the header, the menu or the footer");
+
+  await page.evaluate(() => window.goSection("faq"));
+  await page.waitForTimeout(900);
+  const faqTop = await page.evaluate(() => document.querySelector("#faq").getBoundingClientRect().top);
+  check(faqTop >= 0 && faqTop < 120, `الأسئلة in the nav scrolls to the FAQ (top ${Math.round(faqTop)})`);
+
+  // the FAQ cards open one at a time
+  await page.locator("#homeFaq summary").nth(2).click();
+  await page.waitForTimeout(150);
+  const open = await page.evaluate(() => [...document.querySelectorAll("#homeFaq details")].map(d => d.open));
+  check(open.filter(Boolean).length === 1 && open[2], `one FAQ card open at a time: ${open}`);
+
+  // the WhatsApp band carries the number from store_settings
+  const settings = await fromDb("store_settings?select=key,value");
+  const wa = settings.find(s => s.key === "whatsapp_number").value;
+  const shown = await page.locator("#waNum").innerText();
+  check(shown.replace(/\s/g, "") === "0" + wa.slice(3), `WhatsApp band number from store_settings: ${shown}`);
+
+  // cart pulse fires once
+  await page.evaluate(() => document.querySelector("#cartBadge").classList.remove("cartpulse"));
+  await page.evaluate(() => window.go("shop"));
+  await page.waitForSelector("#shop:not(.hidden)");
+  await page.locator("#shopGrid .pcard", { hasText: "Gemini Pro" }).first().locator(".pbody .btn").click();
+  await page.waitForSelector("#detail:not(.hidden)");
+  await page.locator("#detail .btn-primary").first().click();
+  check(await page.locator("#cartBadge.cartpulse").count() === 1, "adding to cart pulses the badge once");
+  const pulseDur = await page.evaluate(() => getComputedStyle(document.querySelector("#cartBadge")).animationDuration);
+  check(parseFloat(pulseDur) <= 0.4, `pulse is short: ${pulseDur}`);
+
   // ---------- motion ----------
+  await page.evaluate(() => window.go("shop", "all"));
+  await page.waitForTimeout(100);
   const stag = await page.evaluate(() => {
     const c = [...document.querySelectorAll("#shopGrid .pcard")];
     return c.slice(0, 8).map(x => parseInt(x.style.getPropertyValue("--stag-d")) || 0);
@@ -120,7 +294,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
 
   const longTransitions = await page.evaluate(() => {
     const bad = [];
-    for (const el of document.querySelectorAll(".btn,.pcard,.category-chip,.paybtn,.opt")) {
+    for (const el of document.querySelectorAll(".btn,.pcard,.category-chip,.paybtn,.opt,.plus,.sq")) {
       const cs = getComputedStyle(el);
       cs.transitionDuration.split(",").forEach((d, i) => {
         const ms = parseFloat(d) * (d.includes("ms") ? 1 : 1000);
@@ -135,174 +309,42 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     const bad = [];
     for (const el of document.querySelectorAll("*")) {
       const props = getComputedStyle(el).transitionProperty;
-      // .hbar is the pre-existing header shrink-on-scroll. It transitions
-      // height, but inside a fixed header whose reserved space is a
-      // constant, so it reflows five flex children and never the page.
-      // Flagged in the report rather than rewritten.
-      if (el.classList.contains("hbar")) continue;
-      if (/(^|[ ,])(top|left|right|bottom|width|height|margin)([ ,]|$)/.test(props))
+      if (/(^|[ ,])(top|left|right|bottom|width|height|margin|padding)([ ,]|$)/.test(props))
         bad.push(el.className + " -> " + props);
     }
     return bad;
   });
   check(animatedProps.length === 0, `nothing transitions layout properties${animatedProps.length ? " -> " + animatedProps.slice(0,3) : ""}`);
 
-  // ---------- the hero ----------
-  await page.evaluate(() => window.go("home"));
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(500);
-
-  const hero = await page.evaluate(() => {
-    const el = document.querySelector(".hero");
-    const cs = getComputedStyle(el);
-    const r = el.getBoundingClientRect();
-    const best = document.querySelector("#bestSec");
-    return {
-      bg: (cs.backgroundImage.match(/hero-[a-z]+/) || [])[0],
-      size: cs.backgroundSize,
-      position: cs.backgroundPosition,
-      height: Math.round(r.height),
-      /* the artwork is a daylight photograph, so the reading layer has to
-         be a white wash. A dark stop over it would be the old treatment. */
-      wash: (() => {
-        const g = getComputedStyle(el, "::after").backgroundImage;
-        if (!g.includes("gradient")) return null;
-        const stops = g.match(/rgba?\([^)]*\)/g) || [];
-        const opaque = stops.filter(c => {
-          const n = c.match(/[\d.]+/g).map(Number);
-          return (n[3] === undefined || n[3] > 0.02);
-        });
-        return {
-          any: true,
-          // every visible stop is white; none of them darkens the photo
-          allWhite: opaque.length > 0 && opaque.every(c => {
-            const n = c.match(/[\d.]+/g).map(Number);
-            return n[0] > 240 && n[1] > 240 && n[2] > 240;
-          }),
-          // and it fades right out, so the cards themselves stay uncovered
-          clears: stops.some(c => {
-            const n = c.match(/[\d.]+/g).map(Number);
-            return n[3] !== undefined && n[3] <= 0.02;
-          }),
-        };
-      })(),
-      /* dark ink, not white: the copy sits on a light wash now */
-      inkLum: (() => {
-        const n = getComputedStyle(el.querySelector("h1")).color.match(/[\d.]+/g).map(Number);
-        const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-        return 0.2126 * f(n[0]) + 0.7152 * f(n[1]) + 0.0722 * f(n[2]);
-      })(),
-      copy: {
-        badge: !!el.querySelector(".eyebrow"),
-        lines: (el.querySelector("h1")?.innerHTML.match(/<br>/g) || []).length + 1,
-        lede: !!el.querySelector(".lede"),
-        buttons: [...el.querySelectorAll(".hero-cta button")].map(b => b.textContent.trim()),
-      },
-      /* the next section starts under the artwork, not a screen later */
-      gapToNext: best ? Math.round(best.getBoundingClientRect().top - r.bottom) : null,
-      nextIsBest: !!best && !!best.querySelector("#bestRail"),
-      // nothing left from the two heroes this replaces
-      stale: document.querySelectorAll(".heroArt,#horbit,.hoBill,#featGrid,.hstage").length,
-    };
-  });
-  check(hero.bg === "hero-banner", `one banner serves both breakpoints: ${hero.bg}`);
-  check(hero.size === "cover", `the artwork covers its section: ${hero.size}`);
-  check(/^(0%|0px|left)/.test(hero.position),
-        `the crop favours the cards on the left of the frame: ${hero.position}`);
-  check(hero.height <= 560, `desktop height is capped at 560: ${hero.height}px`);
-  check(!!hero.wash, "a reading layer sits over the artwork");
-  check(!!hero.wash && hero.wash.allWhite,
-        "and it is a white wash, not a dark gradient over a daylight photo");
-  check(!!hero.wash && hero.wash.clears,
-        "fading to nothing, so the product cards are never veiled");
-  check(hero.inkLum < 0.12, `the copy is dark ink, not white (luminance ${hero.inkLum.toFixed(3)})`);
-  check(hero.copy.badge && hero.copy.lines === 2 && hero.copy.lede,
-        `badge, a two-line heading and a lede (${hero.copy.lines} lines)`);
-  check(hero.copy.buttons.length === 2,
-        `two real buttons, not painted into the image: ${hero.copy.buttons.join(" / ")}`);
-  check(hero.nextIsBest, "الأكثر طلباً is the section directly under the hero");
-  check(hero.gapToNext !== null && hero.gapToNext <= 4,
-        `no dead space between them: ${hero.gapToNext}px`);
-  check(hero.stale === 0, "nothing left over from the previous heroes");
-
-  // ---------- the header ----------
-  const head = await page.evaluate(() => {
-    const h = document.querySelector("#hd");
-    const cs = getComputedStyle(document.querySelector(".hshell"));
-    return {
-      handle: h.textContent.includes("@janeiro_service"),
-      nav: [...h.querySelectorAll(".nav button")].map(b => b.textContent.trim()),
-      navShown: getComputedStyle(h.querySelector(".nav")).display !== "none",
-      burgerShown: getComputedStyle(h.querySelector(".menu-btn")).display !== "none",
-      glass: cs.backdropFilter && cs.backdropFilter !== "none",
-      translucent: !/^rgb\(/.test(cs.backgroundColor),   // rgba, not opaque
-      badge: !!h.querySelector("#cartBadge"),
-      strokes: [...h.querySelectorAll(".ibtn svg")].map(s => s.getAttribute("stroke-width")),
-      iconSize: getComputedStyle(h.querySelector(".ibtn svg")).width,
-    };
-  });
-  check(!head.handle, "the @handle is gone from the header");
-  check(head.nav.join(" ") === "الرئيسية المنتجات العروض تتبع الطلب تواصل معنا", `nav reads: ${head.nav.join(" / ")}`);
-  check(head.navShown && !head.burgerShown, "a desktop column shows the links, not the burger");
-  check(head.glass, `the bar is frosted: ${head.glass}`);
-  check(head.translucent, "and translucent, so the artwork shows through");
-  check(head.badge, "the cart carries its badge");
-  check(head.strokes.every(w => +w <= 1.6), `icon strokes are thin: ${[...new Set(head.strokes)].join(",")}`);
-  check(head.iconSize === "21px", `icons share one size: ${head.iconSize}`);
-
-  // the search is an icon until it is asked for
-  check(await page.evaluate(() => !document.getElementById("hsearch").classList.contains("open")),
-        "the search starts collapsed");
-  check(await page.evaluate(() => document.getElementById("deskSearch").tabIndex) === -1,
-        "and is out of the tab order while collapsed");
-  await page.click("#hsToggle");
-  await page.waitForTimeout(350);
-  check(await page.evaluate(() => document.getElementById("hsearch").classList.contains("open")),
-        "clicking the icon expands it");
-  check(await page.evaluate(() => document.activeElement.id) === "deskSearch",
-        "and puts the caret in it");
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(300);
-  check(await page.evaluate(() => !document.getElementById("hsearch").classList.contains("open")),
-        "escape closes it again");
-
-  // cart pulse fires once
-  await page.evaluate(() => document.querySelector("#cartBadge").classList.remove("cartpulse"));
-  await page.evaluate(() => window.go("shop"));
-  await page.waitForSelector("#shop:not(.hidden)");
-  await page.locator("#shopGrid .pcard", { hasText: "Gemini Pro" }).first().locator(".pbody .btn").click();
-  await page.waitForSelector("#detail:not(.hidden)");
-  await page.locator("#detail .btn-primary").first().click();
-  check(await page.locator("#cartBadge.cartpulse").count() === 1, "adding to cart pulses the badge once");
-  const pulseDur = await page.evaluate(() => getComputedStyle(document.querySelector("#cartBadge")).animationDuration);
-  check(parseFloat(pulseDur) <= 0.4, `pulse is short: ${pulseDur}`);
-
   // ---------- reduced motion ----------
   const page3 = await newPage({ viewport: { width: 1280, height: 900 } });
   await page3.emulateMedia({ reducedMotion: "reduce" });
   await page3.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await page3.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  await ready(page3);
   await page3.waitForTimeout(600);
   const rm = await page3.evaluate(() => {
-    const hidden = [...document.querySelectorAll(".rv,.stag,#shopGrid .pcard")]
+    const hidden = [...document.querySelectorAll(".rv,.stag,#homeGrid .pcard,#shopGrid .pcard")]
       .filter(e => parseFloat(getComputedStyle(e).opacity) < 1).length;
     const moving = [...document.querySelectorAll("*")]
       .filter(e => getComputedStyle(e).animationName !== "none"
                 && getComputedStyle(e).animationPlayState === "running").length;
-    return { hidden, moving };
+    const loopCopies = [...document.querySelectorAll('#platTrack [aria-hidden="true"]')]
+      .filter(e => getComputedStyle(e).display !== "none").length;
+    return { hidden, moving, loopCopies };
   });
   check(rm.hidden === 0, `reduced motion: nothing left stuck invisible (${rm.hidden} hidden)`);
-  check(rm.moving === 0, `reduced motion: no animation running (${rm.moving} running)`);
+  check(rm.moving === 0, `reduced motion: no animation running, the platforms strip included (${rm.moving} running)`);
+  check(rm.loopCopies === 0, "reduced motion: the strip's loop copy is dropped and it just wraps");
   await page3.close();
 
   // ---------- scroll behaviour across page switches ----------
   // NOTE: click by coordinates, never locator.click(). Playwright scrolls
   // a target into view before clicking, which moves the page itself and
   // makes every one of these assertions measure the harness rather than
-  // the app. Two false readings came from exactly that.
+  // the app.
   const scr = await newPage({ viewport: { width: 390, height: 844 } });
   await scr.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await scr.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  await ready(scr);
   await scr.waitForTimeout(900);
   const sy = () => scr.evaluate(() => window.scrollY);
 
@@ -313,7 +355,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   const deep = await sy();
 
   const onScreenCard = await scr.evaluate(() => {
-    const el = [...document.querySelectorAll("#shopGrid .pcard .pbody .btn")]
+    const el = [...document.querySelectorAll("#shopGrid .pcard .pbody .btn:not([disabled])")]
       .find(x => { const r = x.getBoundingClientRect(); return r.top > 80 && r.bottom < 800; });
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -334,23 +376,20 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
           `going back returns you to the card you were on, not the top (${deep} -> ${back})`);
   }
 
-  // tapping the nav item for the page you are already on means "go to the start"
   await scr.evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
   await scr.waitForTimeout(300);
   await scr.evaluate(() => window.go("shop"));
   await scr.waitForTimeout(400);
   check(await sy() === 0, "re-tapping the current page scrolls to the top");
 
-  // a filter replaces the list, so a remembered offset would point at nothing
   await scr.evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
   await scr.waitForTimeout(250);
   await scr.evaluate(() => window.go("home"));
   await scr.waitForTimeout(250);
   await scr.evaluate(() => window.selectCat("design"));
   await scr.waitForTimeout(450);
-  check(await sy() === 0, "filtering starts the new list at the top");
+  check(await sy() === 0, "filtering the all-products page starts the new list at the top");
 
-  // page switches must jump, not animate up the old page
   const behaviour = await scr.evaluate(() => {
     let seen = null;
     const orig = window.scrollTo.bind(window);
@@ -359,10 +398,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     window.scrollTo = orig;
     return seen;
   });
-  check(behaviour === "instant",
-        `page switches scroll instantly rather than animating (behavior=${behaviour})`);
+  check(behaviour === "instant", `page switches scroll instantly rather than animating (behavior=${behaviour})`);
 
-  // drawers must not lose the page position
   await scr.evaluate(() => window.go("shop"));
   await scr.evaluate(() => window.scrollTo({ top: 800, behavior: "instant" }));
   await scr.waitForTimeout(350);
@@ -375,135 +412,130 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
         `opening and closing the cart keeps your place (${beforeDrawer} -> ${await sy()})`);
   await scr.close();
 
-  // ---------- narrow viewports ----------
-  for (const w of [375, 380, 390, 430]) {
-    const pm = await newPage({ viewport: { width: w, height: 820 } });
+  // ---------- the phone layout ----------
+  for (const w of [375, 390, 430]) {
+    const pm = await newPage({ viewport: { width: w, height: 844 } });
     await pm.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-    await pm.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
-    await pm.waitForTimeout(500);
-    const over = await pm.evaluate(() => ({
-      doc: document.documentElement.scrollWidth,
-      win: window.innerWidth,
-      offenders: [...document.querySelectorAll("body *")]
-        .filter(e => e.getBoundingClientRect().right > window.innerWidth + 1
-                  && getComputedStyle(e).position !== "fixed"
-                  && !e.closest(".rail,.category-carousel,[style*='overflow']"))
-        .slice(0, 3).map(e => e.tagName + "." + (e.className || "").toString().slice(0, 30)),
-    }));
-    check(over.doc <= over.win + 1, `${w}px: no horizontal scroll (doc ${over.doc} vs win ${over.win})${over.offenders.length ? " -> " + over.offenders : ""}`);
-
-    /* the banner is the thing that ran away on a phone last time: it has to
-       fill 60vh and then stop, with الأكثر طلباً already on the first screen. */
-    const mh = await pm.evaluate(() => {
-      const el = document.querySelector(".hero");
-      const r = el.getBoundingClientRect();
-      const h1 = el.querySelector("h1").getBoundingClientRect();
-      const cta = [...el.querySelectorAll(".hero-cta button")].map(b => b.getBoundingClientRect());
-      const best = document.querySelector("#bestSec");
+    await ready(pm);
+    await pm.waitForTimeout(600);
+    const m = await pm.evaluate(() => {
+      const box = s => document.querySelector(s).getBoundingClientRect();
+      const lh = el => parseFloat(getComputedStyle(el).lineHeight);
+      const h2 = document.querySelector("#store h2");
       return {
+        doc: document.documentElement.scrollWidth, win: window.innerWidth,
+        offenders: [...document.querySelectorAll("body *")]
+          .filter(e => e.getBoundingClientRect().right > window.innerWidth + 1
+                    && getComputedStyle(e).position !== "fixed"
+                    && !e.closest(".tabs-scroll,.marquee,.panel"))
+          .slice(0, 3).map(e => e.tagName + "." + (e.className || "").toString().slice(0, 30)),
+        h1Lines: Math.round(box(".hero h1").height / lh(document.querySelector(".hero h1"))),
+        checksHidden: getComputedStyle(document.querySelector(".hero-copy .checks")).display === "none",
+        stackBottom: box(".stack").bottom,
+        platsTop: box("#plats .marquee").top,
+        platsLabel: getComputedStyle(document.querySelector(".plats-lbl")).display === "none",
+        shopH2Lines: Math.round(h2.getBoundingClientRect().height / lh(h2)),
+        firstCard: box("#homeGrid .pcard").top + window.scrollY,
         vh: window.innerHeight,
-        height: Math.round(r.height),
-        // the copy stays inside its own section, nothing clipped away
-        fits: h1.top >= r.top - 1 && (cta.length ? cta[cta.length - 1].bottom <= r.bottom + 1 : false),
-        bestTop: best ? Math.round(best.getBoundingClientRect().top) : null,
-        gap: best ? Math.round(best.getBoundingClientRect().top - r.bottom) : null,
+        gridBottom: box("#homeGrid").bottom,
+        offerTop: box("#offer").top,
+        langsInHeader: getComputedStyle(document.querySelector("#hd .langs")).display !== "none",
+        burger: box(".menu-btn"),
       };
     });
-    check(mh.height >= Math.round(mh.vh * 0.58) && mh.height <= Math.round(mh.vh * 0.72),
-          `${w}px: the banner holds 60vh without taking the screen (${mh.height}px of ${mh.vh}px)`);
-    check(mh.fits, `${w}px: badge, heading and both buttons sit inside the banner`);
-    check(mh.gap !== null && mh.gap <= 4, `${w}px: no dead space under the banner (${mh.gap}px)`);
-    check(mh.bestTop !== null && mh.bestTop < mh.vh,
-          `${w}px: الأكثر طلباً is already on the first screen (top ${mh.bestTop} of ${mh.vh})`);
-    if (w === 390) await pm.screenshot({ path: "/tmp/claude-0/-home-user-JANEIRO/68cc013f-a073-5abe-9b55-e7d0bdbc6503/scratchpad/m390.png" });
+    check(m.doc <= m.win + 1, `${w}px: no horizontal scroll (doc ${m.doc} vs win ${m.win})${m.offenders.length ? " -> " + m.offenders : ""}`);
+    check(m.h1Lines === 2 && m.checksHidden, `${w}px: a short hero -- two-line heading, no tick row (${m.h1Lines} lines)`);
+    check(m.platsLabel && m.platsTop - m.stackBottom <= 24,
+          `${w}px: the platforms strip hugs the cards, no label (${Math.round(m.platsTop - m.stackBottom)}px)`);
+    check(m.shopH2Lines === 1, `${w}px: the shop heading is one line (${m.shopH2Lines})`);
+    check(m.firstCard < m.vh * 2, `${w}px: products start within the second screen (${Math.round(m.firstCard)}px)`);
+    check(m.offerTop > m.gridBottom, `${w}px: عرض الشهر comes after the grid on a phone`);
+    check(!m.langsInHeader && m.burger.left >= 0 && m.burger.right <= m.win,
+          `${w}px: the languages move into the menu and the burger stays on screen`);
+    /* the language button next to the cart opens the three choices */
+    await pm.click("#langBtn");
+    const pick = await pm.evaluate(() => ({
+      open: !document.querySelector("#langMenu").hidden,
+      items: [...document.querySelectorAll("#langMenu button")].map(b => b.dataset.lang).join(","),
+      box: document.querySelector("#langMenu").getBoundingClientRect(),
+    }));
+    check(pick.open && pick.items === "ar,fr,en" && pick.box.left >= 0 && pick.box.right <= w,
+          `${w}px: the language button opens ع / FR / EN, on screen`);
+    await pm.click('#langMenu [data-lang="fr"]');
+    const picked = await pm.evaluate(() => [document.documentElement.lang, document.querySelector("#langBtn").textContent,
+      document.querySelector("#langMenu").hidden]);
+    check(picked.join() === "fr,FR,true", `${w}px: picking French switches, relabels the button and closes the list (${picked})`);
+    await pm.evaluate(() => window.setLang("ar"));
+    if (w === 390) {
+      await pm.evaluate(() => window.openPanel("menu"));
+      await pm.waitForTimeout(400);
+      check(await pm.locator("#menu .langs").isVisible(), "390px: the side menu carries the language pills");
+    }
     await pm.close();
   }
 
   // ---------- language switch (AR / FR / EN) ----------
-  // its own page: re-rendering the grid here must not disturb whatever
-  // filter/state the shared `page` above was left in for later checks.
   const lp = await newPage({ viewport: { width: 1280, height: 1000 } });
   await lp.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await lp.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
-
-  // the dropdown itself: closed by default, opens on the button, picking
-  // an option both switches and closes it, clicking away closes it too
-  check(await lp.locator("#langMenu").isHidden(), "the language dropdown starts closed");
-  await lp.click("#langBtn");
-  check(await lp.locator("#langMenu").isVisible(), "opens on the button");
-  check(await lp.locator("#langBtn").getAttribute("aria-expanded") === "true", "and says so to assistive tech");
-  await lp.click('#langMenu button[data-lang="fr"]');
-  check(await lp.locator("#langMenu").isHidden(), "picking an option closes it again");
-
+  await ready(lp);
+  await lp.click('#hd .langs button[data-lang="fr"]');
   const fr = await lp.evaluate(() => ({
     dir: document.documentElement.getAttribute("dir"),
     lang: document.documentElement.getAttribute("lang"),
     nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
-    langBtn: document.querySelector("#langBtn").textContent.trim(),
-    current: document.querySelector('#langMenu button[data-lang="fr"]').getAttribute("aria-current"),
-    cardBtn: document.querySelector("#shopGrid .pcard .btn")?.textContent.trim(),
+    pressed: [...document.querySelectorAll('.langs [data-lang="fr"]')].every(b => b.getAttribute("aria-pressed") === "true")
+          && document.querySelector('#langMenu [data-lang="fr"]').getAttribute("aria-checked") === "true",
+    cardBtn: document.querySelector("#homeGrid .pcard .btn")?.textContent.trim(),
+    offer: document.querySelector("#offer .tag")?.textContent,
+    h1: document.querySelector(".hero h1").textContent.replace(/\s+/g, " ").trim(),
   }));
   check(fr.dir === "ltr" && fr.lang === "fr", `switches to French: dir=${fr.dir} lang=${fr.lang}`);
-  check(fr.nav === "Accueil Produits Offres Suivre ma commande Nous contacter", `French nav reads: ${fr.nav}`);
-  check(fr.langBtn === "FR", `the language button shows the active code: ${fr.langBtn}`);
-  check(fr.current === "true", "the picked option is marked current in the dropdown");
-  check(/Voir les détails|Indisponible/.test(fr.cardBtn || ""), `product card buttons translate too: "${fr.cardBtn}"`);
+  check(fr.nav === "Accueil Produits Comment commander Questions", `French nav reads: ${fr.nav}`);
+  check(fr.pressed, "both copies of the FR pill are marked pressed");
+  check(fr.cardBtn === "Acheter" && fr.offer === "Offre du mois", `cards and the offer translate: ${fr.cardBtn} / ${fr.offer}`);
+  check(fr.h1 === "Tous vos abonnements numériques, au même endroit.", `the hero translates: ${fr.h1}`);
 
-  // clicking anywhere else closes an open dropdown without changing anything
-  await lp.click("#langBtn");
-  check(await lp.locator("#langMenu").isVisible(), "reopens for the next check");
-  await lp.click("body", { position: { x: 20, y: 400 } });
-  check(await lp.locator("#langMenu").isHidden(), "clicking away closes it");
-
-  // localStorage, not just in-memory state -- a returning French visitor
-  // should not see a flash of Arabic before it catches up
   await lp.reload({ waitUntil: "networkidle" });
-  await lp.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
-  const persisted = await lp.evaluate(() => ({
-    dir: document.documentElement.getAttribute("dir"), lang: document.documentElement.getAttribute("lang"),
-  }));
-  check(persisted.dir === "ltr" && persisted.lang === "fr",
-        `the language choice survives a reload: dir=${persisted.dir} lang=${persisted.lang}`);
-
-  const ltrOverflow = await lp.evaluate(() => (
-    { doc: document.documentElement.scrollWidth, win: window.innerWidth }));
-  check(ltrOverflow.doc <= ltrOverflow.win + 1,
-        `LTR layout has no horizontal scroll (doc ${ltrOverflow.doc} vs win ${ltrOverflow.win})`);
+  await ready(lp);
+  const persisted = await lp.evaluate(() => document.documentElement.getAttribute("lang"));
+  check(persisted === "fr", `the language choice survives a reload: ${persisted}`);
+  const ltrOverflow = await lp.evaluate(() => ({ doc: document.documentElement.scrollWidth, win: window.innerWidth }));
+  check(ltrOverflow.doc <= ltrOverflow.win + 1, `LTR layout has no horizontal scroll (doc ${ltrOverflow.doc} vs win ${ltrOverflow.win})`);
 
   const en = await lp.evaluate(() => {
     window.setLang("en");
-    return {
-      dir: document.documentElement.getAttribute("dir"),
-      lang: document.documentElement.getAttribute("lang"),
-      nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
-    };
+    return [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" ");
   });
-  check(en.dir === "ltr" && en.lang === "en", `switches to English: dir=${en.dir} lang=${en.lang}`);
-  check(en.nav === "Home Products Deals Track Order Contact Us", `English nav reads: ${en.nav}`);
-
-  const backToAr = await lp.evaluate(() => {
+  check(en === "Home Products How to order FAQ", `English nav reads: ${en}`);
+  const ar = await lp.evaluate(() => {
     window.setLang("ar");
-    return {
-      dir: document.documentElement.getAttribute("dir"),
-      lang: document.documentElement.getAttribute("lang"),
-      nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
-    };
+    return { dir: document.documentElement.getAttribute("dir"),
+             nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" ") };
   });
-  check(backToAr.dir === "rtl" && backToAr.lang === "ar",
-        `cycles back to Arabic: dir=${backToAr.dir} lang=${backToAr.lang}`);
-  check(backToAr.nav === "الرئيسية المنتجات العروض تتبع الطلب تواصل معنا", `back to Arabic nav: ${backToAr.nav}`);
+  check(ar.dir === "rtl" && ar.nav === "الرئيسية المنتجات كيفاش تطلب الأسئلة", `cycles back to Arabic: ${ar.nav}`);
+
+  /* every key the page asks for exists in all three languages */
+  const missing = await lp.evaluate(() => {
+    const keys = new Set();
+    document.querySelectorAll("[data-i18n],[data-i18n-ph],[data-i18n-aria]").forEach(e =>
+      ["i18n", "i18nPh", "i18nAria"].forEach(k => e.dataset[k] && keys.add(e.dataset[k])));
+    const out = [];
+    for (const l of ["fr", "en"]) {
+      window.setLang(l);
+      document.querySelectorAll("[data-i18n]").forEach(e => {
+        if (e.textContent === e.dataset.i18n) out.push(`${l}:${e.dataset.i18n}`);
+      });
+    }
+    window.setLang("ar");
+    return out;
+  });
+  check(missing.length === 0, `every static string has FR and EN${missing.length ? " -> " + missing.slice(0, 5) : ""}`);
   await lp.close();
 
   // ---------- catalogue text (owner-authored, machine-translated) ----------
-  // Product names/descriptions and category names come from the
-  // dashboard, not the frontend's own dictionary, so switching
-  // language has to fetch them from translate-content -- checked
-  // against the mock's deterministic "[FR] <text>" stand-in for a
-  // real DeepL call, on its own page so this async round trip cannot
-  // race the synchronous dictionary checks above.
   const lt = await newPage({ viewport: { width: 1280, height: 1000 } });
   await lt.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await lt.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
+  await ready(lt);
   const beforeName = await lt.locator("#shopGrid .pcard h3").first().textContent();
   await lt.evaluate(() => window.setLang("fr"));
   await lt.waitForFunction(() => {
@@ -512,72 +544,20 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   }, { timeout: 8000 });
   const afterName = await lt.locator("#shopGrid .pcard h3").first().textContent();
   check(afterName === `[FR] ${beforeName}`, `product name is machine-translated: "${beforeName}" -> "${afterName}"`);
-  // each chip carries two <span>s -- the icon tile (.cticon) and the
-  // name -- so the name has to be picked out explicitly
-  const catChip = await lt.locator("#catGrid .category-chip span:not(.cticon)").nth(1).textContent();
-  check(catChip.startsWith("[FR] "), `category name is translated too: "${catChip}"`);
-  const allChip = await lt.locator("#catGrid .category-chip span:not(.cticon)").first().textContent();
-  check(allChip === "Tout", `the "all" chip is dictionary-translated, not sent for machine translation: "${allChip}"`);
-
-  // switching back to Arabic restores the kept original -- no new request
+  const catTab = await lt.locator("#catGrid .category-chip").nth(1).textContent();
+  check(catTab.startsWith("[FR] "), `category name is translated too: "${catTab}"`);
+  const allTab = await lt.locator("#catGrid .category-chip").first().textContent();
+  check(allTab === "Tout", `the "all" tab is dictionary-translated, not sent for machine translation: "${allTab}"`);
   await lt.evaluate(() => window.setLang("ar"));
   await lt.waitForTimeout(150);
   const restoredName = await lt.locator("#shopGrid .pcard h3").first().textContent();
   check(restoredName === beforeName, `switching back to Arabic restores the original text: "${restoredName}"`);
   await lt.close();
 
-  // ---------- language switch on a phone ----------
-  // The header is position:fixed, so a button spilling past the
-  // viewport edge does NOT grow document.documentElement.scrollWidth --
-  // the usual overflow check above would miss it. The language switch
-  // has to stay in the always-visible row on every width (the store
-  // owner asked for it there, not tucked in the hamburger panel), so
-  // the wordmark is what gives way on a narrow phone instead: below
-  // 480px the header keeps the mark alone and drops "Janeiro Store",
-  // which frees far more width than the switch needs.
-  const lm = await newPage({ viewport: { width: 390, height: 844 } });
-  await lm.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
-  await lm.waitForFunction(() => document.querySelectorAll("#shopGrid .pcard:not(.sk)").length > 0);
-  const header390 = await lm.evaluate(() => {
-    const burger = document.querySelector(".menu-btn").getBoundingClientRect();
-    const lang = document.querySelector(".langwrap").getBoundingClientRect();
-    return {
-      burgerLeft: burger.left, burgerRight: burger.right,
-      langVisible: getComputedStyle(document.querySelector(".langwrap")).display !== "none",
-      langLeft: lang.left, langRight: lang.right,
-      wordmarkShown: getComputedStyle(document.querySelector(".hbar .brand b")).display !== "none",
-      win: window.innerWidth,
-    };
-  });
-  check(header390.burgerLeft >= -0.5 && header390.burgerRight <= header390.win + 0.5,
-        `the hamburger stays fully on screen (left ${header390.burgerLeft.toFixed(1)}, right ${header390.burgerRight.toFixed(1)} of ${header390.win}px)`);
-  check(header390.langVisible, "the language switch stays in the top row on a phone too");
-  check(header390.langLeft >= -0.5 && header390.langRight <= header390.win + 0.5,
-        `and it stays fully on screen too (left ${header390.langLeft.toFixed(1)}, right ${header390.langRight.toFixed(1)} of ${header390.win}px)`);
-  check(!header390.wordmarkShown, "the wordmark steps aside instead, to make room");
-
-  // the dropdown works the same way here as on desktop
-  await lm.click("#langBtn");
-  await lm.click('#langMenu button[data-lang="fr"]');
-  const mobileLang = await lm.evaluate(() => ({
-    dir: document.documentElement.getAttribute("dir"),
-    current: document.querySelector('#langMenu button[data-lang="fr"]').getAttribute("aria-current"),
-  }));
-  check(mobileLang.dir === "ltr" && mobileLang.current === "true",
-        `the dropdown switches it on a phone too: dir=${mobileLang.dir} current=${mobileLang.current}`);
-  await lm.close();
-
   /* Every var() in the stylesheet must resolve to something defined.
-     A typo like var(--s5) on a scale that has no --s5 is not an error
-     anywhere -- the element silently loses that property -- and it is
-     invisible to the CSSOM, because the browser drops the declaration
-     before cssRules is built. So this reads the stylesheet SOURCE.
-     Found the bug it exists for: a bundle card with no padding. */
+     A typo like var(--s5) is not an error anywhere -- the element just
+     silently loses that property -- so this reads the stylesheet SOURCE. */
   const unresolved = await page.evaluate(() => {
-    /* comments stripped first: this file explains its own tokens in
-       prose, and a comment reading "there is no --s5:" counted as a
-       definition and made the check pass over the very bug it was
-       written for */
     const css = [...document.querySelectorAll("style")].map(s => s.textContent).join("\n")
                   .replace(/\/\*[\s\S]*?\*\//g, " ");
     const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map(m => m[1]));
@@ -585,11 +565,13 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
       for (const p of el.style) if (p.startsWith("--")) defined.add(p);
     const used = new Set();
     for (const m of css.matchAll(/var\(\s*(--[\w-]+)\s*([,)])/g))
-      if (m[2] === ")") used.add(m[1]);          // no fallback -> it must exist
+      if (m[2] === ")") used.add(m[1]);
+    /* and the inline styles the script writes */
+    for (const el of document.querySelectorAll("[style]"))
+      for (const m of el.getAttribute("style").matchAll(/var\(\s*(--[\w-]+)\s*\)/g)) used.add(m[1]);
     return [...used].filter(n => !defined.has(n));
   });
-  check(unresolved.length === 0,
-        `every var() in the stylesheet resolves${unresolved.length ? " -> " + unresolved.join(", ") : ""}`);
+  check(unresolved.length === 0, `every var() resolves${unresolved.length ? " -> " + unresolved.join(", ") : ""}`);
 
   check(errs.length === 0, `no JS errors${errs.length ? " -> " + errs.slice(0, 3).join(" | ") : ""}`);
   await page.close();

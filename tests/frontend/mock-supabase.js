@@ -102,6 +102,8 @@ async function rest(url, res) {
   try {
     if (table === "store_settings")
       return send(res, 200, await asAnon("select key, value from store_settings"));
+    if (table === "site_texts")
+      return send(res, 200, await asAnon("select key, lang, value from site_texts order by key, lang"));
     if (table === "categories")
       return send(res, 200, await asAnon(
         "select id,name,slug,icon,icon_path,accent_color from categories where is_active order by sort_order"));
@@ -247,6 +249,18 @@ async function adminRpc(name, req, res) {
       const rows = await asUser(
         "select admin_update_order_status($1::uuid, $2::order_status, $3) as r",
         [body.p_order_id, body.p_new_status, body.p_note ?? null], uid, "admin_update_order_status");
+      return send(res, 200, rows[0].r);
+    }
+    /* The console added in 035 calls more admin_* functions. Rather
+       than one branch per function, they go through named-argument
+       notation and Postgres resolves the types from the signature --
+       the function's own is_admin() still decides, as in production. */
+    if (/^admin_[a-z_]+$/.test(name)) {
+      const keys = Object.keys(body);
+      if (!keys.every(k => /^p_[a-z_]+$/.test(k))) return send(res, 400, { message: "bad args" });
+      const vals = keys.map(k => body[k] !== null && typeof body[k] === "object" ? JSON.stringify(body[k]) : body[k]);
+      const args = keys.map((k, i) => `${k} => $${i + 1}`).join(", ");
+      const rows = await asUser(`select ${name}(${args}) as r`, vals, uid, name);
       return send(res, 200, rows[0].r);
     }
     return send(res, 404, { message: `no rpc ${name}` });

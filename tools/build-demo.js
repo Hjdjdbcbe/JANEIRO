@@ -37,7 +37,9 @@ function queryFromApi(table) {
   const src = fs.readFileSync(path.join(ROOT, "js/janeiro-api.js"), "utf8");
   const at = src.indexOf(`"${table}?select=`);
   if (at < 0) throw new Error(`build-demo: no ${table} query in janeiro-api.js`);
-  const call = src.slice(at, src.indexOf(");", at));
+  /* comments go first: one in the products query quotes a string of
+     its own, which would otherwise be read as part of the query */
+  const call = src.slice(at, src.indexOf(");", at)).replace(/\/\*[\s\S]*?\*\//g, "");
   const parts = call.match(/"(?:[^"\\]|\\.)*"/g) || [];
   const joined = parts.map(x => JSON.parse(x)).join("");
   const rest = call.replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/[\s+,]/g, "");
@@ -52,6 +54,7 @@ const QUERIES = [
   queryFromApi("payment_methods"),
   queryFromApi("public_daily_deals"),
   queryFromApi("public_bundles"),
+  queryFromApi("site_texts"),
 ];
 
 const MIME = { ".webp":"image/webp", ".png":"image/png", ".jpg":"image/jpeg",
@@ -135,6 +138,17 @@ const dataUri = (file) => {
     return { order: { order_number: o.order_number, status: o.status,
                       created_at: o.created_at, total: o.total, items: [] } };
   }
+  if (name === "translate-content") {
+    /* no DeepL here: answer from the baked table, and leave anything
+       it does not cover in the owner's Arabic, as the real one would
+       on a failed call */
+    const translations = {};
+    for (const it of body.items) {
+      const tr = DEMO_TRANSLATIONS[it.text];
+      if (tr && tr[body.lang]) translations[it.type + ":" + it.id] = tr[body.lang];
+    }
+    return { translations };
+  }
   throw new Error("demo: unhandled function " + name);
 }`);
 
@@ -170,7 +184,9 @@ const dataUri = (file) => {
     `const DEMO_WHATSAPP = ${JSON.stringify(settings.whatsapp_number || "213000000000")};\n` +
     `const DEMO_PRODUCTS_KEY = ${JSON.stringify(QUERIES[2])};\n` +
     `const DEMO_DATA = ${JSON.stringify(data)};\n` +
-    `const DEMO_MEDIA = ${JSON.stringify(media)};\n`;
+    `const DEMO_MEDIA = ${JSON.stringify(media)};\n` +
+    `const DEMO_TRANSLATIONS = ${JSON.stringify(
+      JSON.parse(fs.readFileSync(path.join(__dirname, "demo-translations.json"), "utf8")))};\n`;
 
   /* A FUNCTION replacement, never a string: $&, $\` and $' are special in a
      replacement string, and the code being injected is full of `${...}`. */
@@ -178,7 +194,7 @@ const dataUri = (file) => {
     `/* ---- demo build: the api module, inlined, with its transports swapped ---- */\n` +
     preamble + api + `\nconst API = { isConfigured, loadStoreSettings, loadCategories, loadProducts,\n` +
     `  loadProduct, loadPaymentMethods, loadDailyDeals, loadBundles, mediaUrl, newIdempotencyKey,\n` +
-    `  createOrder, uploadReceipt, submitOrder, buildWhatsAppUrl, trackOrder, revalidateCart };\n`;
+    `  createOrder, uploadReceipt, submitOrder, buildWhatsAppUrl, trackOrder, getCertificate, translateContent, revalidateCart };\n`;
   html = html.replace('import * as API from "../js/janeiro-api.js";', () => injected);
   html = html.replace(/^\s*export (async function|function|const)/gm, "$1");
 
@@ -216,10 +232,10 @@ const dataUri = (file) => {
 
   // ---------- 6. say plainly that it is a demo ----------
   html = html.replace("</body>", `
-<div id="demoTag" style="position:fixed;inset-block-end:calc(var(--s4) + env(safe-area-inset-bottom));
-  inset-inline-start:var(--s4);z-index:95;background:var(--code-bg);color:#fff;
+<div id="demoTag" style="position:fixed;top:calc(80px + env(safe-area-inset-top,0px));
+  inset-inline-start:16px;pointer-events:none;z-index:95;background:var(--code-bg);color:#fff;
   font-family:var(--f-body);font-size:11.5px;font-weight:600;line-height:1.5;
-  padding:8px 13px;border-radius:999px;box-shadow:var(--sh-3);max-width:min(78vw,320px)">
+  padding:8px 13px;border-radius:999px;box-shadow:0 12px 30px rgba(0,0,0,.3);max-width:min(78vw,320px)">
   معاينة — لا تُرسل طلبات فعلية
 </div>
 </body>`);
