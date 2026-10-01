@@ -205,6 +205,20 @@ b,strong{font-weight:700}
 :root[data-theme="light"] .themebtn .sun{display:none}
 .menu-btn{display:none}
 @media (max-width:860px){.nav,.hdr-row .langs{display:none}.menu-btn{display:grid}}
+/* On a phone the ع / FR / EN pills do not fit the bar, so one button next
+   to the cart shows the current language and opens the three choices. */
+.langpick{position:relative;display:none}
+@media (max-width:860px){.langpick{display:block}}
+.langpick .sq{font-size:14px;font-weight:700;font-family:var(--f-body)}
+.langmenu{position:absolute;top:calc(100% + 8px);inset-inline-end:0;z-index:70;min-width:150px;padding:6px;display:grid;gap:2px;
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px -12px rgba(0,0,0,.45)}
+.langmenu button{display:flex;align-items:center;justify-content:space-between;gap:12px;height:44px;padding:0 14px;border-radius:12px;
+  font-size:15px;font-weight:600;color:var(--fg);text-align:start}
+.langmenu[hidden]{display:none}
+.langmenu button:hover{background:var(--raise)}
+.langmenu button[aria-checked="true"]{background:var(--chip);color:var(--accent-fg)}
+.langmenu button small{font-size:12px;color:var(--muted);font-weight:600}
+@media (max-width:480px){.word small{display:none}}
 
 /* ============ SECTION HEADS ============ */
 .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--accent-fg);letter-spacing:.2px}
@@ -588,6 +602,18 @@ h1 .h1a,h2 .h2a{color:inherit}
 .stickybar .amt b{font-family:var(--f-display);font-weight:700;font-size:19px;white-space:nowrap}
 .stickybar .btn{flex:1;height:48px;padding:0 14px;font-size:15px}
 @media (min-width:820px){.stickybar .btn{flex:0 0 auto;min-width:180px}.stickybar .amt{margin-inline-end:auto}}
+/* On a phone three things in one row squeezed the total out of sight and
+   cut the button labels. The total gets its own line, the two buttons
+   share the one under it at equal widths. */
+@media (max-width:819px){
+  .stickybar{padding-top:10px}
+  .stickybar .wrap{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+  .stickybar .amt{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .stickybar .amt small{font-size:13px}
+  .stickybar .btn{min-width:0;padding:0 10px}
+  #detail.page{padding-bottom:150px}
+  .wa.lift{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
+}
 
 /* checkout */
 .ostep{display:flex;align-items:center;padding:6px 0 18px}
@@ -761,7 +787,6 @@ h1 .h1a,h2 .h2a{color:inherit}
   .pay2{grid-template-columns:1fr 1fr}
 }
 @media (max-width:380px){
-  .word small{display:none}
   .hdr-row{gap:8px}
   .tools{gap:6px}
   .sq{width:42px;height:42px}
@@ -830,6 +855,14 @@ h1 .h1a,h2 .h2a{color:inherit}
         <svg class="ic sun" aria-hidden="true"><use href="#i-sun"/></svg>
         <svg class="ic moon" aria-hidden="true"><use href="#i-moon"/></svg>
       </button>
+      <div class="langpick" id="langPick">
+        <button type="button" class="sq" id="langBtn" onclick="toggleLangMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="langMenu" data-i18n-aria="aria_lang" aria-label="اللغة">ع</button>
+        <div class="langmenu" id="langMenu" role="menu" hidden>
+          <button type="button" role="menuitemradio" data-lang="ar" lang="ar" aria-checked="true" onclick="setLang('ar')">العربية <small>ع</small></button>
+          <button type="button" role="menuitemradio" data-lang="fr" lang="fr" aria-checked="false" onclick="setLang('fr')">Français <small>FR</small></button>
+          <button type="button" role="menuitemradio" data-lang="en" lang="en" aria-checked="false" onclick="setLang('en')">English <small>EN</small></button>
+        </div>
+      </div>
       <button type="button" class="sq cart" id="cartBtn" onclick="openPanel('cart')" data-i18n-aria="aria_cart" aria-label="السلة">
         <svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg>
         <span class="cbadge" id="cartBadge">0</span>
@@ -1722,8 +1755,9 @@ function applyLang(){
   $$("[data-i18n-ph]").forEach(el => el.setAttribute("placeholder", t(el.dataset.i18nPh)));
   $$("[data-i18n-aria]").forEach(el => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
   /* both copies of the ع / FR / EN pills -- header and side menu */
-  $$("[data-lang]").forEach(b =>
-    b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
+  $$("[data-lang]").forEach(b => b.setAttribute(
+    b.getAttribute("role") === "menuitemradio" ? "aria-checked" : "aria-pressed", String(b.dataset.lang === LANG)));
+  $("#langBtn").textContent = { ar:"ع", fr:"FR", en:"EN" }[LANG];
   /* the theme button's own label depends on the CURRENT theme, not just
      the language -- applyTheme() already knows how to phrase it right */
   const themeMode = document.documentElement.getAttribute("data-theme");
@@ -1766,7 +1800,20 @@ function setLang(lang){
   LANG = lang;
   try{ localStorage.setItem(LANG_KEY, LANG); }catch(e){}
   applyLang();
+  toggleLangMenu(false);
 }
+/* the phone's language button: opens the three choices, and closes on a
+   pick, a tap anywhere else, or Escape */
+function toggleLangMenu(force){
+  const menu = $("#langMenu"), btn = $("#langBtn");
+  const open = force ?? menu.hidden;
+  menu.hidden = !open;
+  btn.setAttribute("aria-expanded", String(open));
+}
+document.addEventListener("click", e => {
+  if(!$("#langMenu").hidden && !$("#langPick").contains(e.target)) toggleLangMenu(false);
+});
+document.addEventListener("keydown", e => { if(e.key === "Escape") toggleLangMenu(false); });
 
 /* Keeps each product/category/bundle's own original Arabic on the
    object (._nameAr etc.) the first time it is seen, so switching back
@@ -3226,7 +3273,7 @@ Object.assign(window, {
   openBundle, addBundle, addBundleToCart,
   step, setChannel, setPay, onReceipt, sendOrder, resetOrder,
   nextFromDetails, validateName, validatePhone, validateChannel, validateDetails, clearErr,
-  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, setLang,
+  runTrack, contactWhatsApp, toast, toggleTheme, addToCart, setLang, toggleLangMenu,
   openCertificate,
 });
 

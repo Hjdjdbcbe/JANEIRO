@@ -452,6 +452,20 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     check(m.offerTop > m.gridBottom, `${w}px: عرض الشهر comes after the grid on a phone`);
     check(!m.langsInHeader && m.burger.left >= 0 && m.burger.right <= m.win,
           `${w}px: the languages move into the menu and the burger stays on screen`);
+    /* the language button next to the cart opens the three choices */
+    await pm.click("#langBtn");
+    const pick = await pm.evaluate(() => ({
+      open: !document.querySelector("#langMenu").hidden,
+      items: [...document.querySelectorAll("#langMenu button")].map(b => b.dataset.lang).join(","),
+      box: document.querySelector("#langMenu").getBoundingClientRect(),
+    }));
+    check(pick.open && pick.items === "ar,fr,en" && pick.box.left >= 0 && pick.box.right <= w,
+          `${w}px: the language button opens ع / FR / EN, on screen`);
+    await pm.click('#langMenu [data-lang="fr"]');
+    const picked = await pm.evaluate(() => [document.documentElement.lang, document.querySelector("#langBtn").textContent,
+      document.querySelector("#langMenu").hidden]);
+    check(picked.join() === "fr,FR,true", `${w}px: picking French switches, relabels the button and closes the list (${picked})`);
+    await pm.evaluate(() => window.setLang("ar"));
     if (w === 390) {
       await pm.evaluate(() => window.openPanel("menu"));
       await pm.waitForTimeout(400);
@@ -469,7 +483,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
     dir: document.documentElement.getAttribute("dir"),
     lang: document.documentElement.getAttribute("lang"),
     nav: [...document.querySelectorAll("#mainNav button")].map(b => b.textContent.trim()).join(" "),
-    pressed: [...document.querySelectorAll('[data-lang="fr"]')].every(b => b.getAttribute("aria-pressed") === "true"),
+    pressed: [...document.querySelectorAll('.langs [data-lang="fr"]')].every(b => b.getAttribute("aria-pressed") === "true")
+          && document.querySelector('#langMenu [data-lang="fr"]').getAttribute("aria-checked") === "true",
     cardBtn: document.querySelector("#homeGrid .pcard .btn")?.textContent.trim(),
     offer: document.querySelector("#offer .tag")?.textContent,
     h1: document.querySelector(".hero h1").textContent.replace(/\s+/g, " ").trim(),
