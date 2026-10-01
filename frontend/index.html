@@ -698,6 +698,26 @@ h1 .h1a,h2 .h2a{color:inherit}
   .cert-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 
+/* about */
+.about-head{display:flex;flex-direction:column;gap:12px;align-items:flex-start;padding-bottom:28px;border-bottom:1px solid var(--line)}
+.about-head .lede{max-width:40em}
+.about-sub{font-size:clamp(22px,2.6vw,28px);margin:32px 0 16px}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:14px}
+.feat-card{display:flex;flex-direction:column;gap:8px;padding:22px;border-radius:20px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+.feat-card .circ{width:48px;height:48px;border-radius:50%;background:var(--chip);color:var(--accent-fg);display:grid;place-items:center;margin-bottom:6px}
+.feat-card .circ .ic{width:22px;height:22px}
+.feat-card h3{font-size:18px;font-weight:700;line-height:1.4}
+.feat-card p{font-size:14.5px;line-height:1.75;color:var(--muted)}
+.contact-card{margin-top:28px;padding:26px;border-radius:24px;border:1px solid var(--accent);background:var(--surface);
+  box-shadow:0 30px 70px -40px var(--glow);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px}
+.contact-txt{display:flex;flex-direction:column;gap:6px}
+.contact-txt h2{font-size:clamp(22px,2.6vw,28px)}
+.contact-txt p{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:15px}
+.contact-txt .ic{color:var(--accent-fg)}
+.contact-btns{display:flex;flex-wrap:wrap;gap:10px}
+.contact-btns .btn{height:48px}
+@media (max-width:640px){.contact-btns{width:100%}.contact-btns .btn{flex:1 1 140px}}
+
 /* policies keep the FAQ cards */
 #policies .faq{margin-top:20px}
 
@@ -829,6 +849,7 @@ h1 .h1a,h2 .h2a{color:inherit}
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/><path d="m10 13 4-4"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.2 6.8h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></symbol>
 </svg>
 
@@ -1301,25 +1322,39 @@ h1 .h1a,h2 .h2a{color:inherit}
 
 <!-- ================= ABOUT ================= -->
 <section id="about" class="hidden page">
-  <div class="wrap" style="max-width:720px">
+  <div class="wrap" style="max-width:900px">
     <button class="crumb" data-i18n="crumb_home" onclick="go('home')">→ الرئيسية</button>
-    <h1 data-i18n="nav_about">شكون حنا</h1>
-    <p class="lede" data-i18n="about_lede">Janeiro Store متجر جزائري تاع الاشتراكات والمنتجات الرقمية. الفكرة ساهلة: طلب واضح، دفع بالدينار بلا تعقيد، وواحد يتبّعك حتى يتفعّل واش طلبت.</p>
-    <div class="card">
-      <h3 data-i18n="about_how_h">كيفاش نخدمو</h3>
-      <div class="dl">
-        <div><span data-i18n="about_pay_label">الدفع</span><b data-i18n="about_pay_value">بالدينار: CCP، BaridiMob ولا Flexy</b></div>
-        <div><span data-i18n="about_review_label">مراجعة الطلبات</span><b data-i18n="about_review_value">نشوفو كل طلب باليد</b></div>
-        <div><span data-i18n="about_followup_label">المتابعة</span><b data-i18n="about_followup_value">واتساب ولا إنستغرام</b></div>
-        <div><span data-i18n="about_signup_label">الحساب</span><b data-i18n="about_signup_value">تشري بلا ما تدير حساب</b></div>
+    <div class="about-head">
+      <span class="eyebrow"><i></i><span data-i18n="nav_about">شكون حنا</span></span>
+      <h1><span class="h1a" data-i18n="about_h1">متجر جزائري للاشتراكات الرقمية،</span> <br><span data-i18n="about_h2">بخدمة سريعة ومضمونة.</span></h1>
+      <p class="lede" data-i18n="about_lede">Janeiro Store يوفّرلك أشهر الاشتراكات والمنتجات الرقمية بالدينار. طلب واضح، دفع محلي بلا تعقيد، وفريق يتابع طلبك حتى يتفعّل.</p>
+    </div>
+
+    <h2 class="about-sub" data-i18n="about_how_h">كيفاش نخدمو</h2>
+    <div class="feats">
+      <div class="feat-card">
+        <span class="circ"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg></span>
+        <h3 data-i18n="about_pay_t">الدفع بالدينار</h3>
+        <p data-i18n="about_pay_p">CCP، BaridiMob ولا Flexy. بلا بطاقة بنكية وبلا تعقيد.</p>
+      </div>
+      <div class="feat-card">
+        <span class="circ"><svg class="ic" aria-hidden="true"><use href="#i-bolt"/></svg></span>
+        <h3 data-i18n="about_fast_t">معالجة سريعة</h3>
+        <p data-i18n="about_fast_p">كل طلب يتعالج يدوياً من طرف فريقنا، ويتفعّل في أسرع وقت ممكن.</p>
+      </div>
+      <div class="feat-card">
+        <span class="circ"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg></span>
+        <h3 data-i18n="about_follow_t">متابعة حتى التفعيل</h3>
+        <p data-i18n="about_follow_p">نبقاو معاك على الواتساب ولا الإنستغرام حتى يكمل طلبك، ومن بعد ثاني.</p>
       </div>
     </div>
-    <div class="card">
-      <h3 data-i18n="nav_contact">تواصل معانا</h3>
-      <div class="dl">
-        <div><span data-i18n="about_handle_label">الحساب</span><b class="mono" id="aboutHandle">@janeiro_service</b></div>
-        <div><span data-i18n="about_hours_label">وقت الرد</span><b data-i18n="about_hours_value">كل يوم من 9 الصباح حتى 11 الليل</b></div>
+
+    <div class="contact-card">
+      <div class="contact-txt">
+        <h2 data-i18n="nav_contact">تواصل معانا</h2>
+        <p><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg><span data-i18n="about_hours_value">كل يوم من 9 الصباح حتى 11 الليل</span></p>
       </div>
+      <div class="contact-btns" id="aboutContact"></div>
     </div>
   </div>
 </section>
@@ -1763,20 +1798,18 @@ const I18N = {
   cert_print:     { ar:"اطبع", fr:"Imprimer", en:"Print" },
 
   /* ---- about ---- */
-  about_lede: { ar:"Janeiro Store متجر جزائري تاع الاشتراكات والمنتجات الرقمية. الفكرة ساهلة: طلب واضح، دفع بالدينار بلا تعقيد، وواحد يتبّعك حتى يتفعّل واش طلبت.",
-                fr:"Janeiro Store est une boutique algérienne d'abonnements et de produits numériques. L'idée est simple : une commande claire, un paiement en dinars sans complication, et une vraie personne qui vous suit jusqu'à l'activation.",
-                en:"Janeiro Store is an Algerian shop for subscriptions and digital products. The idea is simple: a clear order, paying in dinars without the hassle, and a real person following up until what you ordered is active." },
-  about_how_h:        { ar:"كيفاش نخدمو", fr:"Comment nous travaillons", en:"How we work" },
-  about_pay_label:    { ar:"الدفع", fr:"Paiement", en:"Payment" },
-  about_pay_value:    { ar:"بالدينار: CCP، BaridiMob ولا Flexy", fr:"En dinars : CCP, BaridiMob ou Flexy", en:"In dinars: CCP, BaridiMob or Flexy" },
-  about_review_label: { ar:"مراجعة الطلبات", fr:"Vérification", en:"Order review" },
-  about_review_value: { ar:"نشوفو كل طلب باليد", fr:"Chaque commande vérifiée à la main", en:"Every order checked by hand" },
-  about_followup_label:{ ar:"المتابعة", fr:"Suivi", en:"Follow-up" },
-  about_followup_value:{ ar:"واتساب ولا إنستغرام", fr:"WhatsApp ou Instagram", en:"WhatsApp or Instagram" },
-  about_signup_label: { ar:"الحساب", fr:"Compte", en:"Account" },
-  about_signup_value: { ar:"تشري بلا ما تدير حساب", fr:"Achat sans compte", en:"Buy without an account" },
-  about_handle_label: { ar:"الحساب", fr:"Identifiant", en:"Handle" },
-  about_hours_label:  { ar:"وقت الرد", fr:"Horaires de réponse", en:"Response hours" },
+  about_h1:   { ar:"متجر جزائري للاشتراكات الرقمية،", fr:"Une boutique algérienne d'abonnements numériques,", en:"An Algerian store for digital subscriptions," },
+  about_h2:   { ar:"بخدمة سريعة ومضمونة.", fr:"rapide et fiable.", en:"fast and dependable." },
+  about_lede: { ar:"Janeiro Store يوفّرلك أشهر الاشتراكات والمنتجات الرقمية بالدينار. طلب واضح، دفع محلي بلا تعقيد، وفريق يتابع طلبك حتى يتفعّل.",
+                fr:"Janeiro Store vous propose les abonnements et produits numériques les plus demandés, en dinars. Une commande claire, un paiement local sans complication, et une équipe qui suit votre commande jusqu'à l'activation.",
+                en:"Janeiro Store brings you the most popular digital subscriptions and products, in dinars. A clear order, simple local payment, and a team that follows your order until it's active." },
+  about_how_h:    { ar:"كيفاش نخدمو", fr:"Comment nous travaillons", en:"How we work" },
+  about_pay_t:    { ar:"الدفع بالدينار", fr:"Paiement en dinars", en:"Pay in dinars" },
+  about_pay_p:    { ar:"CCP، BaridiMob ولا Flexy. بلا بطاقة بنكية وبلا تعقيد.", fr:"CCP, BaridiMob ou Flexy. Sans carte bancaire, sans complication.", en:"CCP, BaridiMob or Flexy. No bank card, no hassle." },
+  about_fast_t:   { ar:"معالجة سريعة", fr:"Traitement rapide", en:"Fast processing" },
+  about_fast_p:   { ar:"كل طلب يتعالج يدوياً من طرف فريقنا، ويتفعّل في أسرع وقت ممكن.", fr:"Chaque commande est traitée à la main par notre équipe et activée dans les meilleurs délais.", en:"Every order is handled by our team and activated as quickly as possible." },
+  about_follow_t: { ar:"متابعة حتى التفعيل", fr:"Suivi jusqu'à l'activation", en:"Follow-up until it's active" },
+  about_follow_p: { ar:"نبقاو معاك على الواتساب ولا الإنستغرام حتى يكمل طلبك، ومن بعد ثاني.", fr:"Nous restons avec vous sur WhatsApp ou Instagram jusqu'à la fin de la commande, et après.", en:"We stay with you on WhatsApp or Instagram until your order is done, and after." },
   about_hours_value:  { ar:"كل يوم من 9 الصباح حتى 11 الليل", fr:"Tous les jours de 9h à 23h", en:"Daily, 9am to 11pm" },
 
   /* ---- policies ---- */
@@ -2367,7 +2400,11 @@ function renderStoreInfo(){
     `<button type="button" onclick="contactWhatsApp()"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>${t("ch_whatsapp")}</button>`
     + (ig ? `<a href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>${t("ch_instagram")}</a>` : "")
     + (tg ? `<a href="https://t.me/${encodeURIComponent(tg)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>${t("ch_telegram")}</a>` : "");
-  if(ig) $("#aboutHandle").textContent = "@" + ig;
+  /* the about page's contact card: one button per channel the owner has set up */
+  $("#aboutContact").innerHTML =
+    `<button type="button" class="btn btn-primary" onclick="contactWhatsApp()"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>${t("ch_whatsapp")}</button>`
+    + (ig ? `<a class="btn btn-ghost" href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>${t("ch_instagram")}</a>` : "")
+    + (tg ? `<a class="btn btn-ghost" href="https://t.me/${encodeURIComponent(tg)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>${t("ch_telegram")}</a>` : "");
 
   if(PAYMENT_METHODS.length){
     const labels = PAYMENT_METHODS.map(m => m.label);
