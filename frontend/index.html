@@ -601,7 +601,12 @@ h1 .h1a,h2 .h2a{color:inherit}
 .feat{display:grid;gap:8px;font-size:15px;color:var(--muted);list-style:none}
 .feat li{display:flex;gap:9px;align-items:flex-start}
 .feat .ic{color:var(--ok);margin-top:4px;width:16px;height:16px;stroke-width:2.4}
-.stickybar{position:fixed;inset-inline:0;bottom:0;z-index:45;background:var(--header);border-top:1px solid var(--line);
+/* Sticky, not fixed: it rides the bottom of the screen while the product
+   is in view, then comes to rest at the end of the product section --
+   so it never sits on top of the footer, and the page needs no blank
+   padding underneath to make room for it. */
+#detail.page{padding-bottom:0;min-height:0}
+.stickybar{position:sticky;bottom:0;margin-top:28px;z-index:45;background:var(--header);border-top:1px solid var(--line);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px))}
 .stickybar .wrap{display:flex;align-items:center;gap:10px}
 .stickybar .amt{min-width:0}
@@ -618,7 +623,6 @@ h1 .h1a,h2 .h2a{color:inherit}
   .stickybar .amt{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
   .stickybar .amt small{font-size:13px}
   .stickybar .btn{min-width:0;padding:0 10px}
-  #detail.page{padding-bottom:150px}
   .wa.lift{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
 }
 
