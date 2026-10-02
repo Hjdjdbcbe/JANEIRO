@@ -149,6 +149,15 @@ if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/site-texts.test.sql" 2>&1 
 fi
 set +o pipefail
 
+bold "==> claim-email-payment.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/claim-email-payment.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: claim-email-payment.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
 bold "==> forbidden-text.test.sh"
 bash "$HERE/forbidden-text.test.sh"
 
