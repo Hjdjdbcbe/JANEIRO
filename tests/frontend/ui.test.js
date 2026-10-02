@@ -145,7 +145,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check((offer.price || "").includes("770") && (offer.old || "").includes("1,100"),
         `deal price ${offer.price}, list price ${offer.old} struck`);
   check(!!offer.disc && offer.disc.includes("30"), `discount chip, bidi-isolated: ${offer.disc}`);
-  check(offer.offerTop < offer.gridTop, "on a desktop it sits above the grid");
+  check(offer.offerTop > offer.gridTop, "on a desktop too it comes after the products");
 
   await page.locator("#offer .btn-primary").click();
   await page.waitForSelector("#detail:not(.hidden)");
