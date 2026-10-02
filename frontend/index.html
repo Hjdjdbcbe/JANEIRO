@@ -22,6 +22,21 @@
 <meta property="og:description" content="اشتراكات رقمية بالدينار، من الدزاير. تفعيل سريع ودعم بالدارجة.">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="ar_DZ">
+<!-- the brand logo, shown by Google, WhatsApp, Telegram and Facebook
+     when the store is searched for or a link to it is shared -->
+<meta property="og:site_name" content="Janeiro Store">
+<meta property="og:url" content="https://www.janeiro-store.com/">
+<meta property="og:image" content="https://www.janeiro-store.com/assets/janeiro-logo-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="1200">
+<meta property="og:image:alt" content="Janeiro Store">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://www.janeiro-store.com/assets/janeiro-logo-share.jpg">
+<link rel="canonical" href="https://www.janeiro-store.com/">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"Janeiro Store",
+ "url":"https://www.janeiro-store.com/","logo":"https://www.janeiro-store.com/assets/janeiro-logo-share.jpg"}
+</script>
 <link rel="preload" href="assets/fonts/alexandria-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/ibm-plex-sans-arabic-400-arabic.woff2" as="font" type="font/woff2" crossorigin>
 <script>
@@ -222,7 +237,8 @@ b,strong{font-weight:700}
 .langmenu button:hover{background:var(--raise)}
 .langmenu button[aria-checked="true"]{background:var(--chip);color:var(--accent-fg)}
 .langmenu button small{font-size:12px;color:var(--muted);font-weight:600}
-@media (max-width:480px){.word small{display:none}}
+/* a narrow phone keeps the full name: STORE goes under janeiro instead of beside it */
+@media (max-width:480px){.hdr .word{flex-direction:column;align-items:flex-start;gap:0;line-height:1.05}.hdr .word small{font-size:9px;letter-spacing:3.2px}}
 
 /* ============ SECTION HEADS ============ */
 .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--accent-fg);letter-spacing:.2px}
