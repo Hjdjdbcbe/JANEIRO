@@ -648,6 +648,11 @@ h1 .h1a,h2 .h2a{color:inherit}
   .wa.lift{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
 }
 
+/* order received: the WhatsApp step */
+.sent-wa{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.sent-wa .btn{gap:10px;height:54px;font-size:16px}
+.sent-wa .hint{margin:0;font-size:13px;color:var(--muted)}
+
 /* checkout */
 .ostep{display:flex;align-items:center;padding:6px 0 18px}
 .ostep .n{width:30px;height:30px;border-radius:50%;border:2px solid var(--line2);background:var(--surface);display:grid;place-items:center;
@@ -1303,6 +1308,15 @@ h1 .h1a,h2 .h2a{color:inherit}
         <div><span data-i18n="pay_method_label">طريقة الدفع</span><b id="sentPay"></b></div>
       </div>
     </div>
+    <!-- The order's own message, ready in WhatsApp. A link the customer
+         taps, not a window opened by script: phones block a window that
+         opens on its own after the upload, so this button is the path
+         that always works. Hidden when the store has no WhatsApp number. -->
+    <div class="sent-wa" id="sentWaBox" hidden>
+      <a class="btn btn-primary btn-block" id="sentWa" href="#" target="_blank" rel="noopener">
+        <svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg><span data-i18n="sent_wa">ابعثلنا الطلب على الواتساب</span></a>
+      <p class="hint" data-i18n="sent_wa_hint">الرسالة جاهزة فيها رقم الطلب والمبلغ — غير اضغط «إرسال».</p>
+    </div>
     <div class="order-actions">
       <button class="btn btn-ghost btn-block" onclick="resetOrder()" data-i18n="back_to_store">ارجع للمتجر</button>
     </div>
@@ -1784,6 +1798,8 @@ const I18N = {
 
   /* ---- order received ---- */
   sent_h:   { ar:"طلبك وصلنا", fr:"Commande reçue", en:"We got your order" },
+  sent_wa:      { ar:"ابعثلنا الطلب على الواتساب", fr:"Envoyez-nous la commande sur WhatsApp", en:"Send us the order on WhatsApp" },
+  sent_wa_hint: { ar:"الرسالة جاهزة فيها رقم الطلب والمبلغ — غير اضغط «إرسال».", fr:"Le message est prêt, avec le numéro et le montant — appuyez juste sur « Envoyer ».", en:"The message is ready with the order number and amount — just tap Send." },
   sent_sub: { ar:"سجّلنا الطلب تاعك والوصل. خبّي رقم الطلب باش تتبّعو:", fr:"Votre commande et le reçu sont enregistrés. Gardez ce numéro pour la suivre :", en:"Your order and receipt are recorded. Keep this number to track it:" },
   order_number_label: { ar:"رقم الطلب", fr:"N° de commande", en:"Order number" },
   amount_label:       { ar:"المبلغ", fr:"Montant", en:"Amount" },
@@ -3145,7 +3161,12 @@ async function sendOrder(){
       return { name:p.name, plan:p.plans[c.plan].n, act:lineActType(c) };
     });
     const number = whatsappNumber || CONFIG.whatsapp;
-    if(number) window.open(API.buildWhatsAppUrl(number, order, items, CONFIG.currency), "_blank");
+    const waUrl = number ? API.buildWhatsAppUrl(number, order, items, CONFIG.currency) : "";
+    $("#sentWa").href = waUrl || "#";
+    $("#sentWaBox").hidden = !waUrl;
+    /* still try to open it straight away; where the browser allows it the
+       customer lands in WhatsApp, and where it blocks it the button is there */
+    if(waUrl) window.open(waUrl, "_blank");
 
     $("#sentOid").textContent   = order.order_number;
     $("#sentTotal").textContent = money(Number(order.total));

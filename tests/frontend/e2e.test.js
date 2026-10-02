@@ -235,6 +235,11 @@ const check = (c, m) => c ? ok(m) : bad(m);
   check(!waUrl.includes("undefined") && !waUrl.includes("null"), "WhatsApp message has no undefined/null placeholders");
   check(decodeURIComponent(waUrl).includes("تفعيل مباشر"),
         "the chosen نوع التفعيل travels with the order to WhatsApp");
+  /* phones block the automatic window, so the received page must carry
+     the same message as a button the customer taps */
+  const btn = await page.evaluate(() => ({ shown: !document.querySelector("#sentWaBox").hidden,
+    href: decodeURIComponent(document.querySelector("#sentWa").href) }));
+  check(btn.shown && btn.href === waUrl, "the received page has a WhatsApp button with the same ready message");
 
   // ---------- tracking ----------
   await page.evaluate(() => window.go("track"));
