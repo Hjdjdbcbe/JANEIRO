@@ -86,6 +86,8 @@ for fn in create-order upload-receipt submit-order track-order translate-content
   } > "$out"
 
   echo "  $fn.ts  ($(wc -l < "$out") سطراً)"
+  # إشعارات الطلبات تُلصق من GitHub مثل البوت، فنسختها في docs/ أيضاً
+  [ "$fn" = "submit-order" ] && cp "$out" docs/submit-order-function.ts
 done
 
 echo
