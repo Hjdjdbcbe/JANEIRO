@@ -237,7 +237,9 @@ h1 .h1a,h2 .h2a{color:inherit}
 .sub{margin:0;font-size:16px;color:var(--muted);max-width:36em}
 .more{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;color:var(--fg)}
 .more:hover{color:var(--accent-fg)}
-.sec{padding-block:64px}
+.sec{padding-block:56px}
+/* the shop follows the platforms strip directly: no second band of space */
+#store{padding-top:28px}
 #store,#how,#faq{scroll-margin-top:72px}
 .sec-head{display:flex;flex-direction:column;gap:12px;margin-bottom:28px}
 .sec-head .bar{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
@@ -268,7 +270,7 @@ h1 .h1a,h2 .h2a{color:inherit}
 .hero::before{content:"";position:absolute;inset:0;background-image:radial-gradient(var(--dot) 1.2px,transparent 1.2px);
   background-size:24px 24px;-webkit-mask-image:linear-gradient(#000 0%,#000 50%,transparent 100%);
   mask-image:linear-gradient(#000 0%,#000 50%,transparent 100%);pointer-events:none}
-.hero-in{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:32px 48px;padding-block:56px 32px}
+.hero-in{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:32px 48px;padding-block:40px 24px}
 .hero-copy{flex:1 1 440px;min-width:0;display:flex;flex-direction:column;gap:22px;align-items:flex-start}
 .eyebrow.pill{padding:7px 14px 7px 16px;border-radius:999px;background:var(--chip)}
 .eyebrow.pill i{box-shadow:0 0 10px var(--accent)}
@@ -307,7 +309,7 @@ h1 .h1a,h2 .h2a{color:inherit}
   border-radius:999px;padding:1px 8px;margin-inline-start:6px;vertical-align:middle}
 
 /* ============ PLATFORM MARQUEE ============ */
-.plats{position:relative;display:flex;flex-direction:column;gap:14px;padding-block:8px 48px}
+.plats{position:relative;display:flex;flex-direction:column;gap:12px;padding-block:4px 20px}
 .plats p{margin:0;font-size:14px;color:var(--muted)}
 .marquee{overflow:hidden;direction:ltr;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
   mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
