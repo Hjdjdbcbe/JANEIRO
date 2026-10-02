@@ -105,6 +105,7 @@ type Doc = {
   subtitle: (platform: string) => string;
   labels: {
     ref: string; holder: string; account: string; service: string;
+    email: string; payment: string;
     coverage: string; activatedOn: string; coveredUntil: string; key: string;
   };
   /** المدة: بالأشهر أو بالأيام، مع أيام الهدية إن وُجدت. */
@@ -124,6 +125,7 @@ type Doc = {
   form: {
     heading: string; intro: string; submit: string;
     fullName: string; whatsapp: string; instagram: string;
+    email: string; emailHint: string; payment: string;
     /* لا تُعرض: الاستمارة لا تضع قوساً بجنب أيّ عنوان. تبقى
        الكلمة مترجَمةً لأنّ حقول المنتجات (/addfield) قد تحتاجها،
        ولا تعود إلى استمارة الزبون. */
@@ -159,6 +161,8 @@ const DOC: Record<Lang, Doc> = {
       ref: "مرجع Janeiro",
       holder: "صاحب الاشتراك",
       account: "الحساب المنشّط",
+      email: "البريد (Gmail)",
+      payment: "طريقة الدفع",
       service: "الخدمة",
       coverage: "التغطية",
       activatedOn: "نُشّط في",
@@ -195,6 +199,9 @@ const DOC: Record<Lang, Doc> = {
       fullName: "الاسم الكامل",
       whatsapp: "رقم واتساب",
       instagram: "يوزر الانستغرام",
+      email: "البريد الإلكتروني (Gmail)",
+      emailHint: "البريد الذي فُعِّل عليه اشتراكك — إن وُجد",
+      payment: "طريقة الدفع",
       optional: "اختياري",
       whatsappHint: "رقم جزائري: 0550… أو +213550…",
       instagramHint: "بلا @ — به يُعرف حسابك المفعَّل",
@@ -210,6 +217,8 @@ const DOC: Record<Lang, Doc> = {
       INVALID_NAME: "اكتب اسمك الكامل.",
       INVALID_PHONE: "رقم واتساب جزائري غير صحيح.",
       INVALID_INSTAGRAM: "يوزر انستغرام غير صحيح.",
+      INVALID_EMAIL: "البريد الإلكتروني غير صحيح.",
+      INVALID_PAYMENT: "اختر طريقة الدفع.",
       RATE_LIMITED: "محاولات كثيرة. انتظر قليلاً.",
       UNKNOWN: "تعذّر إتمام الطلب.",
     },
@@ -227,6 +236,8 @@ const DOC: Record<Lang, Doc> = {
       ref: "Réf. Janeiro",
       holder: "Titulaire",
       account: "Compte activé",
+      email: "E-mail (Gmail)",
+      payment: "Moyen de paiement",
       service: "Service",
       coverage: "Couverture",
       activatedOn: "Activé le",
@@ -263,6 +274,9 @@ const DOC: Record<Lang, Doc> = {
       fullName: "Nom complet",
       whatsapp: "Numéro WhatsApp",
       instagram: "Identifiant Instagram",
+      email: "Adresse e-mail (Gmail)",
+      emailHint: "l’adresse sur laquelle l’abonnement est activé — s’il y en a une",
+      payment: "Moyen de paiement",
       optional: "facultatif",
       whatsappHint: "Numéro algérien : 0550… ou +213550…",
       instagramHint: "sans @ — il identifie le compte activé",
@@ -278,6 +292,8 @@ const DOC: Record<Lang, Doc> = {
       INVALID_NAME: "Indiquez votre nom complet.",
       INVALID_PHONE: "Numéro WhatsApp algérien invalide.",
       INVALID_INSTAGRAM: "Identifiant Instagram invalide.",
+      INVALID_EMAIL: "Adresse e-mail invalide.",
+      INVALID_PAYMENT: "Choisissez le moyen de paiement.",
       RATE_LIMITED: "Trop de tentatives. Patientez un instant.",
       UNKNOWN: "La demande n'a pas pu aboutir.",
     },
@@ -296,6 +312,8 @@ const DOC: Record<Lang, Doc> = {
       ref: "Janeiro Ref.",
       holder: "Holder",
       account: "Activated account",
+      email: "Email (Gmail)",
+      payment: "Payment method",
       service: "Service",
       coverage: "Coverage",
       activatedOn: "Activated on",
@@ -330,6 +348,9 @@ const DOC: Record<Lang, Doc> = {
       fullName: "Full name",
       whatsapp: "WhatsApp number",
       instagram: "Instagram handle",
+      email: "Email address (Gmail)",
+      emailHint: "the address the subscription is activated on — if any",
+      payment: "Payment method",
       optional: "optional",
       whatsappHint: "Algerian number: 0550… or +213550…",
       instagramHint: "without @ — it identifies the activated account",
@@ -345,6 +366,8 @@ const DOC: Record<Lang, Doc> = {
       INVALID_NAME: "Enter your full name.",
       INVALID_PHONE: "Invalid Algerian WhatsApp number.",
       INVALID_INSTAGRAM: "Invalid Instagram handle.",
+      INVALID_EMAIL: "Invalid email address.",
+      INVALID_PAYMENT: "Choose the payment method.",
       RATE_LIMITED: "Too many attempts. Please wait a moment.",
       UNKNOWN: "The request could not be completed.",
     },
@@ -1437,6 +1460,7 @@ function certPage(c: Certificate & { contacts?: Contact[] }): Response {
 // ============================================================
 type Engagement = {
   code: string; ref_code: string; holder_name: string; instagram: string | null;
+  email?: string | null; payment_method?: string | null;
   platform: string; months: number | null; duration_days: number | null;
   bonus_days: number;
   starts_at: string; ends_at: string | null;
@@ -1494,7 +1518,11 @@ const ENG_CSS = `
 @media print{.head{margin:0 0 18px;border-radius:0}}
 `;
 
-/** استمارة الزبون — الحقول الثلاثة، بلغته. */
+/** طرق الدفع التي يختار منها الزبون — نفس أسمائها في كل لغة. */
+const PAYMENTS: [string, string][] = [["baridimob", "BaridiMob"], ["ccp", "CCP"], ["flexy", "Flexy"]];
+const paymentName = (v: string | null | undefined) => PAYMENTS.find(([k]) => k === v)?.[1] ?? "";
+
+/** استمارة الزبون — بلغته. */
 function engFormPage(token: string, d: {
   platform: string; months: number | null; duration_days: number | null;
   bonus_days: number;
@@ -1521,10 +1549,24 @@ function engFormPage(token: string, d: {
         ${field("whatsapp", f.whatsapp, f.whatsappHint, false,
                 'inputmode="tel" placeholder="0550 00 00 00"')}
         ${field("instagram", f.instagram, f.instagramHint, true, `maxlength="40"`)}
+        ${field("email", f.email, f.emailHint, false,
+                'type="email" inputmode="email" maxlength="120" placeholder="name@gmail.com" dir="ltr"')}
+        <p class="lbl" id="payLbl">${esc(f.payment)}</p>
+        <div class="pay" role="radiogroup" aria-labelledby="payLbl">${PAYMENTS.map(([v, n], i) => `
+          <label class="opt"><input type="radio" name="payment" value="${v}" ${i === 0 ? "required" : ""}><span>${n}</span></label>`).join("")}
+        </div>
         <button type="submit">${esc(f.submit)}</button>
       </form>
     </div><p class="brand">Janeiro Store</p>`,
-    `<style>${ENG_CSS}.hint{margin:6px 0 0;font-size:12px;color:var(--muted)}</style>`,
+    `<style>${ENG_CSS}.hint{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.lbl{margin:18px 0 8px;font-weight:600}
+.pay{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pay .opt{display:block;position:relative;margin:0;cursor:pointer}
+.pay .opt input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer}
+.pay .opt span{display:block;text-align:center;padding:12px 6px;border-radius:12px;border:1px solid var(--line);
+ background:var(--bg);font-weight:700;font-size:14px;direction:ltr}
+.pay .opt input:checked + span{border-color:var(--accent);background:var(--accent);color:#fff}
+.pay .opt input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}</style>`,
     { lang, noindex: true });
 }
 
@@ -1671,6 +1713,8 @@ function engDocPage(d: Engagement, lang: Lang): Response {
           ${row(L.ref, d.ref_code)}
           ${row(L.holder, d.holder_name)}
           ${d.instagram ? row(L.account, "@" + d.instagram) : ""}
+          ${d.email ? row(L.email, d.email) : ""}
+          ${d.payment_method ? row(L.payment, paymentName(d.payment_method)) : ""}
           ${row(L.service, d.platform)}
           ${row(L.coverage, t.duration(d.months, 0, d.duration_days),
                 d.bonus_days > 0 ? `<span class="pill">${esc(t.bonusPill(d.bonus_days))}</span>` : "")}
@@ -3415,6 +3459,8 @@ async function customerRoute(req: Request, url: URL): Promise<Response | null> {
       p_whatsapp: String(form.get("whatsapp") ?? ""),
       p_instagram: String(form.get("instagram") ?? "") || null,
       p_ip: ip,
+      p_email: String(form.get("email") ?? "") || null,
+      p_payment: String(form.get("payment") ?? "") || null,
     });
     if (error) {
       // الخطأ يُعاد داخل الاستمارة نفسها لا في صفحة ميتة

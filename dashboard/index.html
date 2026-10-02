@@ -1535,7 +1535,7 @@ async function loadWarranty() {
       <button class="chip" data-wt="site" aria-pressed="${s.tab === "site"}">طلبات الموقع</button>
       <button class="chip" data-wt="bot" aria-pressed="${s.tab === "bot"}">بوت التليغرام</button>
     </div>
-    <div class="toolbar">${searchBox("wq", s.tab === "site" ? "الكود، رقم الطلب، الاسم ولا الهاتف" : "الكود، الاسم، الإنستغرام ولا الهاتف", s.q)}
+    <div class="toolbar">${searchBox("wq", s.tab === "site" ? "الكود، رقم الطلب، الاسم ولا الهاتف" : "الكود، الاسم، الإنستغرام، الإيميل ولا الهاتف", s.q)}
       ${s.tab === "bot" ? `<select id="wst" aria-label="الحالة"><option value="">كل الحالات</option>${
         Object.entries(ENG_STATUS).map(([k, v]) => `<option value="${k}" ${s.status === k ? "selected" : ""}>${v[0]}</option>`).join("")}</select>` : ""}
     </div>
@@ -1572,7 +1572,8 @@ async function fillWarranty(append) {
         <span class="main">
           <span class="num mono">${esc(c.code)}${c.ref_code ? ` · ${esc(c.ref_code)}` : ""}</span>
           <span class="name">${esc(c.holder_name || "— مازال ما عمّرش —")}${c.whatsapp ? ` <span class="mono" style="font-size:12.5px;color:var(--muted)">${esc(c.whatsapp)}</span>` : ""}</span>
-          <span class="sub">${esc(c.platform || "")}${c.instagram ? ` · @${esc(c.instagram)}` : ""}${c.ends_at ? ` · حتى ${day(c.ends_at)}` : ""}${
+          <span class="sub">${esc(c.platform || "")}${c.instagram ? ` · @${esc(c.instagram)}` : ""}${c.email ? ` · ${esc(c.email)}` : ""}${
+            c.payment_method ? ` · ${({ baridimob: "BaridiMob", ccp: "CCP", flexy: "Flexy" })[c.payment_method] || esc(c.payment_method)}` : ""}${c.ends_at ? ` · حتى ${day(c.ends_at)}` : ""}${
             c.days_left != null && c.status === "active" ? ` · بقات ${c.days_left} يوم` : ""} · ${esc(c.seller || "")}</span>
         </span>
         <span class="side-acts">
