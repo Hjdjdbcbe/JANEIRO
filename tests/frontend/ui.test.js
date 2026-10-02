@@ -247,7 +247,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   });
   check(head.pos === "sticky", "the header stays on top");
   check(head.nav.join(" ") === "الرئيسية المنتجات كيفاش تطلب الأسئلة", `nav reads: ${head.nav.join(" / ")}`);
-  check(head.navShown && !head.burgerShown, "a desktop column shows the links, not the burger");
+  check(head.navShown && head.burgerShown, "a desktop column shows the links and the same menu button as the phone");
   check(head.langs.join(" ") === "ع:true FR:false EN:false", `language pills: ${head.langs.join(" ")}`);
   check(head.cartBg === "rgb(124, 58, 237)" && head.badge, "the cart is the violet button with its count");
   check(head.theme, "the sun/moon button is there");
@@ -444,9 +444,10 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
       };
     });
     check(m.doc <= m.win + 1, `${w}px: no horizontal scroll (doc ${m.doc} vs win ${m.win})${m.offenders.length ? " -> " + m.offenders : ""}`);
-    check(m.h1Lines === 2 && m.checksHidden, `${w}px: a short hero -- two-line heading, no tick row (${m.h1Lines} lines)`);
-    check(m.platsLabel && m.platsTop - m.stackBottom <= 24,
-          `${w}px: the platforms strip hugs the cards, no label (${Math.round(m.platsTop - m.stackBottom)}px)`);
+    /* the phone shows what the computer shows: same tick row, same label */
+    check(m.h1Lines === 2 && !m.checksHidden, `${w}px: two-line heading and the same tick row as the computer (${m.h1Lines} lines)`);
+    check(!m.platsLabel && m.platsTop - m.stackBottom <= 60,
+          `${w}px: the platforms strip, with its label, sits right under the cards (${Math.round(m.platsTop - m.stackBottom)}px)`);
     check(m.shopH2Lines === 1, `${w}px: the shop heading is one line (${m.shopH2Lines})`);
     check(m.firstCard < m.vh * 2, `${w}px: products start within the second screen (${Math.round(m.firstCard)}px)`);
     check(m.offerTop > m.gridBottom, `${w}px: عرض الشهر comes after the grid on a phone`);
@@ -478,7 +479,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   const lp = await newPage({ viewport: { width: 1280, height: 1000 } });
   await lp.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
   await ready(lp);
-  await lp.click('#hd .langs button[data-lang="fr"]');
+  await lp.click("#langBtn");
+  await lp.click('#langMenu [data-lang="fr"]');
   const fr = await lp.evaluate(() => ({
     dir: document.documentElement.getAttribute("dir"),
     lang: document.documentElement.getAttribute("lang"),
