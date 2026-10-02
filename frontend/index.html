@@ -12,8 +12,9 @@
      The anon key is public by design; the service_role key must NEVER
      appear in any file the browser can load. -->
 <script src="config.js" onerror="/* not configured yet */"></script>
-<link rel="icon" type="image/png" href="assets/janeiro-logo.png">
-<link rel="apple-touch-icon" href="assets/janeiro-logo.png">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title>Janeiro Store — كل اشتراكاتك الرقمية في بلاصة وحدة</title>
 <meta name="description" content="Snapchat+، Claude Pro، Canva Pro، بطاقات PlayStation وبزاف حوايج أخرين. تخلّص بالدينار بـ CCP ولا BaridiMob ولا Flexy، وتستلم اشتراكك بلا تعقيد.">
 <meta property="og:title" content="Janeiro Store — كل اشتراكاتك الرقمية في بلاصة وحدة">
@@ -181,8 +182,8 @@ b,strong{font-weight:700}
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .hdr-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px}
 .brand{display:flex;align-items:center;gap:10px;flex:none}
-.logo{width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#B79BFF 0%,#7C3AED 55%,#3B1680 100%);
-  box-shadow:0 0 22px var(--glow);display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:20px;flex-shrink:0}
+.logo{width:40px;height:40px;border-radius:50%;display:block;object-fit:cover;background:#09080D;
+  box-shadow:0 0 22px var(--glow);flex-shrink:0}
 .word{display:flex;align-items:baseline;gap:5px;font-family:var(--f-display);direction:ltr;unicode-bidi:isolate}
 .word b{font-weight:700;font-size:19px}
 .word small{font-weight:600;font-size:10px;letter-spacing:2.5px;color:var(--accent-fg)}
@@ -863,7 +864,7 @@ h1 .h1a,h2 .h2a{color:inherit}
 <header class="hdr" id="hd">
   <div class="wrap hdr-row">
     <a href="#" class="brand" onclick="go('home');return false" aria-label="Janeiro Store">
-      <span class="logo" aria-hidden="true">J</span>
+      <img class="logo" src="assets/logo-96.png" alt="" aria-hidden="true" width="40" height="40">
       <span class="word"><b>janeiro</b><small>STORE</small></span>
     </a>
 
@@ -908,7 +909,7 @@ h1 .h1a,h2 .h2a{color:inherit}
 <!-- ===== side menu ===== -->
 <aside class="panel r" id="menu" data-i18n-aria="aria_menu" aria-label="القائمة">
   <div class="phead">
-    <span class="brand"><span class="logo" aria-hidden="true">J</span><span class="word"><b>janeiro</b><small>STORE</small></span></span>
+    <span class="brand"><img class="logo" src="assets/logo-96.png" alt="" aria-hidden="true" width="40" height="40"><span class="word"><b>janeiro</b><small>STORE</small></span></span>
     <button class="sq" onclick="closePanels()" data-i18n-aria="aria_close" aria-label="سكّر">
       <svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>
     </button>
@@ -1378,7 +1379,7 @@ h1 .h1a,h2 .h2a{color:inherit}
   <div class="wrap">
     <div class="fcols">
       <div class="fcol brandcol">
-        <span class="brand"><span class="logo" aria-hidden="true">J</span><span class="word"><b>janeiro</b><small>STORE</small></span></span>
+        <span class="brand"><img class="logo" src="assets/logo-96.png" alt="" aria-hidden="true" width="40" height="40"><span class="word"><b>janeiro</b><small>STORE</small></span></span>
         <p data-i18n="footer_desc">اشتراكاتك الرقمية بالدينار، من الدزاير.</p>
         <div class="socials" id="socials">
           <button onclick="contactWhatsApp()"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg><span data-i18n="ch_whatsapp">واتساب</span></button>
@@ -3228,7 +3229,7 @@ function renderCertificate(c){
           <div class="cert-title">Janeiro Store</div>
           <div class="cert-sub">${esc(c.product_name)}</div>
         </div>
-        <span class="logo" aria-hidden="true">J</span>
+        <img class="logo" src="assets/logo-96.png" alt="" aria-hidden="true" width="40" height="40">
       </div>
       <div class="cert-body">
         <p class="cert-lede">${t("cert_lede")}</p>
