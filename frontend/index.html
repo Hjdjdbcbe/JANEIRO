@@ -617,7 +617,8 @@ h1 .h1a,h2 .h2a{color:inherit}
 .opt .rad{width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);flex:none;position:relative}
 .opt[aria-checked="true"] .rad{border-color:var(--accent)}
 .opt[aria-checked="true"] .rad::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
-.opt .nm{font-weight:600;font-size:15px}
+.opt .nm{font-weight:600;font-size:15px;display:flex;flex-direction:column;gap:2px;min-width:0;text-align:start}
+.opt .nm small{font-weight:500;font-size:12.5px;color:var(--accent-fg,var(--accent));line-height:1.35}
 .opt .pr{margin-inline-start:auto;font-family:var(--f-display);font-weight:700;font-size:16px;white-space:nowrap}
 .opt .pr s{font-family:var(--f-body);font-weight:400;font-size:13px;color:var(--muted)}
 .feat{display:grid;gap:8px;font-size:15px;color:var(--muted);list-style:none}
@@ -2579,7 +2580,7 @@ function fillDetail(){
   $("#dFeat").closest(".card").classList.toggle("hidden", !cur.features.length);
   $("#dPlans").innerHTML=cur.plans.length
     ? cur.plans.map((pl,i)=>`<button class="opt" role="radio" aria-checked="${i===curPlan}" onclick="setPlan(${i})">
-        <span class="rad"></span><span class="nm">${esc(durationText(pl.n))}</span>
+        <span class="rad"></span><span class="nm">${esc(durationText(pl.n))}${pl.note?`<small>${esc(pl.note)}</small>`:""}</span>
         <span class="pr">${money(pl.p)}${pl.old?` <s>${money(pl.old)}</s>`:""}</span></button>`).join("")
     : `<p style="color:var(--muted);font-size:14.5px">${t("plans_soon")}</p>`;
   setPlan(curPlan);
@@ -2801,7 +2802,7 @@ function renderCart(){
     return `<div class="citem">
       <div class="cthumb" aria-hidden="true">${artInner(p)}</div>
       <div class="cinfo">
-        <b>${esc(p.name)}</b><div class="pl">${esc(durationText(pl.n))}${p.actType?` · ${esc(p.actType)}`:""}</div>
+        <b>${esc(p.name)}</b><div class="pl">${esc(durationText(pl.n))}${pl.note?` · ${esc(pl.note)}`:""}${p.actType?` · ${esc(p.actType)}`:""}</div>
         <div class="pr">${money(unit*c.qty)}</div>
         ${c.bundle?"":`<div class="qty"><button onclick="chQty(${i},-1)" aria-label="${t("qty_less")}">−</button><span>${c.qty}</span><button onclick="chQty(${i},1)" aria-label="${t("qty_more")}">+</button></div>`}
       </div>
@@ -3015,7 +3016,7 @@ function collectOrder(){
     receipt:receiptName,
     items:CART.map((c,ci)=>{
       const p=P(c.id);
-      return { name:p.name, plan:p.plans[c.plan].n, qty:c.qty, price:p.plans[c.plan].p*c.qty,
+      return { name:p.name, plan:p.plans[c.plan].n, note:p.plans[c.plan].note, qty:c.qty, price:p.plans[c.plan].p*c.qty,
         act:lineActType(c),
         data:p.fields.map((f,fi)=>({l:f.l, v:($(`[data-af="${ci}_${fi}"]`)||{}).value||"—"})) };
     }),
@@ -3062,7 +3063,7 @@ function orderMessage(o){
   m+=`${t("order_number_label")}: ${o.id ?? t("issued_on_confirm")}\n`;
   m+=`———————————\n`;
   o.items.forEach(it=>{
-    m+=`• ${it.name} — ${durationText(it.plan)}${it.qty>1?` ×${it.qty}`:""}\n`;
+    m+=`• ${it.name} — ${durationText(it.plan)}${it.note?` (${it.note})`:""}${it.qty>1?` ×${it.qty}`:""}\n`;
     if(it.act) m+=`  ${t("activation_type_label")}: ${it.act}\n`;
     m+=`  ${t("price_label")}: ${money(it.price)}\n`;
     it.data.forEach(d=>{ m+=`  ${d.l}: ${d.v}\n`; });
