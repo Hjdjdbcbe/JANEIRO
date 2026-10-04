@@ -88,6 +88,7 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   // ---------- fill it in properly ----------
   await p.fill('[data-p="0"][data-k="name"]', "شهر واحد");
   await p.fill('[data-p="0"][data-k="price"]', String(PRICE));
+  await p.fill('[data-p="0"][data-k="note"]', "التفعيل للآيفون");
   await p.fill('[data-f="short_description"]', "منتج أُنشئ من لوحة التحكم.");
 
   // an old price below the real price is a data error, caught before saving
@@ -128,6 +129,8 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   await p.waitForSelector("#editor:not(.hidden)");
   check(await p.locator('[data-p="0"][data-k="price"]').inputValue() === String(PRICE),
         "the plan price round-trips");
+  check(await p.locator('[data-p="0"][data-k="note"]').inputValue() === "التفعيل للآيفون",
+        "the plan note round-trips");
   check(await p.locator('[data-r="0"][data-k="label"]').inputValue() === "البريد الإلكتروني للحساب",
         "the activation field round-trips");
   check(await p.locator('[data-f="slug"]').isDisabled(),
@@ -162,6 +165,21 @@ const check = (c, m) => { console.log(`${c ? "\x1b[32mPASS\x1b[0m" : "\x1b[31mFA
   check(bought.ok === true, `a customer can order it${bought.err ? " -> " + bought.err : ""}`);
   check(Number(bought.total) === PRICE,
         `the price charged is the one typed in the editor (${bought.total} = ${PRICE})`);
+
+  // ---------- the note sits beside the plan on the product page ----------
+  const shop = await browser.newPage();
+  await shop.addInitScript(b => {
+    window.JANEIRO_CONFIG = { SUPABASE_URL: b, SUPABASE_ANON_KEY: "mock-anon-key" };
+  }, BASE);
+  await shop.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+  const pid = await shop.evaluate(async ([b, s]) =>
+    (await (await fetch(`${b}/rest/v1/products?select=id&slug=eq.${s}`)).json())[0]?.id, [BASE, slug]);
+  await shop.waitForSelector(`[onclick="openDetail('${pid}')"]`, { state: "attached", timeout: 10000 });
+  await shop.evaluate(id => openDetail(id), pid);
+  await shop.waitForSelector("#detail:not(.hidden)");
+  const note = await shop.locator("#dPlans .opt .nm small").first().innerText().catch(() => "");
+  check(note === "التفعيل للآيفون", `the customer sees the plan note: "${note}"`);
+  await shop.close();
 
   // ---------- archiving hides it without erasing the order ----------
   await p.goto(`${BASE}/dashboard/index.html`, { waitUntil: "networkidle" });

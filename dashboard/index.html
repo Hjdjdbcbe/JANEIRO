@@ -1101,6 +1101,8 @@ function renderEditor() {
             <button class="del" data-del="plans" data-i="${i}">حذف</button>
           </div>
           <input data-p="${i}" data-k="name" value="${esc(pl.name || "")}" placeholder="اسم الخطة — مثال: شهر واحد">
+          <input data-p="${i}" data-k="note" value="${esc(pl.note || "")}" maxlength="80"
+                 placeholder="ملاحظة للزبون تظهر بجانب الخطة (اختياري) — مثال: التفعيل للآيفون">
           <div class="two">
             <input data-p="${i}" data-k="price" type="number" inputmode="numeric"
                    value="${pl.price ?? ""}" placeholder="السعر">
