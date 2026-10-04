@@ -167,6 +167,15 @@ if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/plan-note.test.sql" 2>&1 \
 fi
 set +o pipefail
 
+bold "==> payment-pricing.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/payment-pricing.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: payment-pricing.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
 bold "==> forbidden-text.test.sh"
 bash "$HERE/forbidden-text.test.sh"
 

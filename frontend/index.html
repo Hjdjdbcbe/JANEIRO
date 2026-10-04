@@ -687,6 +687,8 @@ h1 .h1a,h2 .h2a{color:inherit}
   transition:transform var(--t-tap) var(--ease-out),border-color var(--t-ui) ease,background-color var(--t-ui) ease,color var(--t-ui) ease}
 .paybtn:active{transform:scale(.98)}
 .paybtn[aria-checked="true"]{border-color:var(--accent);background:var(--chip);color:var(--accent-fg)}
+.pay-diff{margin:8px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+.pay-diff span{white-space:nowrap}
 .paybox{background:var(--raise);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:16px;font-size:15px}
 .paybox .r{display:flex;justify-content:space-between;gap:12px;padding:6px 0;align-items:center}
 .paybox .r span{color:var(--muted)}
@@ -1759,6 +1761,9 @@ const I18N = {
   pay_account: { ar:"معلومات الحساب", fr:"Coordonnées", en:"Account details" },
   pay_not_set: { ar:"مازال ما تزادتش", fr:"pas encore renseignées", en:"not added yet" },
   pay_amount:  { ar:"المبلغ اللي تخلّصو", fr:"Montant à payer", en:"Amount to pay" },
+  pay_more:    { ar:"الدفع بـ {m} عليه زيادة {pct}%.", fr:"Le paiement par {m} est majoré de {pct} %.", en:"Paying by {m} adds {pct}%." },
+  pay_less:    { ar:"عرض خاص للدفع بـ {m}.", fr:"Offre spéciale pour le paiement par {m}.", en:"Special price when paying by {m}." },
+  pay_was:     { ar:"(بالطرق الأخرى: {x})", fr:"(autres moyens : {x})", en:"(other methods: {x})" },
   step_paid:   { ar:"خلّصت — نرفع الوصل", fr:"J'ai payé — Envoyer le reçu", en:"I've paid — Upload receipt" },
   step_back:   { ar:"ارجع", fr:"Retour", en:"Back" },
   receipt_h:   { ar:"صورة وصل الدفع", fr:"Photo du reçu", en:"Receipt photo" },
@@ -2759,14 +2764,33 @@ function delItem(i){
 /* Removes a whole bundle in one go, which is what its own delete does. */
 function delBundle(id){ CART=CART.filter(c=>c.bundle!==id); renderCart(); }
 
-function cartTotal(){
+/* The price by payment method, the same rule create_order applies:
+   the method's percentage on top, rounded up to 10 دج, or a plan's own
+   Flexy price when that is lower. The server prices the order itself;
+   this only shows the customer the figure before they pay it. */
+function payPrice(base, pct){
+  if(!pct || pct<=0) return base;
+  return Math.ceil(Math.round(base*(100+pct)*100)/100000)*10;
+}
+const payPct = m => (m && Number(m.surcharge_pct)) || 0;
+function lineUnit(c, m, bundled){
+  const pl=P(c.id).plans[c.plan];
+  if(bundled){
+    const item=bundled.items.find(x=>x.productId===c.id);
+    return payPrice(item ? item.price : pl.p, payPct(m));
+  }
+  let u=payPrice(pl.p, payPct(m));
+  if(m && m.type==="flexy" && pl.flexy!=null) u=Math.min(u, pl.flexy);
+  return u;
+}
+function cartTotal(m){
   let t=0;
   const counted=new Set();
   for(const id of cartBundleIds()){
     const g=bundleGroup(id);
-    if(g && g.whole){ t += g.bundle.price*g.qty; g.lines.forEach(l=>counted.add(l)); }
+    if(g && g.whole){ t += payPrice(g.bundle.price, payPct(m))*g.qty; g.lines.forEach(l=>counted.add(l)); }
   }
-  for(const c of CART) if(!counted.has(c)) t += P(c.id).plans[c.plan].p*c.qty;
+  for(const c of CART) if(!counted.has(c)) t += lineUnit(c, m)*c.qty;
   return t;
 }
 /* What the bundles took off the total, for the line that says so. */
@@ -2984,7 +3008,22 @@ function renderPayBox(){
       ? rows.map(r=>`<div class="r"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("")
       : `<div class="r"><span>${t("pay_account")}</span><b>${t("pay_not_set")}</b></div>`)
     + (m && m.instructions ? `<div class="r"><span>${t("pay_instr")}</span><b>${esc(m.instructions)}</b></div>` : "")
-    + `<div class="r amount"><span>${t("pay_amount")}</span><b>${money(cartTotal())}</b></div>`;
+    + `<div class="r amount"><span>${t("pay_amount")}</span><b>${money(cartTotal(m))}</b></div>`
+    + payDiffNote(m);
+}
+/* Says why the amount moved when a method is priced differently, so a
+   higher Flexy figure never reads as a mistake. */
+function payDiffNote(m){
+  const base=cartTotal(), now=cartTotal(m);
+  if(!m || now===base) return "";
+  /* what the percentage alone would make it: anything below that is a
+     plan's own offer for this method */
+  const pctOnly=cartTotal({ ...m, type:"" });
+  const msg = now<pctOnly
+    ? t("pay_less").replace("{m}", esc(m.label))
+    : t("pay_more").replace("{pct}", payPct(m)).replace("{m}", esc(m.label));
+  const was = t("pay_was").replace("{x}", money(base));
+  return `<p class="pay-diff">${msg} <span>${was}</span></p>`;
 }
 function onReceipt(input){
   const f=input.files&&input.files[0];
@@ -3022,11 +3061,13 @@ function collectOrder(){
     receipt:receiptName,
     items:CART.map((c,ci)=>{
       const p=P(c.id);
-      return { name:p.name, plan:p.plans[c.plan].n, note:p.plans[c.plan].note, qty:c.qty, price:p.plans[c.plan].p*c.qty,
+      const g=c.bundle && bundleGroup(c.bundle);
+      return { name:p.name, plan:p.plans[c.plan].n, note:p.plans[c.plan].note, qty:c.qty,
+        price:lineUnit(c, m, g && g.whole ? g.bundle : null)*c.qty,
         act:lineActType(c),
         data:p.fields.map((f,fi)=>({l:f.l, v:($(`[data-af="${ci}_${fi}"]`)||{}).value||"—"})) };
     }),
-    total:cartTotal()
+    total:cartTotal(m)
   };
 }
 
