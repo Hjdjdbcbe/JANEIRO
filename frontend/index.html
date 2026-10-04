@@ -558,7 +558,11 @@ h1 .h1a,h2 .h2a{color:inherit}
 
 .citem{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .citem:last-child{border-bottom:0}
-.cthumb{width:48px;flex:none;aspect-ratio:600/832;border-radius:6px;overflow:hidden;position:relative;background:var(--raise)}
+.cthumb{width:48px;height:auto;flex:none;align-self:flex-start;aspect-ratio:600/832;border-radius:6px;overflow:hidden;position:relative;background:var(--raise)}
+.cthumb .pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* the brand mark, when the product has one: square, whole, never cropped */
+.cthumb.ico{aspect-ratio:1;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line)}
+.cthumb.ico img{width:76%;height:76%;object-fit:contain}
 .cthumb .ph-name,.cthumb .ph-side,.cthumb .ph-foot,.cthumb .ph-dots{display:none}
 .cthumb .ph-tile{top:22%;width:62%}
 .cinfo{flex:1;min-width:0}
@@ -2800,7 +2804,9 @@ function renderCart(){
     const item=inBundle ? inBundle.bundle.items.find(x=>x.productId===c.id) : null;
     const unit=item ? item.price : pl.p;
     return `<div class="citem">
-      <div class="cthumb" aria-hidden="true">${artInner(p)}</div>
+      ${p.icon
+        ? `<div class="cthumb ico" aria-hidden="true"><img src="${esc(p.icon)}" alt="" loading="lazy" onerror="this.remove()"></div>`
+        : `<div class="cthumb" aria-hidden="true">${artInner(p)}</div>`}
       <div class="cinfo">
         <b>${esc(p.name)}</b><div class="pl">${esc(durationText(pl.n))}${pl.note?` · ${esc(pl.note)}`:""}${p.actType?` · ${esc(p.actType)}`:""}</div>
         <div class="pr">${money(unit*c.qty)}</div>
