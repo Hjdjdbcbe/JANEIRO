@@ -96,6 +96,36 @@ const check = (c, m) => c ? ok(m) : bad(m);
       await q("update product_plans set sort_order=$2 where id=$1", [dear.id, dear.sort_order]);
     }
 
+    /* Flexy: the receipt step asks for a screenshot and the exact time */
+    await toPay([a.id]);
+    await page.locator("#o2 .pay2 .paybtn", { hasText: "Flexy" }).click();
+    await page.evaluate(() => step(3));
+    let rs = await page.evaluate(() => ({ h: document.querySelector("#receiptH").textContent,
+      lbl: document.querySelector("#refLabel").textContent, type: document.querySelector("#fRef").type,
+      drop: document.querySelector("#dropText").textContent }));
+    check(/الفليكسي/.test(rs.h) && /الفليكسي/.test(rs.drop), `Flexy asks for the Flexy screenshot: "${rs.h}"`);
+    check(/وقت الدفع/.test(rs.lbl) && rs.type === "time", `and the exact time of payment, as a time field: "${rs.lbl}" (${rs.type})`);
+    await page.setInputFiles("#receiptFile", { name: "flexy.png", mimeType: "image/png",
+      buffer: Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex") });
+    await page.evaluate(() => nextFromReceipt());
+    const stuck = await page.evaluate(() => !document.querySelector("#o3").classList.contains("hidden"));
+    check(stuck, "without the time it does not move on");
+    await page.fill("#fRef", "14:35");
+    await page.evaluate(() => nextFromReceipt());
+    const moved = await page.evaluate(() => !document.querySelector("#o4").classList.contains("hidden"));
+    check(moved, "with the screenshot and the time it moves on");
+    const review = await page.locator("#orderSummary").innerText();
+    check(/وقت الدفع/.test(review) && /14:35/.test(review), "the review shows the payment time");
+
+    /* back to BaridiMob: receipt and transaction number again */
+    await page.evaluate(() => step(2));
+    await page.locator("#o2 .pay2 .paybtn", { hasText: "BaridiMob" }).click();
+    await page.evaluate(() => step(3));
+    rs = await page.evaluate(() => ({ h: document.querySelector("#receiptH").textContent,
+      lbl: document.querySelector("#refLabel").textContent, type: document.querySelector("#fRef").type }));
+    check(/وصل/.test(rs.h) && /رقم العملية/.test(rs.lbl) && rs.type === "text",
+          `BaridiMob asks for the receipt and the number: "${rs.h}" / "${rs.lbl}"`);
+
     /* the same cart, priced by the server */
     const server = await page.evaluate(async ([b, items, pm]) => {
       const res = await (await fetch(`${b}/functions/v1/create-order`, {

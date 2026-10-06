@@ -62,7 +62,9 @@ async function buildMessage(db: SupabaseClient, orderId: string): Promise<string
   lines.push(`الإجمالي: ${o?.total} ${o?.currency ?? "دج"}`);
   const pm = (o as { payment_methods?: { label?: string } } | null)?.payment_methods;
   lines.push(`الدفع: ${pm?.label ?? "—"}`);
-  if (o?.payment_reference) lines.push(`رقم العملية: ${o.payment_reference}`);
+  // Flexy sends the exact time of payment instead of a transaction number
+  if (o?.payment_reference) lines.push(/^(وقت الدفع|Heure du paiement|Payment time)/.test(o.payment_reference)
+    ? `⏱ ${o.payment_reference}` : `رقم العملية: ${o.payment_reference}`);
   if (o?.customer_note) lines.push("", `رسالة العميل: ${o.customer_note}`);
   lines.push(`وقت الطلب: ${o?.submitted_at}`);
   lines.push(`الحالة: ${STATUS_AR[o?.status as string] ?? o?.status}`);
