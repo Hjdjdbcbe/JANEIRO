@@ -36,6 +36,7 @@ node tests/frontend/ui.test.js    # icons, deals, motion, narrow viewports
 node tests/frontend/theme.test.js # light/dark theme + measured contrast
 node tests/frontend/admin.test.js   # dashboard: login, overview, order queue
 node tests/frontend/console.test.js # dashboard: bot stock, sales, warranties, sellers, settings
+PGUSER="$(whoami)" node tests/frontend/pricing.test.js # price by payment method (Flexy %)
 ```
 
 Each exits non-zero on the first failed check.

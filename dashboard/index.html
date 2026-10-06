@@ -1109,6 +1109,8 @@ function renderEditor() {
             <input data-p="${i}" data-k="old_price" type="number" inputmode="numeric"
                    value="${pl.old_price ?? ""}" placeholder="السعر قبل الخصم (اختياري)">
           </div>
+          <input data-p="${i}" data-k="flexy_price" type="number" inputmode="numeric"
+                 value="${pl.flexy_price ?? ""}" placeholder="سعر خاص بالفليكسي — عرض (اختياري، وإلا تُطبّق نسبة الفليكسي)">
           <div class="two">
             <input data-p="${i}" data-k="duration_value" type="number"
                    value="${pl.duration_value ?? ""}" placeholder="المدة (رقم)">
@@ -1381,6 +1383,9 @@ async function saveProduct() {
   for (const p of payload.plans)
     if (p.old_price && Number(p.old_price) <= Number(p.price))
       return toast(`«${p.name}»: السعر قبل الخصم يجب أن يكون أكبر من السعر.`);
+  for (const p of payload.plans)
+    if (String(p.flexy_price ?? "").trim() !== "" && !(Number(p.flexy_price) > 0))
+      return toast(`«${p.name}»: سعر الفليكسي يجب أن يكون رقماً أكبر من 0.`);
 
   btn.disabled = true; btn.textContent = "جارٍ الحفظ…";
   try {
@@ -2098,6 +2103,10 @@ async function loadSettings() {
         <div class="two"><input data-k="account_number" value="${esc(m.account_number || "")}" placeholder="رقم الحساب / RIP / الفليكسي" dir="ltr">
           <input data-k="extra_info" value="${esc(m.extra_info || "")}" placeholder="معلومة زايدة (اختياري)"></div>
         <input data-k="instructions" value="${esc(m.instructions || "")}" placeholder="تعليمات للزبون (اختياري)">
+        <label class="inl" style="gap:10px;font-size:14px">زيادة على السعر لمن يدفع بهذه الطريقة
+          <input data-k="surcharge_pct" type="number" inputmode="numeric" min="0" max="100" step="1"
+                 value="${Number(m.surcharge_pct) || ""}" placeholder="0" style="width:90px" dir="ltr"> %</label>
+        <p class="hint" style="margin:0">مثلاً 20 = كل الأسعار تزيد 20% عند الدفع بها، مقرّبة لأقرب 10 دج. اتركها فارغة لنفس السعر.</p>
         <div class="inl"><label class="switch"><input type="checkbox" data-k="is_active" ${m.is_active ? "checked" : ""}> تبان في الطلب</label>
           <button class="btn sm go" data-pmsave style="margin-inline-start:auto">حفظ</button></div>
       </div>`).join("")}</div>
@@ -2112,6 +2121,9 @@ async function loadSettings() {
   box.querySelectorAll("[data-pm]").forEach(el => el.querySelector("[data-pmsave]").onclick = async () => {
     const p = { id: el.dataset.pm };
     el.querySelectorAll("[data-k]").forEach(i => p[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value);
+    const pct = String(p.surcharge_pct ?? "").trim();
+    if (pct !== "" && !(/^\d+$/.test(pct) && +pct <= 100)) return toast("الزيادة: رقم صحيح من 0 إلى 100.");
+    p.surcharge_pct = pct === "" ? 0 : +pct;
     try { await rpc("admin_upsert_payment_method", { p }); toast("تحفظت طريقة الدفع."); } catch (e) { fail(e); }
   });
   loadBotSettings();

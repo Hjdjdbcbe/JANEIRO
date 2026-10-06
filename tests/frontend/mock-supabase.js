@@ -119,7 +119,7 @@ async function rest(url, res) {
            from public_bundles order by sort_order`));
     if (table === "payment_methods")
       return send(res, 200, await asAnon(
-        `select id,type,label,account_holder,account_number,extra_info,instructions
+        `select id,type,label,account_holder,account_number,extra_info,instructions,surcharge_pct
            from payment_methods where is_active order by sort_order`));
     if (table === "products") {
       const slug = (q.get("slug") || "").replace("eq.", "");
@@ -137,7 +137,7 @@ async function rest(url, res) {
            from categories c where c.id = p.category_id) as categories` +
         (select.includes("product_plans") ? `,
         coalesce((select jsonb_agg(jsonb_build_object(
-            'id',pl.id,'name',pl.name,'price',pl.price,'old_price',pl.old_price,'note',pl.note,
+            'id',pl.id,'name',pl.name,'price',pl.price,'old_price',pl.old_price,'note',pl.note,'flexy_price',pl.flexy_price,
             'is_active',pl.is_active,'sort_order',pl.sort_order) order by pl.sort_order)
           from product_plans pl where pl.product_id = p.id and pl.is_active), '[]'::jsonb) as product_plans` : "") +
         (select.includes("product_features") ? `,

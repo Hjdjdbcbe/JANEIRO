@@ -122,7 +122,7 @@ export function mediaUrl(path) {
 
 export async function loadPaymentMethods() {
   return rest(
-    "payment_methods?select=id,type,label,account_holder,account_number,extra_info,instructions" +
+    "payment_methods?select=id,type,label,account_holder,account_number,extra_info,instructions,surcharge_pct" +
     "&is_active=eq.true&order=sort_order",
   );
 }
@@ -132,7 +132,7 @@ export async function loadProducts() {
   const rows = await rest(
     "products?select=id,name,slug,short_description,accent_color,poster_path,thumbnail_path,icon_path," +
     "badge_type,badge_label,status,sort_order,warranty_type,warranty_days,warranty_label,activation_type," +
-    "categories(slug,name),product_plans(id,name,note,price,old_price,is_active,sort_order)," +
+    "categories(slug,name),product_plans(id,name,note,price,old_price,flexy_price,is_active,sort_order)," +
     /* Missing here meant the cart and checkout, which build their
        activation form from this SAME array (via P(id)), could never
        see a product's required fields -- "لا حقول إضافية مطلوبة" showed
@@ -191,7 +191,7 @@ function normalizeBundle(row) {
 export async function loadProduct(slug) {
   const rows = await rest(
     `products?select=*,categories(slug,name),` +
-    `product_plans(id,name,note,price,old_price,is_active,sort_order),` +
+    `product_plans(id,name,note,price,old_price,flexy_price,is_active,sort_order),` +
     `product_features(label,sort_order),` +
     `product_requirements(id,label,field_type,placeholder,is_required,sort_order)` +
     `&slug=eq.${encodeURIComponent(slug)}&limit=1`,
@@ -205,7 +205,8 @@ function normalizeProduct(row) {
   const plans = (row.product_plans || [])
     .filter((p) => p.is_active)
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((p) => ({ id: p.id, n: p.name, note: p.note || "", p: Number(p.price), old: p.old_price ? Number(p.old_price) : null }));
+    .map((p) => ({ id: p.id, n: p.name, note: p.note || "", p: Number(p.price), old: p.old_price ? Number(p.old_price) : null,
+                    flexy: p.flexy_price != null ? Number(p.flexy_price) : null }));
 
   return {
     id: row.id,
