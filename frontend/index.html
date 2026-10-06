@@ -1259,7 +1259,7 @@ h1 .h1a,h2 .h2a{color:inherit}
       </div>
       <div class="hint">
         <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
-        <span data-i18n="pay_hint">خبّي رقم العملية اللي في الوصل، يخلّينا نأكدو أسرع. رقم الطلب يوصلك كي يتأكد الطلب.</span>
+        <span id="payHint" data-i18n="pay_hint">خبّي رقم العملية اللي في الوصل، يخلّينا نأكدو أسرع. رقم الطلب يوصلك كي يتأكد الطلب.</span>
       </div>
       <div class="order-actions">
         <button class="btn btn-primary btn-block" onclick="step(3)" data-i18n="step_paid">خلّصت — نرفع الوصل</button>
@@ -1269,19 +1269,19 @@ h1 .h1a,h2 .h2a{color:inherit}
 
     <div id="o3" class="hidden">
       <div class="card" style="margin-top:0">
-        <h3 data-i18n="receipt_h">صورة وصل الدفع</h3>
+        <h3 id="receiptH" data-i18n="receipt_h">صورة وصل الدفع</h3>
         <label class="drop" id="dropLabel">
           <b id="dropText" data-i18n="receipt_drop">اضغط باش تختار صورة الوصل</b>
           <span data-i18n="receipt_hint2">JPG ولا PNG · حتى 5 ميغا</span>
           <input type="file" accept="image/*" hidden id="receiptFile" onchange="onReceipt(this)">
         </label>
         <div class="field" style="margin-top:16px;margin-bottom:0">
-          <label for="fRef"><span data-i18n="ref_label">رقم العملية / المرجع</span> <span class="sub" data-i18n="ref_sub">— يخلّينا نأكدو أسرع</span></label>
+          <label for="fRef"><span id="refLabel" data-i18n="ref_label">رقم العملية / المرجع</span> <span class="sub" id="refSub" data-i18n="ref_sub">— يخلّينا نأكدو أسرع</span></label>
           <input id="fRef" class="mono" data-i18n-ph="ref_ph" placeholder="مثلاً: 4821990">
         </div>
       </div>
       <div class="order-actions">
-        <button class="btn btn-primary btn-block" onclick="step(4)" data-i18n="step_next_act">التالي — معلومات التفعيل</button>
+        <button class="btn btn-primary btn-block" onclick="nextFromReceipt()" data-i18n="step_next_act">التالي — معلومات التفعيل</button>
         <button class="btn btn-soft btn-block" onclick="step(2)" data-i18n="step_back">ارجع</button>
       </div>
     </div>
@@ -1753,6 +1753,7 @@ const I18N = {
   note_ph:     { ar:"إذا عندك حاجة تحب تزيدها للطلب…", fr:"Quelque chose à ajouter à la commande…", en:"Anything you'd like to add to the order…" },
   step_next_pay: { ar:"التالي — طريقة الدفع", fr:"Suivant — Paiement", en:"Next — Payment" },
   pay_h:       { ar:"اختار كيفاش تخلّص", fr:"Choisissez le mode de paiement", en:"Choose how to pay" },
+  pay_hint_flexy:{ ar:"بعد ما تبعث الفليكسي، دير سكرين للرسالة وشوف الوقت بالضبط، راح نطلبوهم في الخطوة الجاية.", fr:"Après l'envoi du Flexy, faites une capture du SMS et notez l'heure exacte : elles seront demandées à l'étape suivante.", en:"After sending the Flexy, screenshot the SMS and note the exact time — the next step asks for both." },
   pay_hint:    { ar:"خبّي رقم العملية اللي في الوصل، يخلّينا نأكدو أسرع. رقم الطلب يوصلك كي يتأكد الطلب.", fr:"Gardez le numéro de transaction du reçu, ça accélère la vérification. Le numéro de commande arrive à la confirmation.", en:"Keep the transaction number from the receipt — it speeds up the check. Your order number arrives on confirmation." },
   pay_none:    { ar:"ما كاين حتى طريقة دفع دركا.", fr:"Aucun moyen de paiement disponible pour le moment.", en:"No payment method is available right now." },
   pay_holder:  { ar:"الاسم واللقب", fr:"Titulaire", en:"Account holder" },
@@ -1787,6 +1788,13 @@ const I18N = {
   step_back_edit:{ ar:"ارجع باش تبدّل", fr:"Retour pour modifier", en:"Back to edit" },
   toast_pay_required: { ar:"اختار طريقة الدفع", fr:"Choisissez un mode de paiement", en:"Choose a payment method" },
   toast_receipt_required: { ar:"ارفع صورة وصل الدفع", fr:"Envoyez la photo du reçu", en:"Upload the receipt photo" },
+  receipt_h_flexy:   { ar:"صورة الفليكسي", fr:"Capture du Flexy", en:"Flexy screenshot" },
+  receipt_drop_flexy:{ ar:"اضغط باش تختار صورة الفليكسي (سكرين)", fr:"Touchez pour choisir la capture du Flexy", en:"Tap to choose the Flexy screenshot" },
+  ref_label_flexy:   { ar:"وقت الدفع بالضبط", fr:"Heure exacte du paiement", en:"Exact time of payment" },
+  ref_sub_flexy:     { ar:"— الساعة والدقيقة كيما في رسالة الفليكسي", fr:"— l'heure et la minute du SMS Flexy", en:"— hour and minute, as in the Flexy SMS" },
+  ref_flexy_word:    { ar:"وقت الدفع", fr:"Heure du paiement", en:"Payment time" },
+  toast_time_required:{ ar:"اكتب وقت الدفع بالضبط", fr:"Indiquez l'heure exacte du paiement", en:"Enter the exact time of payment" },
+  toast_flexy_shot_required:{ ar:"ارفع صورة الفليكسي", fr:"Envoyez la capture du Flexy", en:"Upload the Flexy screenshot" },
   complete_field: { ar:"كمّل", fr:"Complétez", en:"Fill in" },
   busy_sending:   { ar:"راهو يتبعث…", fr:"Envoi…", en:"Sending…" },
   busy_creating_order: { ar:"راهو يتسجّل الطلب…", fr:"Création de la commande…", en:"Creating the order…" },
@@ -1943,7 +1951,7 @@ function applyLang(){
     if(orderStep===2) renderPayBox();
     if(orderStep===4) buildReview();
   }
-  if(!receiptFile) $("#dropText").textContent = t("receipt_drop");
+  if(!receiptFile) $("#dropText").textContent = t($("#dropText").dataset.i18n || "receipt_drop");
   else $("#dropText").textContent = `${t("receipt_chosen")} ${receiptName}`;
   /* the certificate page is built from data fetched once and cached --
      no need to re-fetch it, just re-render the same data in the new
@@ -2915,6 +2923,7 @@ function step(n){
   $$("#steps .bar").forEach((el,i)=>el.classList.toggle("on",i<n-1));
   $("#stepLbl").textContent=`${t("step_word")} ${n} ${t("of_4")} — ${t(STEP_LBL_KEYS[n-1])}`;
   if(n===2){ renderPayMethods(); renderPayBox(); }
+  if(n===3) applyPayKind();
   if(n===4){ buildActivation(); buildReview(); }
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
@@ -2981,6 +2990,34 @@ function setPay(el,id){
   [...el.parentNode.children].forEach(b=>b.setAttribute("aria-checked","false"));
   el.setAttribute("aria-checked","true");
   renderPayBox();
+  applyPayKind();
+}
+/* Flexy has no receipt and no transaction number: what proves it is a
+   screenshot and the exact time it was sent. The receipt step asks for
+   those when Flexy is chosen, and for the receipt and number otherwise. */
+const isFlexyPay = () => (payMethodById(payMethod)||{}).type==="flexy";
+function applyPayKind(){
+  const fx=isFlexyPay();
+  const set=(id,key)=>{ const el=$("#"+id); el.dataset.i18n=key; el.textContent=t(key); };
+  set("receiptH", fx?"receipt_h_flexy":"receipt_h");
+  set("payHint",  fx?"pay_hint_flexy":"pay_hint");
+  set("refLabel", fx?"ref_label_flexy":"ref_label");
+  set("refSub",   fx?"ref_sub_flexy":"ref_sub");
+  if(!receiptFile){ const d=$("#dropText"); d.dataset.i18n=fx?"receipt_drop_flexy":"receipt_drop"; d.textContent=t(d.dataset.i18n); }
+  const inp=$("#fRef");
+  if(fx && inp.type!=="time"){ inp.value=""; inp.type="time"; inp.required=true; }
+  if(!fx && inp.type==="time"){ inp.value=""; inp.type="text"; inp.required=false; }
+}
+/* what goes to the server as the payment reference */
+const payRefValue = () => {
+  const v=$("#fRef").value.trim();
+  return v && isFlexyPay() ? `${t("ref_flexy_word")} ${v}` : v;
+};
+function nextFromReceipt(){
+  const fx=isFlexyPay();
+  if(!receiptFile){ toast(t(fx?"toast_flexy_shot_required":"toast_receipt_required")); return; }
+  if(fx && !$("#fRef").value.trim()){ toast(t("toast_time_required")); $("#fRef").focus(); return; }
+  step(4);
 }
 const payMethodById = id => PAYMENT_METHODS.find(m=>m.id===id);
 
@@ -3087,7 +3124,7 @@ function collectOrder(){
     wilaya:$("#fWilaya").value.trim(),
     pay:m?m.label:"—",
     channel:channel,
-    ref:$("#fRef").value.trim(),
+    ref:payRefValue(),
     receipt:receiptName,
     items:CART.map((c,ci)=>{
       const p=P(c.id);
@@ -3148,7 +3185,7 @@ function orderMessage(o){
   m+=`———————————\n`;
   m+=`${t("total_label")}: ${money(o.total)}\n`;
   m+=`${t("pay_method_label")}: ${o.pay}\n`;
-  if(o.ref) m+=`${t("ref_label")}: ${o.ref}\n`;
+  if(o.ref) m+=isFlexyPay() ? `${o.ref}\n` : `${t("ref_label")}: ${o.ref}\n`;
   m+=`${t("receipt_photo_label")}: ${o.receipt? t("will_attach_in_chat") : t("not_attached_yet")}\n`;
   m+=`———————————\n`;
   m+=`${t("name_only_label")}: ${o.name}\n`;
@@ -3162,7 +3199,7 @@ function buildReview(){
   $("#orderSummary").innerHTML =
     o.items.map(it=>`<div class="r"><span>${esc(it.name)} — ${esc(durationText(it.plan))}${it.act?` · ${esc(it.act)}`:""}${it.qty>1?` ×${it.qty}`:""}</span><b class="mono">${money(it.price)}</b></div>`).join("")
     + `<div class="r"><span>${t("pay_method_label")}</span><b>${o.pay}</b></div>`
-    + (o.ref?`<div class="r"><span>${t("ref_label")}</span><b class="mono">${o.ref}</b></div>`:"")
+    + (o.ref?`<div class="r"><span>${t(isFlexyPay()?"ref_label_flexy":"ref_label")}</span><b class="mono">${esc(isFlexyPay()?$("#fRef").value.trim():o.ref)}</b></div>`:"")
     + `<div class="r"><span>${t("receipt_photo_label")}</span><b>${o.receipt?t("receipt_selected"):t("receipt_not_uploaded")}</b></div>`
     + `<div class="r"><span>${t("channel_only_label")}</span><b>${esc(channelText(o.channel))}</b></div>`
     + `<div class="r"><span>${t("name_only_label")}</span><b>${o.name}</b></div>`
@@ -3202,7 +3239,8 @@ async function sendOrder(){
   }
   const name=$("#fName").value.trim(), phone=phoneValue();
   if(!payMethod){ toast(t("toast_pay_required")); step(2); return; }
-  if(!receiptFile){ toast(t("toast_receipt_required")); step(3); return; }
+  if(!receiptFile){ toast(t(isFlexyPay()?"toast_flexy_shot_required":"toast_receipt_required")); step(3); return; }
+  if(isFlexyPay() && !$("#fRef").value.trim()){ toast(t("toast_time_required")); step(3); return; }
 
   const missing=firstMissingField();
   if(missing){ toast(`${t("complete_field")}: ${missing.label}`); missing.el&&missing.el.focus(); return; }
@@ -3231,7 +3269,7 @@ async function sendOrder(){
 
     /* 3) confirm. Only now is the order real. */
     setSendBusy(true,t("busy_confirming"));
-    const { order, whatsappNumber } = await API.submitOrder(placedOrder.order_id, $("#fRef").value.trim());
+    const { order, whatsappNumber } = await API.submitOrder(placedOrder.order_id, payRefValue());
 
     /* 4) and only now do we open WhatsApp */
     const items=CART.map(c=>{
@@ -3518,7 +3556,7 @@ function toggleTheme(){
    The markup drives everything through inline handlers, so publish
    exactly the ones it names -- changing the markup instead would mean
    touching the design. */
-Object.assign(window, {
+Object.assign(window, { nextFromReceipt,
   go, goSection, openPolicy, selectCat, setHomeCat, homeSearch, doSearch, openSearch,
   addQuick, addOffer,
   openDetail, setPlan, addCurrent,
