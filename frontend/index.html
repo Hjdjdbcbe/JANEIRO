@@ -1762,7 +1762,7 @@ const I18N = {
   pay_not_set: { ar:"مازال ما تزادتش", fr:"pas encore renseignées", en:"not added yet" },
   pay_amount:  { ar:"المبلغ اللي تخلّصو", fr:"Montant à payer", en:"Amount to pay" },
   pay_more:    { ar:"الدفع بـ {m} عليه زيادة {pct}%.", fr:"Le paiement par {m} est majoré de {pct} %.", en:"Paying by {m} adds {pct}%." },
-  pay_less:    { ar:"عرض خاص للدفع بـ {m}.", fr:"Offre spéciale pour le paiement par {m}.", en:"Special price when paying by {m}." },
+  pay_less:    { ar:"سعر خاص للدفع بـ {m}.", fr:"Prix spécial pour le paiement par {m}.", en:"Special price when paying by {m}." },
   pay_was:     { ar:"(بالطرق الأخرى: {x})", fr:"(autres moyens : {x})", en:"(other methods: {x})" },
   step_paid:   { ar:"خلّصت — نرفع الوصل", fr:"J'ai payé — Envoyer le reçu", en:"I've paid — Upload receipt" },
   step_back:   { ar:"ارجع", fr:"Retour", en:"Back" },
@@ -2765,8 +2765,8 @@ function delItem(i){
 function delBundle(id){ CART=CART.filter(c=>c.bundle!==id); renderCart(); }
 
 /* The price by payment method, the same rule create_order applies:
-   the method's percentage on top, rounded up to 10 دج, or a plan's own
-   Flexy price when that is lower. The server prices the order itself;
+   a plan's own Flexy price exactly as written, otherwise the method's
+   percentage on top, rounded up to 10 دج. The server prices the order itself;
    this only shows the customer the figure before they pay it. */
 function payPrice(base, pct){
   if(!pct || pct<=0) return base;
@@ -2779,9 +2779,8 @@ function lineUnit(c, m, bundled){
     const item=bundled.items.find(x=>x.productId===c.id);
     return payPrice(item ? item.price : pl.p, payPct(m));
   }
-  let u=payPrice(pl.p, payPct(m));
-  if(m && m.type==="flexy" && pl.flexy!=null) u=Math.min(u, pl.flexy);
-  return u;
+  if(m && m.type==="flexy" && pl.flexy!=null) return pl.flexy;   // the owner's own Flexy price, as written
+  return payPrice(pl.p, payPct(m));
 }
 function cartTotal(m){
   let t=0;
@@ -3016,10 +3015,13 @@ function renderPayBox(){
 function payDiffNote(m){
   const base=cartTotal(), now=cartTotal(m);
   if(!m || now===base) return "";
-  /* what the percentage alone would make it: anything below that is a
-     plan's own offer for this method */
-  const pctOnly=cartTotal({ ...m, type:"" });
-  const msg = now<pctOnly
+  /* a plan with its own Flexy price is named as such; otherwise the
+     difference is the method's percentage */
+  const own = m.type==="flexy" && CART.some(c=>{
+    const g=c.bundle && bundleGroup(c.bundle);
+    return !(g && g.whole) && P(c.id).plans[c.plan].flexy!=null;
+  });
+  const msg = own || !payPct(m)
     ? t("pay_less").replace("{m}", esc(m.label))
     : t("pay_more").replace("{pct}", payPct(m)).replace("{m}", esc(m.label));
   const was = t("pay_was").replace("{x}", money(base));

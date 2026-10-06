@@ -73,7 +73,14 @@ begin
 
   v := create_order('زبون', '0550390003', null, v_flexy,
          jsonb_build_array(jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1)), 'pay-039-3');
-  assert (v->>'total')::numeric = 1100, 'a plan''s Flexy offer beats the percentage: ' || (v->>'total');
+  assert (v->>'total')::numeric = 1100, 'a plan''s own Flexy price is charged as written: ' || (v->>'total');
+
+  -- with no percentage at all, a Flexy price above the list price still applies
+  update payment_methods set surcharge_pct = 0 where id = v_flexy;
+  v := create_order('زبون', '0550390007', null, v_flexy,
+         jsonb_build_array(jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1)), 'pay-039-7');
+  assert (v->>'total')::numeric = 1100, 'the Flexy price applies without a percentage: ' || (v->>'total');
+  update payment_methods set surcharge_pct = 20 where id = v_flexy;
 
   v := create_order('زبون', '0550390004', null, v_bmob,
          jsonb_build_array(jsonb_build_object('product_id', v_p2, 'plan_id', v_pl2, 'quantity', 1)), 'pay-039-4');
