@@ -57,8 +57,15 @@ const check = (c, m) => c ? ok(m) : bad(m);
 
     await toPay([b.id]);
     r = await amountFor("Flexy");
-    check(+r.amount === offer, `a plan's Flexy offer is charged instead (${r.amount} = ${offer})`);
-    check(/عرض خاص/.test(r.note), `and is named an offer: "${r.note.trim()}"`);
+    check(+r.amount === offer, `a plan's own Flexy price is charged as written (${r.amount} = ${offer})`);
+    check(/سعر خاص/.test(r.note), `and is named a special price: "${r.note.trim()}"`);
+
+    /* no percentage at all: the plan's Flexy price still applies */
+    await q("update payment_methods set surcharge_pct=0 where id=$1", [flexy.id]);
+    await toPay([b.id]);
+    r = await amountFor("Flexy");
+    check(+r.amount === offer, `without a percentage the Flexy price still applies (${r.amount})`);
+    await q("update payment_methods set surcharge_pct=20 where id=$1", [flexy.id]);
 
     await toPay([a.id, b.id]);
     r = await amountFor("Flexy");

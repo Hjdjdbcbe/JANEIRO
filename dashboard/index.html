@@ -1110,7 +1110,7 @@ function renderEditor() {
                    value="${pl.old_price ?? ""}" placeholder="السعر قبل الخصم (اختياري)">
           </div>
           <input data-p="${i}" data-k="flexy_price" type="number" inputmode="numeric"
-                 value="${pl.flexy_price ?? ""}" placeholder="سعر خاص بالفليكسي — عرض (اختياري، وإلا تُطبّق نسبة الفليكسي)">
+                 value="${pl.flexy_price ?? ""}" placeholder="سعر الفليكسي لهذه الخطة (اختياري) — فارغ = السعر + نسبة الفليكسي">
           <div class="two">
             <input data-p="${i}" data-k="duration_value" type="number"
                    value="${pl.duration_value ?? ""}" placeholder="المدة (رقم)">
