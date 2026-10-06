@@ -694,6 +694,9 @@ h1 .h1a,h2 .h2a{color:inherit}
 .paybox .r span{color:var(--muted)}
 .paybox .r b{font-weight:600;text-align:end}
 .paybox .r.amount{border-top:1px solid var(--line);margin-top:8px;padding-top:12px}
+.paybox .paylines{border-top:1px solid var(--line);margin-top:8px;padding-top:6px}
+.paybox .paylines .r{font-size:14px;padding:3px 0}
+.paybox .paylines .r span{min-width:0}
 .paybox .r.amount b{font-family:var(--f-display);font-weight:700;font-size:19px;color:var(--accent-fg)}
 .drop{display:block;border:1.5px dashed var(--line2);border-radius:16px;padding:32px 16px;text-align:center;background:var(--surface2);cursor:pointer;
   transition:border-color var(--t-ui) ease,background-color var(--t-ui) ease}
@@ -2565,7 +2568,10 @@ let cur=null,curPlan=0;
    instead of the first one. */
 function openDetail(id, planId){
   cur=P(id);
-  curPlan = planId ? Math.max(0, cur.plans.findIndex(pl=>pl.id===planId)) : 0;
+  /* no plan asked for -> the cheapest, the one the card's «يبدا من»
+     quoted, so the price the customer clicked on is the one selected */
+  const cheapest = cur.plans.reduce((b,pl,i,a)=>pl.p<a[b].p?i:b, 0);
+  curPlan = planId ? Math.max(0, cur.plans.findIndex(pl=>pl.id===planId)) : cheapest;
   fillDetail();
   go("detail");
 }
@@ -2602,6 +2608,9 @@ function setPlan(i){
 }
 function addCurrent(buyNow){
   if(!cur.available||!cur.plans.length){ toast(t("product_unavailable")); return; }
+  /* «اطلب الآن» on something already in the cart goes to checkout with
+     it, rather than quietly adding a second one */
+  if(buyNow && CART.some(c=>c.id===cur.id && c.plan===curPlan && !c.bundle)){ go("order"); return; }
   addToCart(cur.id,curPlan);
   if(buyNow) go("order"); 
 }
@@ -3007,8 +3016,27 @@ function renderPayBox(){
       ? rows.map(r=>`<div class="r"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("")
       : `<div class="r"><span>${t("pay_account")}</span><b>${t("pay_not_set")}</b></div>`)
     + (m && m.instructions ? `<div class="r"><span>${t("pay_instr")}</span><b>${esc(m.instructions)}</b></div>` : "")
+    + payLines(m)
     + `<div class="r amount"><span>${t("pay_amount")}</span><b>${money(cartTotal(m))}</b></div>`
     + payDiffNote(m);
+}
+/* What the amount pays for, line by line at this method's prices, so a
+   cart still holding an earlier choice is seen before it is paid for. */
+function payLines(m){
+  const out=[], seen=new Set();
+  for(const c of CART){
+    const g=c.bundle && bundleGroup(c.bundle);
+    if(g && g.whole){
+      if(seen.has(g.bundle.id)) continue;
+      seen.add(g.bundle.id);
+      out.push([`${esc(g.bundle.name)}${g.qty>1?` ×${g.qty}`:""}`, payPrice(g.bundle.price, payPct(m))*g.qty]);
+      continue;
+    }
+    const p=P(c.id), pl=p.plans[c.plan];
+    out.push([`${esc(p.name)} — ${esc(durationText(pl.n))}${c.qty>1?` ×${c.qty}`:""}`, lineUnit(c, m)*c.qty]);
+  }
+  return `<div class="paylines">${out.map(([n,v])=>
+    `<div class="r"><span>${n}</span><b>${money(v)}</b></div>`).join("")}</div>`;
 }
 /* Says why the amount moved when a method is priced differently, so a
    higher Flexy figure never reads as a mistake. */

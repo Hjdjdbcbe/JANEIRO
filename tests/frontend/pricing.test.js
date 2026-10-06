@@ -71,6 +71,31 @@ const check = (c, m) => c ? ok(m) : bad(m);
     r = await amountFor("Flexy");
     check(+r.amount === flexA + offer, `mixed cart adds both (${r.amount} = ${flexA + offer})`);
 
+    const lines = await page.locator("#payBox .paylines .r").count();
+    check(lines === 2, `the pay step lists what is paid for (${lines} lines)`);
+
+    /* «اطلب الآن» twice on the same plan is still one item */
+    await page.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+    await page.evaluate(id => { openDetail(id); addCurrent(true); openDetail(id); addCurrent(true); }, a.id);
+    const qty = await page.evaluate(() => document.querySelector("#cartBadge").textContent.trim());
+    check(qty === "1", `buying the same plan now twice does not double it (cart: ${qty})`);
+
+    /* a product page opens on its cheapest plan, the price its card quoted:
+       list ChatGPT's dearer plan first for this check */
+    const plans = await q(`select pl.id, pl.price, pl.sort_order from product_plans pl join products p on p.id=pl.product_id
+                            where p.slug='chatgpt-plus' and pl.is_active order by pl.sort_order`);
+    const dear = plans.reduce((x, y) => Number(y.price) > Number(x.price) ? y : x);
+    await q("update product_plans set sort_order=-1 where id=$1", [dear.id]);
+    try {
+      await page.goto(`${BASE}/frontend/index.html`, { waitUntil: "networkidle" });
+      await page.evaluate(id => openDetail(id), b.id);
+      const sel = await page.evaluate(() => document.querySelector("#dTotal").textContent.replace(/[^\d]/g, ""));
+      const lo = Math.min(...plans.map(x => Number(x.price)));
+      check(+sel === lo, `the cheapest plan is selected first, even listed second (${sel} = ${lo})`);
+    } finally {
+      await q("update product_plans set sort_order=$2 where id=$1", [dear.id, dear.sort_order]);
+    }
+
     /* the same cart, priced by the server */
     const server = await page.evaluate(async ([b, items, pm]) => {
       const res = await (await fetch(`${b}/functions/v1/create-order`, {
