@@ -2075,6 +2075,7 @@ const SETTING_FIELDS = [
   ["store_name", "اسم المتجر", "Janeiro Store"],
   ["whatsapp_number", "رقم الواتساب", "0661 23 45 67"],
   ["instagram_username", "حساب الإنستغرام", "janeiro_service"],
+  ["snapchat_username", "حساب السناب شات", "janeiro_store"],
   ["telegram_username", "حساب التيليغرام", "janeiro_store"],
   ["support_hours", "وقت الرد", "كل يوم من 9 الصباح حتى 11 الليل"],
   ["support_message", "رسالة الدعم", "نردّو عليك في أسرع وقت."],
@@ -2091,7 +2092,7 @@ async function loadSettings() {
       <h2>المتجر</h2>
       <div class="ed">${SETTING_FIELDS.map(([k, l, ph]) => `<div><label for="s_${k}">${l}</label>
         <input id="s_${k}" data-set="${k}" value="${esc(k === "whatsapp_number" ? String(st[k] || "").replace(/^213/, "0") : st[k] || "")}" placeholder="${esc(ph)}"
-          ${["whatsapp_number", "site_url", "instagram_username", "telegram_username", "max_active_orders"].includes(k) ? 'dir="ltr"' : ""}></div>`).join("")}</div>
+          ${["whatsapp_number", "site_url", "instagram_username", "snapchat_username", "telegram_username", "max_active_orders"].includes(k) ? 'dir="ltr"' : ""}></div>`).join("")}</div>
       <div class="acts"><button class="btn go" id="setSave">حفظ</button></div>
     </div>
     <div class="card">
