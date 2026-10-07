@@ -882,6 +882,7 @@ h1 .h1a,h2 .h2a{color:inherit}
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/><path d="m10 13 4-4"/></symbol>
+  <symbol id="i-ghost" viewBox="0 0 24 24"><path d="M12 3c-3.3 0-5.5 2.4-5.5 5.6v2.2l-1.7.6c-.5.2-.4.9.1 1.1l1.6.5c-.6 1.6-1.9 2.9-3.5 3.5.4.7 1.5.9 2.6 1.1.2.6.3 1.2.8 1.2.6 0 1.4-.4 2.6-.1 1.2.3 1.9 1.3 3 1.3s1.8-1 3-1.3c1.2-.3 2 .1 2.6.1.5 0 .6-.6.8-1.2 1.1-.2 2.2-.4 2.6-1.1-1.6-.6-2.9-1.9-3.5-3.5l1.6-.5c.5-.2.6-.9.1-1.1l-1.7-.6V8.6C17.5 5.4 15.3 3 12 3z"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.2 6.8h.01"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></symbol>
@@ -1591,6 +1592,7 @@ const I18N = {
   made_in:       { ar:"صُنع في الدزاير",     fr:"Fait en Algérie",         en:"Made in Algeria" },
   ch_whatsapp:   { ar:"واتساب",             fr:"WhatsApp",                en:"WhatsApp" },
   ch_instagram:  { ar:"إنستغرام",           fr:"Instagram",               en:"Instagram" },
+  ch_snapchat:   { ar:"سناب شات",           fr:"Snapchat",                en:"Snapchat" },
   ch_telegram:   { ar:"تيليغرام",           fr:"Telegram",                en:"Telegram" },
 
   aria_cart:     { ar:"السلة",              fr:"Panier",                  en:"Cart" },
@@ -2463,14 +2465,17 @@ function renderStoreInfo(){
 
   const ig = String(SETTINGS.instagram_username||"").replace(/^@/,"").trim();
   const tg = String(SETTINGS.telegram_username||"").replace(/^@/,"").trim();
+  const sc = String(SETTINGS.snapchat_username||"").replace(/^@/,"").trim();
   $("#socials").innerHTML =
     `<button type="button" onclick="contactWhatsApp()"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>${t("ch_whatsapp")}</button>`
     + (ig ? `<a href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>${t("ch_instagram")}</a>` : "")
+    + (sc ? `<a href="https://www.snapchat.com/add/${encodeURIComponent(sc)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-ghost"/></svg>${t("ch_snapchat")}</a>` : "")
     + (tg ? `<a href="https://t.me/${encodeURIComponent(tg)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>${t("ch_telegram")}</a>` : "");
   /* the about page's contact card: one button per channel the owner has set up */
   $("#aboutContact").innerHTML =
     `<button type="button" class="btn btn-primary" onclick="contactWhatsApp()"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>${t("ch_whatsapp")}</button>`
     + (ig ? `<a class="btn btn-ghost" href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>${t("ch_instagram")}</a>` : "")
+    + (sc ? `<a class="btn btn-ghost" href="https://www.snapchat.com/add/${encodeURIComponent(sc)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-ghost"/></svg>${t("ch_snapchat")}</a>` : "")
     + (tg ? `<a class="btn btn-ghost" href="https://t.me/${encodeURIComponent(tg)}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>${t("ch_telegram")}</a>` : "");
 
   if(PAYMENT_METHODS.length){
