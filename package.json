@@ -4,5 +4,10 @@
   "version": "1.0.0",
   "description": "Janeiro Store — المتجر ووسيط صفحات وثيقة الالتزام",
   "license": "UNLICENSED",
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1"
+  }
 }

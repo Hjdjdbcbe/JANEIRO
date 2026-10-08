@@ -1,13 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/activation-bot.js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
-    { "source": "/warranty", "destination": "/api/warranty" },
-    { "source": "/warranty/:path*", "destination": "/api/warranty?p=:path*" }
+    {
+      "source": "/warranty",
+      "destination": "/api/warranty"
+    },
+    {
+      "source": "/warranty/:path*",
+      "destination": "/api/warranty?p=:path*"
+    }
   ],
   "headers": [
     {
       "source": "/warranty/:path*",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
     }
   ]
 }

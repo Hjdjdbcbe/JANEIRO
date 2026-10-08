@@ -12,7 +12,10 @@
 #        -> engagement-from-issue.test.sql -> terms.test.sql
 #        -> dashboard.test.sql -> admin-console.test.sql
 #        -> forbidden-text.test.sh
-#        -> qr.test.js -> duration.test.js -> bot-e2e.test.js
+#        -> activation-bot.test.sql
+#        -> qr.test.js -> duration.test.js
+#        -> activation-flow.test.js -> activation-bot.test.js
+#        -> bot-e2e.test.js
 #        -> vercel-proxy.test.js
 #
 # Needs: postgresql-16 server running locally and a superuser
@@ -185,6 +188,15 @@ if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/snapchat.test.sql" 2>&1 \
 fi
 set +o pipefail
 
+bold "==> activation-bot.test.sql"
+set -o pipefail
+if ! psql -v ON_ERROR_STOP=1 -d "$DB" -f "$ROOT/tests/activation-bot.test.sql" 2>&1 \
+     | grep -E 'PASS|FAIL|ERROR|=====' ; then
+  red "FAIL: activation-bot.test.sql did not run to completion (see the ERROR above)"
+  exit 1
+fi
+set +o pipefail
+
 bold "==> forbidden-text.test.sh"
 bash "$HERE/forbidden-text.test.sh"
 
@@ -193,6 +205,13 @@ node "$HERE/qr.test.js"
 
 bold "==> duration.test.js"
 node "$HERE/duration.test.js"
+
+# بوت تفعيل Snapchat+ (Vercel): القرارات وحدها، ثم المسار كامل على القاعدة
+bold "==> activation-flow.test.js"
+node "$HERE/activation-flow.test.js"
+
+bold "==> activation-bot.test.js"
+node "$HERE/activation-bot.test.js" "$DB"
 
 bold "==> bot-e2e.test.js"
 node "$HERE/bot-e2e.test.js" "$DB"
