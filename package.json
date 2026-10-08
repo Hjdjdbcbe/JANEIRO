@@ -8,6 +8,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.132.1"
+    "@vercel/functions": "^3.9.11"
   }
 }

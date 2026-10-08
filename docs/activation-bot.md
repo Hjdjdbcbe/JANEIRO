@@ -1,99 +1,99 @@
 # بوت تفعيل Snapchat+
 
-بوت تيليغرام للزبائن، منفصل عن بوت المخزون. يدير **التفعيل برك**: البيع
-والدفع يبقاو عند مالك. الكليان ياخذ كود طلب (`JN-4821`) ويبعثو للبوت،
-والبوت يمشي معاه خطوة بخطوة. أي حاجة ما يعرفهاش تتحول لمالك.
+البوت يدير **التفعيل برك**. البيع والدفع يصراو في إنستغرام مع مالك.
+
+- **الكليان** في **واتساب**، على نفس رقم المتجر (WhatsApp Cloud API، وضع Coexistence).
+  الرقم مشترك مع مالك، فالبوت **ساكت** إلا مع رقم بعث كود طلب صحيح ولا عندو طلب مفتوح.
+- **مالك** في **تيليغرام**: الأوامر، التنبيهات، قبول/رفض الصور، وحفظ الفوكالات بالأزرار.
+
+```
+إنستا: البيع ← /new month في تيليغرام ← https://wa.me/213…?text=JN-4821
+      ← الكليان يضغط ويبعث ← البوت يبدا معاه في واتساب
+```
 
 ## وين كاين الكود
 
 | الملف | واش فيه |
 |---|---|
-| `api/activation-bot.js` | الـwebhook على Vercel: يتحقق من السر ويعطي الـupdate للمنطق |
-| `lib/activation-bot/handler.js` | المنطق: المسارات، أوامر الأدمين، التحويل، المراجعة |
+| `api/whatsapp.js` | webhook واتساب: تحقق Meta (GET)، توقيع `X-Hub-Signature-256` على البايتات الخام، 200 فورا والمعالجة في `waitUntil` |
+| `api/activation-bot.js` | webhook تيليغرام (الأدمين) بالسر |
+| `lib/activation-bot/handler.js` | المنطق: المسارات، الصمت الافتراضي، echoes، التحويل، المراجعة، الأوامر، حفظ الميديا |
 | `lib/activation-bot/flow.js` | القرارات (دوال صافية): جدول القسم 8 وملف المشاكل |
-| `lib/activation-bot/texts.js` | كل النصوص الثابتة كيما كتبهم مالك |
-| `lib/activation-bot/ai.js` | قراية الصور + النية/الجواب الحر (Claude) + الفوكال (STT) |
-| `lib/activation-bot/adapters/telegram.js` | طبقة الميساجات. WhatsApp يجي كملف ثاني بنفس الواجهة |
-| `lib/activation-bot/db.js` | نداءات Supabase (دوال `act_*`) |
-| `supabase/migrations/042_activation_bot.sql` | الجداول والدوال |
+| `lib/activation-bot/texts.js` | كل النصوص الثابتة |
+| `lib/activation-bot/ai.js` | Gemini: الصور، الفوكالات والأجوبة في موديل واحد + الحد اليومي |
+| `lib/activation-bot/adapters/whatsapp.js` · `telegram.js` | طبقة الميساجات (نفس الواجهة) |
+| `lib/activation-bot/storage.js` | Supabase Storage (bucket `bot-media`) |
+| `supabase/migrations/042_…` · `043_…` | الجداول والدوال |
 
-الـAI ما يقررش: يرجع JSON (`page_type`, `currency`…)، والقرار في
-`flow.js`. الميساجات الثابتة تتبعث بلا AI.
+الـAI ما يقررش: يرجع JSON، والقرار في `flow.js`. الميساجات الثابتة تتبعث بلا AI.
 
-## التشغيل
+## التشغيل — واش لازم تدير بيدك
 
-1. **القاعدة:** طبّق `042_activation_bot.sql` (ولا الصق `docs/full-setup.sql`
-   ولا `docs/bot-setup.sql` من جديد — كل شي فيهم يتعاود بلا مشاكل).
-2. **البوت:** بوت جديد من @BotFather (ماشي بوت المخزون).
-3. **Vercel → Settings → Environment Variables:**
-   - `ACTIVATION_BOT_TOKEN`، `ACTIVATION_BOT_USERNAME` (بلا @)
-   - `ACTIVATION_WEBHOOK_SECRET` — `openssl rand -hex 32`
-   - `ADMIN_CHAT_IDS` — أرقام تيليغرام تاع الأدمين، بفاصلة
-   - `SUPABASE_URL` (ولا `ACTIVATION_SUPABASE_URL`)، `SUPABASE_SERVICE_ROLE_KEY`
-   - `ANTHROPIC_API_KEY`
-   - `STT_API_KEY` (+ اختياري `STT_BASE_URL`، `STT_MODEL`)
-4. **Deploy** على Vercel، ومن بعد:
+1. **SQL:** في Supabase SQL Editor الصق `supabase/migrations/042_activation_bot.sql`
+   ثم `043_activation_whatsapp.sql` (ولا `docs/bot-setup.sql` كامل). كل شي يتعاود بلا مشاكل.
+2. **ربط واتساب (Coexistence):** في Meta Business، اربط رقم المتجر بالـCloud API
+   بـ Embedded Signup (مسار Coexistence، غالبا عن طريق مزود معتمد). تأكد بلي +213 مقبول.
+   من بعد عاود اربط واتساب ويب، وحل التطبيق مرة كل 13 يوم على الأقل.
+3. **Webhook واتساب** (App → WhatsApp → Configuration):
+   - Callback URL: `https://janeiro-store.com/api/whatsapp`
+   - Verify token: نفس `WHATSAPP_VERIFY_TOKEN`
+   - اشترك في الحقول: **`messages`** و **`smb_message_echoes`** (هذا لي يوقف البوت كي تكتب من التطبيق).
+4. **تيليغرام:** بوت من @BotFather (جديد ولا الموجود)، ومن بعد:
    ```bash
    ACTIVATION_BOT_TOKEN=... ACTIVATION_WEBHOOK_SECRET=... \
    SITE_URL=https://janeiro-store.com bash tools/setup-activation-bot.sh
    ```
-5. **أكواد الرصيد:** هي نفسها بطاقات بوت المخزون. في بوت المخزون دير
-   منتج ومدد بالمبلغ (مثلا `/addproduct appleinr Apple INR` ثم
-   `/addvariant appleinr r100 ₹100`) واشحن الأكواد عادي. ومن بعد في بوت
-   التفعيل قولو شحال كل مدّة بالروبية:
-   ```
-   /giftamount appleinr r100 100
-   /giftamount appleinr r250 250
-   /stock
-   ```
-   البوت ياخذ **أصغر كود متوفر يغطي** الطلب (شهر ₹99، شهرين ₹98، سنة ₹199)،
-   يعلمو `sold` في بوت المخزون، ويربطو بالطلب. كود واحد لكل طلب، ديما.
-6. **الميديا:** ابعث للبوت (من حساب أدمين):
-   - فيديو بـ caption `/media video_country`، و`/media video_plan_two_months`، و`/media video_plan_year`
-   - صورة بـ caption `/media photo_snap_card`
-   - فوكال، ورد عليه بـ `/voice voice_welcome` (ولا أي خانة أخرى)
-7. **جرب بحسابك** (القسم 14). حساب الأدمين يقدر يلعب دور الكليان: أي
-   ميساج ماشي أمر ولا رد على تنبيه يمشي كيما ميساج كليان.
+5. **متغيرات Vercel** (كاملين في `.env.example`):
+   `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`,
+   `WHATSAPP_STORE_NUMBER`, `ACTIVATION_BOT_TOKEN`, `ACTIVATION_WEBHOOK_SECRET`, `ADMIN_CHAT_IDS`,
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `AI_MODEL`, `AI_DAILY_BUDGET_USD`.
+   ثم **Redeploy**.
+6. **أكواد الرصيد:** هي بطاقات بوت المخزون. قولو شحال كل مدّة بالروبية:
+   `/giftamount appleinr r100 100` … و`/stock`. البوت ياخذ **أصغر كود متوفر يغطي**
+   (شهر ₹99، شهرين ₹98، سنة ₹199)، كود واحد لكل طلب.
+7. **الميديا:** ابعث للبوت في تيليغرام الفيديوهات، الصورة والفوكالات **بلا أوامر**:
+   يسقسيك وين تحطهم (وللفوكال: فوكال برك / نص برك / الاثنين)، ويوريلك معاينة.
+   النسخة الأصلية تتحفظ في Storage وتترفع لواتساب؛ إذا مات `media_id` يتعاود الرفع وحدو.
+8. **جرب بتيليفونك** (القسم 14) قبل أول كليان. `/review on` شاعل من الأول.
 
-## أوامر الأدمين
+## أوامر مالك (تيليغرام)
 
 ```
-/new month | 2months | year      كود طلب جديد (+ رابط t.me/...?start=JN-xxxx)
-/order JN-4821                   وين وصل الطلب
-/orders                          المفتوحة — 🔴 تستنى مالك، 🟡 تستنى مراجعة
-/take JN-4821 · /release JN-4821
-/review on|off                   وضع المراجعة (شاعل في البداية)
-/media <slot>                    caption على فيديو/صورة
-/voice <slot>                    رد على فوكال
-/voicemode <slot> text|voice|both
-/problem العنوان | الأعراض | الحل [| يحول بعد كم]
-/problems · /delproblem <id>
+/new month | 2months | year      كود + رابط wa.me في ميساج وحدو (للنسخ)
+/order JN-4821 · /orders
+/release JN-4821                 يرجع للبوت في نفس الخطوة   ([رجع للبوت])
+/stop JN-4821                    يغلق الطلب، البوت يسكت نهائيا ([غلق الطلب])
+/take JN-4821                    يسكت البوت؛ تجاوب أنت من واتساب بزنس
+/review on|off
+/voices                          الفوكالات المحفوظة: [اسمع] [امسح]
+/voice <slot> · /voicemode <slot> text|voice|both · /media <slot>   (الطريقة القديمة، مازالت تخدم)
+/problem العنوان | الأعراض | الحل · /problems · /delproblem <id>
 /stock · /giftamount <منتج> <مدّة> <₹>
 ```
 
-كي يتحول طلب لمالك يوصل تنبيه فيه [ناخذ المحادثة] [رجع للبوت]. أي رد
-(reply) على تنبيه ولا على ميساج كليان منقول يتبعث للكليان كما هو (نص،
-صورة، فوكال). ميساجات الكليان توصل لمالك طول ما الطلب `HUMAN`.
+**التحويل:** كي يتحول طلب ليك، جاوب الكليان **من تطبيق واتساب بزنس** مباشرة. البوت ساكت
+في هذاك الطلب حتى تضغط [رجع للبوت]. وإذا كتبت بيدك في محادثة فيها طلب مفتوح، البوت
+يسكت وحدو ويبعثلك تنبيه.
 
-## قرارات خديتها (بدّلهم إذا تحب)
+## قواعد مهمة
 
-- **`gift_codes`** ما كانش جدول بهذا الاسم: الستوك الموجود هو `bot_cards`.
-  زدت `amount_inr` على `bot_variants` بلاصة ما نبني ستوك ثاني.
-- **وضع المراجعة** يشمل كل قرار صورة (حتى "ابعث صورة أوضح")، ماشي غير
-  الرابط. [رفض] = المحادثة تولي عند مالك.
-- **حد الميساجات:** 20 ميساج و6 صور/فوكالات في الدقيقة لكل كليان.
-- **أزرار بالعربية** (تيليفون بالعربية): «شهري» و«بدء الفترة التجريبية
-  المجانية» — ما تأكدتش من النص الحقيقي تاع Snapchat؛ يتبدل في `texts.js`.
-- **نصوص ما كانتش في المواصفات** (طلب الكود، "راني نشوف في الصورة"، تذكير
-  الخطوة بعد /release…) كتبتهم بالدارجة في `texts.js`.
-- **الموديل:** `claude-opus-5-5` بـ effort `low` باش يكون سريع.
-  `ACTIVATION_AI_EFFORT=medium` إذا الصور تغلط.
-- **STT:** أي خدمة متوافقة مع `/audio/transcriptions` (OpenAI، Groq…).
-  جودة الدارجة لازم تتجرب.
+- **الصمت:** رقم بلا طلب مفتوح وبلا كود ← لا جواب، لا سجل، لا AI. بعد `DONE` البوت يسكت تاني.
+- **نافذة 24 ساعة:** البوت ما يكتبش برّا النافذة (يلزم templates). إذا ضغطت [رجع للبوت]
+  والنافذة سكرت، يقولك، ويكمل كي يبعث الكليان ميساج.
+- **48 ساعة:** كود ما تستعملش يموت؛ طلب بدا وما كملش يتغلق وتوصلك رسالة.
+- **قناة أخرى (احتياط):** نفس الكود من تيليغرام يكمل من وين وقف (وتوصلك رسالة). من رقم
+  واتساب آخر: مرفوض.
+- **ميزانية الـAI:** كي يوصل `AI_DAILY_BUDGET_USD`، كل حالة تحتاج AI تتحول ليك (تنبيه
+  عاجل مرة في النهار). المصروف يبان في `/stock`.
 
-## مازال
+## قرارات تقنية
 
-- WhatsApp: الطبقة معزولة، لكن `adapters/whatsapp.js` مازال ما تكتبش.
-- ما تجربش مع تيليغرام وClaude وSTT الحقيقيين — الاختبارات تستعمل نسخ
-  وهمية. القاعدة والمنطق مختبرين (`tests/local/activation-*.test.js`،
-  `tests/activation-bot.test.sql`).
+- **الموديل:** `gemini-3.8-flash` (آخر Flash عادي في SDK تاع Google وقت الكتابة). يتبدل
+  من `AI_MODEL`. الأسعار في `.env.example` تقديرات للحساب (من جداول أسعار منشورة، ماشي
+  من صفحة Google مباشرة). بعض المصادر تقول بلي سعر Flash يتضاعف في 1 جانفي 2027: تأكد وبدلهم.
+- **صوت الكليان:** واتساب ما يعطيش المدّة؛ تتقاس من tokens الصوت (32 في الثانية)، فالفوكال
+  الطويل يتحسب قبل ما يتحول.
+- **Temperature منخفضة للصور** (0.1) كيما طلبت. إذا شفت أجوبة غريبة ولا تكرار، جرب
+  `AI_IMAGE_TEMPERATURE=1` (القيمة الافتراضية تاع الموديل).
+- **Echoes:** شكل `smb_message_echoes` ما قدرتش نتأكد منو من وثائق Meta (محبوسة من هنا).
+  الكود يقرا `value.message_echoes[].to`. جربو بأول ميساج تكتبو من التطبيق.

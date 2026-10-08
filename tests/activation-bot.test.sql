@@ -84,6 +84,50 @@ begin
   assert v_ok, 'authenticated cannot take credit codes';
   reset role;
   raise notice 'PASS  only service_role reaches the activation bot';
+  -- 043: احتياط القناة، الغلق، المصروف، المسودات
+  o2 := act_new_order('month', 'admin');
+  assert (act_claim_code('whatsapp', '213600', o2->>'code'))->>'result' = 'ok', 'bound on whatsapp';
+  assert (act_claim_code('whatsapp', '213601', o2->>'code'))->>'result' = 'invalid', 'another number on the same channel refused';
+  assert (act_claim_code('telegram', '77', o2->>'code'))->>'result' = 'moved', 'same code from another channel continues';
+  assert (select platform from activation_orders where code = o2->>'code') = 'telegram', 'order follows the new channel';
+  assert act_open_order_for('whatsapp', '213600') is null, 'the old chat no longer owns the order';
+  raise notice 'PASS  a code follows the customer to another channel, never to another number';
+
+  assert act_close_order(o2->>'code', 'test')->>'status' = 'CLOSED', '/stop closes';
+  assert act_close_order(o2->>'code', 'test') is null, 'closing twice does nothing';
+  assert (act_claim_code('telegram', '77', o2->>'code'))->>'result' = 'invalid', 'a closed code is dead';
+  raise notice 'PASS  closed orders stay closed';
+
+  o2 := act_new_order('year', 'admin');
+  perform act_claim_code('whatsapp', '213602', o2->>'code');
+  set local session_replication_role = replica;
+  update activation_orders set updated_at = now() - interval '49 hours' where code = o2->>'code';
+  set local session_replication_role = origin;
+  delete from store_settings where key = 'activation_last_sweep';
+  assert jsonb_array_length(act_sweep_stale()) >= 1, 'stale order closed';
+  assert (select status from activation_orders where code = o2->>'code') = 'CLOSED', 'it is CLOSED';
+  assert act_sweep_stale() = '[]'::jsonb, 'the sweep runs at most every 10 minutes';
+  raise notice 'PASS  unfinished orders close after 48h';
+
+  assert (act_new_order('month')->>'store_whatsapp') is not distinct from
+         nullif((select value from store_settings where key = 'whatsapp_number'), ''), '/new carries the store number';
+
+  delete from ai_spend where day = current_date;
+  perform act_ai_spend_add(0.4); perform act_ai_spend_add(0.35);
+  assert act_ai_spend_today() = 0.75, 'spend adds up per day';
+  assert act_ai_budget_alert() and not act_ai_budget_alert(), 'budget alert fires once a day';
+  raise notice 'PASS  AI spend and budget alert';
+
+  i := act_draft_add('9001', 'voice', 'TG1', 'audio/ogg');
+  assert act_draft_get(i, '9002') is null, 'another admin cannot see the draft';
+  assert act_draft_set_slot(i, '9001', 'voice_link')->>'slot' = 'voice_link', 'slot chosen';
+  assert act_draft_take(i, '9001') is not null and act_draft_take(i, '9001') is null, 'a draft is saved once';
+  raise notice 'PASS  voice drafts';
+
+  perform act_mark_sent('whatsapp', array['wamid.X']);
+  assert act_is_sent('whatsapp', 'wamid.X') and not act_is_sent('whatsapp', 'wamid.Y'), 'bot messages are recognised in echoes';
+  raise notice 'PASS  own messages are told apart from the owner''s';
+
   raise notice '===== activation bot SQL tests passed =====';
 end $$;
 

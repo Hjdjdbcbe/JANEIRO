@@ -1,38 +1,16 @@
 /* ============================================================
-   /api/activation-bot — webhook بوت تفعيل Snapchat+ (Telegram)
+   /api/activation-bot — webhook بوت التفعيل على Telegram (الأدمين)
+
+   الأوامر، التنبيهات، قبول/رفض الصور، وحفظ الفوكالات بالأزرار.
+   الكليان راه في واتساب (api/whatsapp.js).
 
    تيليغرام يبعث كل update هنا. الطلب يتقبل غير إذا جاب السر
-   (X-Telegram-Bot-Api-Secret-Token) لي تعطى في setWebhook — بلاه
-   أي واحد يقدر يزوّر update ويطلّع أكواد رصيد.
-
-   الجواب ديما 200 بعد المعالجة: تيليغرام يعاود يبعث كل update ما
-   تجاوبش، والتكرار محبوس في القاعدة (act_seen_update).
-
-   المنطق كامل في lib/activation-bot/. الإعداد: docs/activation-bot.md
+   (X-Telegram-Bot-Api-Secret-Token) لي تعطى في setWebhook.
+   الجواب ديما 200 بعد المعالجة، والتكرار محبوس في القاعدة.
    ============================================================ */
 
 const crypto = require("crypto");
-const { createTelegramAdapter } = require("../lib/activation-bot/adapters/telegram");
-const { createDb } = require("../lib/activation-bot/db");
-const { createAi } = require("../lib/activation-bot/ai");
-const { createHandler } = require("../lib/activation-bot/handler");
-
-let handler;
-function getHandler() {
-  if (handler) return handler;
-  const env = process.env;
-  handler = createHandler({
-    msg: createTelegramAdapter({ token: env.ACTIVATION_BOT_TOKEN }),
-    db: createDb({
-      url: env.ACTIVATION_SUPABASE_URL || env.SUPABASE_URL,
-      serviceKey: env.SUPABASE_SERVICE_ROLE_KEY,
-    }),
-    ai: createAi(),
-    adminIds: (env.ADMIN_CHAT_IDS || "").split(/[\s,]+/).filter(Boolean),
-    botUsername: (env.ACTIVATION_BOT_USERNAME || "").replace(/^@/, "") || undefined,
-  });
-  return handler;
-}
+const { getApp } = require("../lib/activation-bot/app");
 
 function sameSecret(got, want) {
   const a = Buffer.from(String(got || ""));
@@ -60,11 +38,10 @@ module.exports = async function activationBot(req, res) {
   }
 
   try {
-    if (update) await getHandler().handleUpdate(update);
+    if (update) await getApp().handleWebhook("telegram", update);
   } catch (e) {
     console.error("[activation-bot]", e);
   }
   res.status(200).setHeader("content-type", "application/json");
   res.end("{}");
 };
-

@@ -14,7 +14,7 @@
 #        -> forbidden-text.test.sh
 #        -> activation-bot.test.sql
 #        -> qr.test.js -> duration.test.js
-#        -> activation-flow.test.js -> activation-bot.test.js
+#        -> activation-flow.test.js -> activation-ai.test.js -> activation-bot.test.js
 #        -> bot-e2e.test.js
 #        -> vercel-proxy.test.js
 #
@@ -209,6 +209,9 @@ node "$HERE/duration.test.js"
 # بوت تفعيل Snapchat+ (Vercel): القرارات وحدها، ثم المسار كامل على القاعدة
 bold "==> activation-flow.test.js"
 node "$HERE/activation-flow.test.js"
+
+bold "==> activation-ai.test.js"
+node "$HERE/activation-ai.test.js"
 
 bold "==> activation-bot.test.js"
 node "$HERE/activation-bot.test.js" "$DB"

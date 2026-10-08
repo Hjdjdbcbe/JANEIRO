@@ -3,6 +3,9 @@
   "functions": {
     "api/activation-bot.js": {
       "maxDuration": 60
+    },
+    "api/whatsapp.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
